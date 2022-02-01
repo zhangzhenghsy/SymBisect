@@ -1,0 +1,59 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"install"
+		],
+		"files" : 
+		[
+			"runtime/Runtest/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 24,
+				"parent" : 0
+			}
+		]
+	},
+	"installers" : 
+	[
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "/usr/local/lib",
+			"paths" : 
+			[
+				"lib/libkleeRuntest.so.1.0"
+			],
+			"targetId" : "kleeRuntest::@b46dcbcb0e9ddc39b8f3",
+			"targetIndex" : 18,
+			"targetInstallNamelink" : "skip",
+			"type" : "target"
+		},
+		{
+			"backtrace" : 1,
+			"component" : "Unspecified",
+			"destination" : "/usr/local/lib",
+			"paths" : 
+			[
+				"lib/libkleeRuntest.so"
+			],
+			"targetId" : "kleeRuntest::@b46dcbcb0e9ddc39b8f3",
+			"targetIndex" : 18,
+			"targetInstallNamelink" : "only",
+			"type" : "target"
+		}
+	],
+	"paths" : 
+	{
+		"build" : "runtime/Runtest",
+		"source" : "runtime/Runtest"
+	}
+}

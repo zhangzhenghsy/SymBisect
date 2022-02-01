@@ -1,0 +1,200 @@
+{
+	"archive" : {},
+	"artifacts" : 
+	[
+		{
+			"path" : "lib/libkleeBasic.a"
+		}
+	],
+	"backtrace" : 2,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"klee_add_component",
+			"target_compile_options",
+			"target_compile_definitions",
+			"include_directories",
+			"target_include_directories"
+		],
+		"files" : 
+		[
+			"cmake/klee_add_component.cmake",
+			"lib/Basic/CMakeLists.txt",
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 1,
+				"line" : 9,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 13,
+				"parent" : 1
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 15,
+				"parent" : 1
+			},
+			{
+				"command" : 3,
+				"file" : 0,
+				"line" : 18,
+				"parent" : 1
+			},
+			{
+				"file" : 2
+			},
+			{
+				"command" : 4,
+				"file" : 2,
+				"line" : 710,
+				"parent" : 5
+			},
+			{
+				"command" : 4,
+				"file" : 2,
+				"line" : 711,
+				"parent" : 5
+			},
+			{
+				"command" : 5,
+				"file" : 0,
+				"line" : 17,
+				"parent" : 1
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : " -Wall -Wextra -Wno-unused-parameter -O0 -g"
+				},
+				{
+					"backtrace" : 3,
+					"fragment" : "-fvisibility-inlines-hidden"
+				},
+				{
+					"backtrace" : 3,
+					"fragment" : "-fno-exceptions"
+				},
+				{
+					"backtrace" : 3,
+					"fragment" : "-fno-builtin-malloc"
+				},
+				{
+					"backtrace" : 3,
+					"fragment" : "-fno-builtin-calloc"
+				},
+				{
+					"backtrace" : 3,
+					"fragment" : "-fno-builtin-realloc"
+				},
+				{
+					"backtrace" : 3,
+					"fragment" : "-fno-builtin-free"
+				},
+				{
+					"fragment" : "-std=gnu++14"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 4,
+					"define" : "_GNU_SOURCE"
+				},
+				{
+					"backtrace" : 4,
+					"define" : "__STDC_CONSTANT_MACROS"
+				},
+				{
+					"backtrace" : 4,
+					"define" : "__STDC_FORMAT_MACROS"
+				},
+				{
+					"backtrace" : 4,
+					"define" : "__STDC_LIMIT_MACROS"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 6,
+					"path" : "/data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/include"
+				},
+				{
+					"backtrace" : 7,
+					"path" : "/data/yhao016/Linux_kernel_UC_KLEE/include"
+				},
+				{
+					"backtrace" : 8,
+					"path" : "/usr/lib/llvm-6.0/include"
+				}
+			],
+			"language" : "CXX",
+			"languageStandard" : 
+			{
+				"backtraces" : 
+				[
+					2
+				],
+				"standard" : "14"
+			},
+			"sourceIndexes" : 
+			[
+				0,
+				1
+			]
+		}
+	],
+	"id" : "kleeBasic::@7e621cac8c588f7ffb57",
+	"name" : "kleeBasic",
+	"nameOnDisk" : "libkleeBasic.a",
+	"paths" : 
+	{
+		"build" : "lib/Basic",
+		"source" : "lib/Basic"
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 2,
+			"compileGroupIndex" : 0,
+			"path" : "lib/Basic/KTest.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 2,
+			"compileGroupIndex" : 0,
+			"path" : "lib/Basic/Statistics.cpp",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "STATIC_LIBRARY"
+}

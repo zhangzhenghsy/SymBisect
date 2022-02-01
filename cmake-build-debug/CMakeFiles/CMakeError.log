@@ -1,0 +1,234 @@
+Determining if the include file util.h exists failed with the following output:
+Change Dir: /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/home/yhao016/.cache/JetBrains/RemoteDev/dist/b7170a8872397_CLion-2021.3.2/bin/ninja/linux/ninja cmTC_645d8 && [1/2] Building C object CMakeFiles/cmTC_645d8.dir/CheckIncludeFile.c.o
+FAILED: CMakeFiles/cmTC_645d8.dir/CheckIncludeFile.c.o 
+/usr/bin/cc   -Wall -Wextra -Wno-unused-parameter -o CMakeFiles/cmTC_645d8.dir/CheckIncludeFile.c.o -c /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:10: fatal error: util.h: No such file or directory
+ #include <util.h>
+          ^~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+
+Determining if the include file libutil.h exists failed with the following output:
+Change Dir: /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/home/yhao016/.cache/JetBrains/RemoteDev/dist/b7170a8872397_CLion-2021.3.2/bin/ninja/linux/ninja cmTC_5871d && [1/2] Building C object CMakeFiles/cmTC_5871d.dir/CheckIncludeFile.c.o
+FAILED: CMakeFiles/cmTC_5871d.dir/CheckIncludeFile.c.o 
+/usr/bin/cc   -Wall -Wextra -Wno-unused-parameter -o CMakeFiles/cmTC_5871d.dir/CheckIncludeFile.c.o -c /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:10: fatal error: libutil.h: No such file or directory
+ #include <libutil.h>
+          ^~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+
+Determining if the function openpty exists failed with the following output:
+Change Dir: /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/home/yhao016/.cache/JetBrains/RemoteDev/dist/b7170a8872397_CLion-2021.3.2/bin/ninja/linux/ninja cmTC_61276 && [1/2] Building C object CMakeFiles/cmTC_61276.dir/CheckFunctionExists.c.o
+[2/2] Linking C executable cmTC_61276
+FAILED: cmTC_61276 
+: && /usr/bin/cc -Wall -Wextra -Wno-unused-parameter -DCHECK_FUNCTION_EXISTS=openpty  CMakeFiles/cmTC_61276.dir/CheckFunctionExists.c.o -o cmTC_61276   && :
+CMakeFiles/cmTC_61276.dir/CheckFunctionExists.c.o: In function `main':
+CheckFunctionExists.c:(.text+0x10): undefined reference to `openpty'
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+
+Determining if the malloc_zone_statistics exist failed with the following output:
+Change Dir: /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/home/yhao016/.cache/JetBrains/RemoteDev/dist/b7170a8872397_CLion-2021.3.2/bin/ninja/linux/ninja cmTC_3b219 && [1/2] Building CXX object CMakeFiles/cmTC_3b219.dir/CheckSymbolExists.cxx.o
+FAILED: CMakeFiles/cmTC_3b219.dir/CheckSymbolExists.cxx.o 
+/usr/bin/c++   -Wall -Wextra -Wno-unused-parameter -o CMakeFiles/cmTC_3b219.dir/CheckSymbolExists.cxx.o -c /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx
+/data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:2:10: fatal error: malloc/malloc.h: No such file or directory
+ #include <malloc/malloc.h>
+          ^~~~~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+File /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:
+/* */
+#include <malloc/malloc.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef malloc_zone_statistics
+  return ((int*)(&malloc_zone_statistics))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the prototype setcon exists for SELINUX_SECURITY_CTX_NO_CONST failed with the following output:
+Change Dir: /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/home/yhao016/.cache/JetBrains/RemoteDev/dist/b7170a8872397_CLion-2021.3.2/bin/ninja/linux/ninja cmTC_058fc && [1/2] Building C object CMakeFiles/cmTC_058fc.dir/CheckPrototypeDefinition.c.o
+FAILED: CMakeFiles/cmTC_058fc.dir/CheckPrototypeDefinition.c.o 
+/usr/bin/cc   -Wall -Wextra -Wno-unused-parameter -o CMakeFiles/cmTC_058fc.dir/CheckPrototypeDefinition.c.o -c /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckPrototypeDefinition.c
+/data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckPrototypeDefinition.c:14:5: error: conflicting types for ‘setcon’
+ int setcon(char* context) {
+     ^~~~~~
+In file included from /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/CheckPrototypeDefinition.c:1:
+/usr/include/selinux/selinux.h:40:12: note: previous declaration of ‘setcon’ was here
+ extern int setcon(const char * con);
+            ^~~~~~
+ninja: build stopped: subcommand failed.
+
+
+
+#include <selinux/selinux.h>
+
+
+static void cmakeRequireSymbol(int dummy, ...) {
+  (void) dummy;
+}
+
+static void checkSymbol(void) {
+#ifndef setcon
+  cmakeRequireSymbol(0, &setcon);
+#endif
+}
+
+int setcon(char* context) {
+  return 0;
+}
+
+#ifdef __CLASSIC_C__
+int main() {
+  int ac;
+  char*av[];
+#else
+int main(int ac, char *av[]) {
+#endif
+  checkSymbol();
+  if (ac > 1000) {
+    return *av[0];
+  }
+  return 0;
+}
+
+
+Performing C++ SOURCE FILE Test LLVM_PR39177_FIXED failed with the following compile output:
+Change Dir: /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/home/yhao016/.cache/JetBrains/RemoteDev/dist/b7170a8872397_CLion-2021.3.2/bin/ninja/linux/ninja cmTC_404e7 && [1/2] Building CXX object CMakeFiles/cmTC_404e7.dir/src.cxx.o
+In file included from /usr/lib/llvm-6.0/include/llvm/ADT/STLExtras.h:21,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/StringRef.h:13,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/StringMap.h:17,
+                 from /usr/lib/llvm-6.0/include/llvm/Support/Host.h:17,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/Hashing.h:49,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/ArrayRef.h:13,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/DenseMapInfo.h:17,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/DenseMap.h:17,
+                 from /usr/lib/llvm-6.0/include/llvm/Analysis/TargetLibraryInfo.h:13,
+                 from /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/src.cxx:2:
+/usr/lib/llvm-6.0/include/llvm/ADT/SmallVector.h: In instantiation of ‘void llvm::SmallVectorTemplateBase<T, true>::push_back(const T&) [with T = std::pair<void*, long unsigned int>]’:
+/usr/lib/llvm-6.0/include/llvm/Support/Allocator.h:247:33:   required from ‘void* llvm::BumpPtrAllocatorImpl<AllocatorT, SlabSize, SizeThreshold>::Allocate(size_t, size_t) [with AllocatorT = llvm::MallocAllocator; long unsigned int SlabSize = 4096; long unsigned int SizeThreshold = 4096; size_t = long unsigned int]’
+/usr/lib/llvm-6.0/include/llvm/Support/YAMLParser.h:130:42:   required from here
+/usr/lib/llvm-6.0/include/llvm/ADT/SmallVector.h:312:11: warning: ‘void* memcpy(void*, const void*, size_t)’ writing to an object of type ‘struct std::pair<void*, long unsigned int>’ with no trivial copy-assignment; use copy-assignment or copy-initialization instead [-Wclass-memaccess]
+     memcpy(this->end(), &Elt, sizeof(T));
+     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/c++/8/utility:70,
+                 from /usr/lib/llvm-6.0/include/llvm/Support/type_traits.h:19,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/Optional.h:22,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/STLExtras.h:20,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/StringRef.h:13,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/StringMap.h:17,
+                 from /usr/lib/llvm-6.0/include/llvm/Support/Host.h:17,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/Hashing.h:49,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/ArrayRef.h:13,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/DenseMapInfo.h:17,
+                 from /usr/lib/llvm-6.0/include/llvm/ADT/DenseMap.h:17,
+                 from /usr/lib/llvm-6.0/include/llvm/Analysis/TargetLibraryInfo.h:13,
+                 from /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp/src.cxx:2:
+/usr/include/c++/8/bits/stl_pair.h:208:12: note: ‘struct std::pair<void*, long unsigned int>’ declared here
+     struct pair
+            ^~~~
+[2/2] Linking CXX executable cmTC_404e7
+
+
+...and run output:
+
+Return value: 1
+Source file was:
+
+    #include "llvm/Analysis/TargetLibraryInfo.h"
+    #include "llvm/AsmParser/Parser.h"
+    #include "llvm/AsmParser/SlotMapping.h"
+    #include "llvm/IR/ConstantFolder.h"
+    #include "llvm/IR/Constants.h"
+    #include "llvm/IR/DataLayout.h"
+    #include "llvm/IR/DiagnosticInfo.h"
+    #include "llvm/IR/Instructions.h"
+    #include "llvm/IR/IRBuilder.h"
+    #include "llvm/IR/LLVMContext.h"
+    #include "llvm/Transforms/Utils/BuildLibCalls.h"
+
+    #include <signal.h>
+
+    void handler(int, siginfo_t*, void*) {
+      // program received SIGSEGV
+      exit(1);
+    }
+
+    using namespace llvm;
+
+    int main() {
+      // capture segfault
+      struct sigaction action;
+      memset(&action, 0, sizeof(struct sigaction));
+      action.sa_flags = SA_SIGINFO;
+      action.sa_sigaction = handler;
+      sigaction(SIGSEGV, &action, NULL);
+
+      // setup test
+      LLVMContext Ctx;
+      SMDiagnostic Error;
+      SlotMapping Mapping;
+      auto M = llvm::parseAssemblyFile("/data/yhao016/Linux_kernel_UC_KLEE/cmake/workaround_llvm_pr39177.ll", Error, Ctx, &Mapping);
+      if (!M) {
+        Error.print("AssemblyString", llvm::errs());
+        return -1;
+      }
+
+      auto *F = M->getFunction("test");
+      auto *CI = cast<CallInst>(&*std::next(F->begin()->begin()));
+      auto &DL = M->getDataLayout();
+      Value *Size = ConstantInt::get(DL.getIntPtrType(Ctx), 8);
+      ConstantFolder CF;
+      IRBuilder<> B(&*F->begin(), CF);
+      TargetLibraryInfo TLI = TargetLibraryInfoWrapperPass({"x86_64", "", "linux-gnu"}).getTLI();
+
+      // test if this call produces segfault
+      emitFWrite(CI->getArgOperand(1), Size, CI->getArgOperand(0), B, DL, &TLI);
+
+      return 0;
+    }
+Performing C SOURCE FILE Test M32_SUPPORTED failed with the following compile output:
+Change Dir: /data/yhao016/Linux_kernel_UC_KLEE/cmake-build-debug/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/home/yhao016/.cache/JetBrains/RemoteDev/dist/b7170a8872397_CLion-2021.3.2/bin/ninja/linux/ninja cmTC_af6b5 && [1/2] Building C object CMakeFiles/cmTC_af6b5.dir/src.c.o
+[2/2] Linking C executable cmTC_af6b5
+FAILED: cmTC_af6b5 
+: && /usr/bin/cc -Wall -Wextra -Wno-unused-parameter -m32  CMakeFiles/cmTC_af6b5.dir/src.c.o -o cmTC_af6b5   && :
+/usr/bin/ld: skipping incompatible /usr/lib/gcc/x86_64-linux-gnu/8/libgcc.a when searching for -lgcc
+/usr/bin/ld: cannot find -lgcc
+/usr/bin/ld: skipping incompatible /usr/lib/gcc/x86_64-linux-gnu/8/libgcc.a when searching for -lgcc
+/usr/bin/ld: cannot find -lgcc
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+...and run output:
+
+Return value: 1
+Source file was:
+int main(int argc, char** argv){return 0;}
