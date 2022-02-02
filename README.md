@@ -1,28 +1,84 @@
-KLEE Symbolic Virtual Machine
-=============================
+# Linux_kernel_UC_KLEE
 
-[![Build Status](https://travis-ci.com/klee/klee.svg?branch=master)](https://travis-ci.com/klee/klee)
-[![Build Status](https://github.com/klee/klee/workflows/CI/badge.svg)](https://github.com/klee/klee/actions?query=workflow%3ACI)
-[![Build Status](https://api.cirrus-ci.com/github/klee/klee.svg)](https://cirrus-ci.com/github/klee/klee)
-[![Coverage](https://codecov.io/gh/klee/klee/branch/master/graph/badge.svg)](https://codecov.io/gh/klee/klee)
+Linux_kernel_UC_KLEE is an under constraint symbolic execution engine for the Linux kernel based on [KLEE](https://github.com/klee/klee).
 
-`KLEE` is a symbolic virtual machine built on top of the LLVM compiler
-infrastructure. Currently, there are two primary components:
+- KLEE: v2.2
+- LLVM/Clang: 11
+- OS: Ubuntu 20.04
 
-  1. The core symbolic virtual machine engine; this is responsible for
-     executing LLVM bitcode modules with support for symbolic
-     values. This is comprised of the code in lib/.
+## Build
 
-  2. A POSIX/Linux emulation layer oriented towards supporting uClibc,
-     with additional support for making parts of the operating system
-     environment symbolic.
+```shell
+sudo apt install -y git cmake vim curl make unzip
+sudo apt install -y autoconf automake libtool g++ build-essential pkg-config flex bison 
+sudo apt install -y libgflags-dev libgtest-dev libc++-dev libssl-dev libelf-dev libsqlite3-dev
+```
+### build with apt install llvm & z3 (sudo)
+```shell
+sudo apt install llvm-11 clang-11 z3
+mkdir ./cmake-build
+cd ./cmake-build
+cmake -DCMAKE_BUILD_TYPE=Debug \
+  -DLLVM_CONFIG_BINARY=/usr/bin/llvm-config-11 \
+  -DENABLE_SOLVER_Z3=ON \
+  -DENABLE_UNIT_TESTS=OFF \
+  -DENABLE_SYSTEM_TESTS=OFF \
+  -DENABLE_TCMALLOC=OFF \
+  -DENABLE_DOXYGEN=OFF \
+  -G "CodeBlocks - Unix Makefiles" \
+  ..
+make -j
+```
+### build llvm & z3 & klee (no sudo)
+```shell
+export PATH_PROJECT=$PWD
+mkdir $PATH_PROJECT/build
+mkdir $PATH_PROJECT/install
 
-Additionally, there is a simple library for replaying computed inputs
-on native code (for closed programs). There is also a more complicated
-infrastructure for replaying the inputs generated for the POSIX/Linux
-emulation layer, which handles running native programs in an
-environment that matches a computed test input, including setting up
-files, pipes, environment variables, and passing command line
-arguments.
+# build llvm & clang
+cd $PATH_PROJECT/build
+git clone https://github.com/llvm/llvm-project.git
+cd llvm-project
+git checkout tags/llvmorg-11.0.0
+mkdir build && cd build
+cmake -G "Unix Makefiles" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DLLVM_ENABLE_PROJECTS="clang;lld" \
+  -DLLVM_TARGETS_TO_BUILD="X86" \
+  -DCMAKE_INSTALL_PREFIX=$PATH_PROJECT/install \
+  ../llvm
+make -j10
+make install
 
-For further information, see the [webpage](http://klee.github.io/).
+# build z3
+cd $PATH_PROJECT/build
+git clone git@github.com:Z3Prover/z3.git
+cd z3
+git checkout z3-4.8.14
+python3 scripts/mk_make.py --prefix=$PATH_PROJECT/install
+cd build
+make -j
+make install
+
+# build klee
+mkdir $PATH_PROJECT/cmake-build
+cd $PATH_PROJECT/cmake-build
+cmake -DCMAKE_BUILD_TYPE=Debug \
+  -DLLVM_CONFIG_BINARY=$PATH_PROJECT/install/bin/llvm-config \
+  -DENABLE_SOLVER_Z3=ON \
+  -DENABLE_UNIT_TESTS=OFF \
+  -DENABLE_SYSTEM_TESTS=OFF \
+  -DENABLE_TCMALLOC=OFF \
+  -DENABLE_DOXYGEN=OFF \
+  -G "CodeBlocks - Unix Makefiles" \
+  -DCMAKE_INSTALL_PREFIX=$PATH_PROJECT/install
+  ..
+make -j
+make install
+
+# generate environment.sh
+cd $PATH_PROJECT
+echo "export PATH=$PATH_PROJECT/install/bin:\$PATH" >> environment.sh
+echo "export PKG_CONFIG_PATH=$PATH_PROJECT/install/lib/pkgconfig:\$PKG_CONFIG_PATH" >> environment.sh
+echo "export PATH_PROJECT=$PATH_PROJECT" >> environment.sh
+```
