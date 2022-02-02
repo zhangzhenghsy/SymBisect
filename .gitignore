@@ -32,4 +32,4 @@
 *.app
 
 # Build
-cmake-build-debug
+cmake-build-debug/*
