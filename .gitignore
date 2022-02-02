@@ -37,3 +37,4 @@
 # Build
 cmake-build-debug/*
 build/*
+install/*
