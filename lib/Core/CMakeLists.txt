@@ -46,4 +46,6 @@ target_link_libraries(kleeCore PRIVATE
   kleaverSolver
   kleaverExpr
   kleeSupport
+        Listener
+        Tool_lib
 )

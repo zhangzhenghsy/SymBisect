@@ -15,6 +15,9 @@
 #include <string>
 #include <vector>
 
+// yu hao: add include
+#include "../../../lib/UC/Tool_lib/json.hpp"
+
 struct KTest;
 
 namespace llvm {
@@ -162,6 +165,9 @@ public:
 
   virtual void getCoveredLines(const ExecutionState &state,
                                std::map<const std::string*, std::set<unsigned> > &res) = 0;
+
+  // yu hao:    config json
+  nlohmann::json config;
 };
 
 } // End klee namespace

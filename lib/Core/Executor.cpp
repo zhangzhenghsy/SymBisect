@@ -507,6 +507,9 @@ Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
                  error.c_str());
     }
   }
+
+    // yu hao: set listener service
+    this->listener_service = new kuc::ListenerService(this);
 }
 
 llvm::Module *
@@ -3486,7 +3489,11 @@ void Executor::run(ExecutionState &initialState) {
     KInstruction *ki = state.pc;
     stepInstruction(state);
 
+    // yu hao: add listener_service
+    this->listener_service->beforeExecuteInstruction(state, ki);
     executeInstruction(state, ki);
+    this->listener_service->afterExecuteInstruction(state, ki);
+
     timers.invoke();
     if (::dumpStates) dumpStates();
     if (::dumpPTree) dumpPTree();
@@ -4361,7 +4368,10 @@ void Executor::runFunctionAsMain(Function *f,
   initializeGlobals(*state);
 
   processTree = std::make_unique<PTree>(state);
+  // yu hao: add listener service
+  this->listener_service->beforeRun(*state);
   run(*state);
+  this->listener_service->afterRun(*state);
   processTree = nullptr;
 
   // hack to clear memory objects

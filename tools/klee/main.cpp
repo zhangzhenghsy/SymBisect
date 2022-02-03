@@ -66,6 +66,14 @@ using namespace llvm;
 using namespace klee;
 
 namespace {
+
+    // yu hao: config json file
+    cl::opt<std::string>
+            config("config",
+                        cl::desc("The configuration json file."),
+                        cl::value_desc("file name"),
+                        cl::init("./config.json"));
+
   cl::opt<std::string>
   InputFile(cl::desc("<input bytecode>"), cl::Positional, cl::init("-"));
 
@@ -165,7 +173,8 @@ namespace {
   cl::OptionCategory LinkCat("Linking options",
                              "These options control the libraries being linked.");
 
-  enum class LibcType { FreestandingLibc, KleeLibc, UcLibc };
+  // yu hao: not link useless bitcode
+  enum class LibcType { FreestandingLibc, KleeLibc, UcLibc, LinuxKernelLibc };
 
   cl::opt<LibcType> Libc(
       "libc", cl::desc("Choose libc version (none by default)."),
@@ -176,7 +185,7 @@ namespace {
           clEnumValN(LibcType::KleeLibc, "klee", "Link in KLEE's libc"),
           clEnumValN(LibcType::UcLibc, "uclibc",
                      "Link in uclibc (adapted for KLEE)") KLEE_LLVM_CL_VAL_END),
-      cl::init(LibcType::FreestandingLibc), cl::cat(LinkCat));
+      cl::init(LibcType::LinuxKernelLibc), cl::cat(LinkCat));
 
   cl::list<std::string>
       LinkLibraries("link-llvm-lib",
@@ -903,6 +912,10 @@ void externalsAndGlobalsCheck(const llvm::Module *m) {
     break;
   case LibcType::FreestandingLibc: /* silence compiler warning */
     break;
+
+  // yu hao: not link useless bitcode
+  case LibcType::LinuxKernelLibc:
+    break;
   }
 
   if (WithPOSIXRuntime)
@@ -1162,6 +1175,20 @@ int main(int argc, char **argv, char **envp) {
   sys::PrintStackTraceOnErrorSignal();
 #endif
 
+    // yu hao: set input file (bitcode) and set entry point (entry function)
+    if(!config.empty()) {
+        std::ifstream json_if_stream(config);
+        nlohmann::json json;
+        json_if_stream >> json;
+        if (json.contains("2_bitcode") && json["2_bitcode"].is_string()) {
+            InputFile = json["2_bitcode"].get<std::string>();
+        }
+        if (json.contains("3_entry_function") && json["3_entry_function"].is_string()) {
+            EntryPoint = json["3_entry_function"].get<std::string>();
+        }
+        json_if_stream.close();
+    }
+
   if (Watchdog) {
     if (MaxTime.empty()) {
       klee_error("--watchdog used without --max-time");
@@ -1332,6 +1359,10 @@ int main(int argc, char **argv, char **envp) {
   case LibcType::UcLibc:
     linkWithUclibc(LibraryDir, opt_suffix, loadedModules);
     break;
+
+  // yu hao: not link useless bitcode
+  case LibcType::LinuxKernelLibc:
+    break;
   }
 
   for (const auto &library : LinkLibraries) {
@@ -1393,6 +1424,13 @@ int main(int argc, char **argv, char **envp) {
     theInterpreter = Interpreter::create(ctx, IOpts, handler);
   assert(interpreter);
   handler->setInterpreter(interpreter);
+  // yu hao: set config json
+    if(!config.empty()) {
+        std::ifstream json_if_stream(config);
+        json_if_stream >> interpreter->config;
+        json_if_stream.close();
+    }
+
 
   for (int i=0; i<argc; i++) {
     handler->getInfoStream() << argv[i] << (i+1<argc ? " ":"\n");

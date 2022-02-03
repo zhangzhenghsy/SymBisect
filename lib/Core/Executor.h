@@ -36,6 +36,9 @@
 #include <string>
 #include <vector>
 
+// yu hao: add include
+#include "../UC/Listener/ListenerService.h"
+
 struct KTest;
 
 namespace llvm {
@@ -551,6 +554,9 @@ public:
 
   MergingSearcher *getMergingSearcher() const { return mergingSearcher; };
   void setMergingSearcher(MergingSearcher *ms) { mergingSearcher = ms; };
+
+  // yu hao: add listener service
+  kuc::ListenerService *listener_service;
 };
   
 } // End klee namespace
