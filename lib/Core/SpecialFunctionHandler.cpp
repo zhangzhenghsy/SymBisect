@@ -142,6 +142,10 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("__ubsan_handle_divrem_overflow", handleDivRemOverflow, false),
   add("klee_eh_typeid_for", handleEhTypeid, true),
 
+  // yu hao: handle kernel function
+  add("__kmalloc", handleKmalloc, true),
+  add("iminor", handleIminor, true),
+
 #undef addDNR
 #undef add
 };
@@ -918,4 +922,26 @@ void SpecialFunctionHandler::handleDivRemOverflow(ExecutionState &state,
                                                std::vector<ref<Expr> > &arguments) {
   executor.terminateStateOnError(state, "overflow on division or remainder",
                                  Executor::Overflow);
+}
+
+// yu hao: handle kernel function
+void SpecialFunctionHandler::handleKmalloc(ExecutionState &state,
+                                           KInstruction *target,
+                                           std::vector<ref<Expr> > &arguments) {
+    // XXX should type check args
+    assert(arguments.size()==2 && "invalid number of arguments to kmalloc");
+    executor.executeAlloc(state, arguments[0], false, target, true);
+}
+
+void SpecialFunctionHandler::handleIminor(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments) {
+    // XXX should type check args
+    assert(arguments.size()==1 && "invalid number of arguments to iminor");
+    auto name = "minor";
+    auto ty = target->inst->getType();
+    unsigned int size = executor.kmodule->targetData->getTypeStoreSize(ty);
+    Expr::Width width = executor.getWidthForLLVMType(ty);
+    ref<Expr> symbolic = executor.manual_make_symbolic(name, size, width);
+    executor.bindLocal(target, state, symbolic);
 }

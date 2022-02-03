@@ -6,6 +6,7 @@
 #define INC_BASIC_H
 
 #define DEBUG_LEVEL 1
+#define BIT_WIDTH 64
 
 #include <llvm/IR/InstVisitor.h>
 #include <llvm/IR/Operator.h>

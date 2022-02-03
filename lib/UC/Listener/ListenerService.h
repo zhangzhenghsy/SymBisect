@@ -31,6 +31,8 @@ namespace kuc {
 
         Listener *popListener();
 
+        void preparation();
+
         void beforeRun(klee::ExecutionState &state);
 
         void beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki);

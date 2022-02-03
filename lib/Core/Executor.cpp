@@ -821,7 +821,9 @@ void Executor::initializeGlobalObjects(ExecutionState &state) {
     MemoryObject *mo = globalObjects.find(&v)->second;
     ObjectState *os = bindObjectInState(state, mo, false);
 
-    if (v.isDeclaration() && mo->size) {
+    // yu hao: do not handle external global variables
+    if(v.isExternallyInitialized()) {
+    } else if (v.isDeclaration() && mo->size) {
       // Program already running -> object already initialized.
       // Read concrete value and write it to our copy.
       void *addr;
@@ -4300,29 +4302,39 @@ void Executor::runFunctionAsMain(Function *f,
   KFunction *kf = kmodule->functionMap[f];
   assert(kf);
   Function::arg_iterator ai = f->arg_begin(), ae = f->arg_end();
-  if (ai!=ae) {
-    arguments.push_back(ConstantExpr::alloc(argc, Expr::Int32));
-    if (++ai!=ae) {
-      Instruction *first = &*(f->begin()->begin());
-      argvMO =
-          memory->allocate((argc + 1 + envc + 1 + 1) * NumPtrBytes,
-                           /*isLocal=*/false, /*isGlobal=*/true,
-                           /*allocSite=*/first, /*alignment=*/8);
+    if (f->getName().str() == "main") {
+        /// yu hao: init arguments for main function
+        /// yu hao: not work for under constraint symbolic execution
+        if (ai!=ae) {
+            arguments.push_back(ConstantExpr::alloc(argc, Expr::Int32));
+            if (++ai!=ae) {
+                Instruction *first = &*(f->begin()->begin());
+                argvMO =
+                        memory->allocate((argc + 1 + envc + 1 + 1) * NumPtrBytes,
+                                /*isLocal=*/false, /*isGlobal=*/true,
+                                /*allocSite=*/first, /*alignment=*/8);
 
-      if (!argvMO)
-        klee_error("Could not allocate memory for function arguments");
+                if (!argvMO)
+                    klee_error("Could not allocate memory for function arguments");
 
-      arguments.push_back(argvMO->getBaseExpr());
+                arguments.push_back(argvMO->getBaseExpr());
 
-      if (++ai!=ae) {
-        uint64_t envp_start = argvMO->address + (argc+1)*NumPtrBytes;
-        arguments.push_back(Expr::createPointer(envp_start));
+                if (++ai!=ae) {
+                    uint64_t envp_start = argvMO->address + (argc+1)*NumPtrBytes;
+                    arguments.push_back(Expr::createPointer(envp_start));
 
-        if (++ai!=ae)
-          klee_error("invalid main function (expect 0-3 arguments)");
-      }
+                    if (++ai!=ae)
+                        klee_error("invalid main function (expect 0-3 arguments)");
+                }
+            }
+        }
+    } else {
+        /// yu hao: create symbolic expr for arguments
+        for (; ai != ae; ai++) {
+            ref<Expr> expr = create_symbolic_arg(ai->getType());
+            arguments.push_back(expr);
+        }
     }
-  }
 
   ExecutionState *state = new ExecutionState(kmodule->functionMap[f]);
 
@@ -4684,4 +4696,92 @@ void Executor::dumpStates() {
 Interpreter *Interpreter::create(LLVMContext &ctx, const InterpreterOptions &opts,
                                  InterpreterHandler *ih) {
   return new Executor(ctx, opts, ih);
+}
+
+ref<Expr> Executor::manual_make_symbolic(const std::string &name, unsigned int size, Expr::Width width) {
+    const Array *array = new Array(name, size);
+    auto *os = new ObjectState(size, array);
+    ref<Expr> offset = ConstantExpr::create(0, BIT_WIDTH);
+    ref<Expr> result = os->read(offset, width);
+    delete os;
+    return result;
+}
+
+ref<Expr> Executor::create_symbolic_arg(llvm::Type *ty) {
+    ref<Expr> expr;
+    if (ty->isSized()) {
+        std::string name = inputName + "_" +std::to_string(inputCount++);
+        unsigned int size = kmodule->targetData->getTypeStoreSize(ty);
+        Expr::Width width = getWidthForLLVMType(ty);
+        expr = manual_make_symbolic(name, size, width);
+    } else {
+        klee_error("function arguments do not have size");
+    }
+    return expr;
+}
+
+Cell& Executor::un_eval(KInstruction *ki, unsigned index,
+                        ExecutionState &state) const {
+    assert(index < ki->inst->getNumOperands());
+    int vnumber = ki->operands[index];
+
+    assert(vnumber != -1 &&
+           "Invalid operand to eval(), not a value or constant!");
+
+    // Determine if this is a constant or not.
+    if (vnumber < 0) {
+        unsigned index = -vnumber - 2;
+        return kmodule->constantTable[index];
+    } else {
+        unsigned index = vnumber;
+        StackFrame &sf = state.stack.back();
+        return sf.locals[index];
+    }
+}
+
+MemoryObject *Executor::create_mo(ExecutionState &state, llvm::Type *ty, llvm::Instruction *inst, const std::string& name) {
+    auto size = kmodule->targetData->getTypeStoreSize(ty);
+    MemoryObject *mo = memory->allocate(size,
+            /*isLocal=*/false, /*isGlobal=*/false,
+            /*allocSite=*/inst, /*alignment=*/8);
+    executeMakeSymbolic(state, mo, name);
+    return mo;
+}
+
+llvm::Module *Executor::get_module() {
+    return this->kmodule->module.get();
+}
+
+bool Executor::getMemoryObject(ObjectPair& op, ExecutionState& state, ref<Expr> address) {
+    bool success;
+    solver->setTimeout(coreSolverTimeout);
+    if (!state.addressSpace.resolveOne(state, solver, address, op, success)) {
+        llvm::errs() << "getMemoryObject: error" << "\n";
+        address = toConstant(state, address, "resolveOne failure");
+        success = state.addressSpace.resolveOne(cast<ConstantExpr>(address), op);
+    }
+    solver->setTimeout(time::Span());
+    return success;
+}
+
+ref<Expr> Executor::read_value_from_address(ExecutionState& state, const ref<Expr>& address, Expr::Width type) {
+    ObjectPair op;
+    bool success = getMemoryObject(op, state, address);
+    if(!success) {
+        klee_message("not find the mo");
+        return address;
+    }
+    const MemoryObject *mo = op.first;
+    ref<Expr> offset = mo->getOffsetExpr(address);
+    const ObjectState *os = op.second;
+    ref<Expr> result = os->read(offset, type);
+    return result;
+}
+
+bool Executor::special_function(llvm::Function *f) {
+    if(this->specialFunctionHandler->handlers.find(f) == this->specialFunctionHandler->handlers.end()){
+        return false;
+    } else {
+        return true;
+    }
 }

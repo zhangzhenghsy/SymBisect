@@ -144,6 +144,9 @@ namespace klee {
     HANDLER(handleMulOverflow);
     HANDLER(handleSubOverflow);
     HANDLER(handleDivRemOverflow);
+    // yu hao: handle kernel function
+    HANDLER(handleKmalloc);
+    HANDLER(handleIminor);
 #undef HANDLER
   };
 } // End klee namespace

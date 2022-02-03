@@ -497,6 +497,18 @@ public:
   /// the array size.
   const std::vector<ref<ConstantExpr> > constantValues;
 
+/// Array - Construct a new array object.
+///
+/// \param _name - The name for this array. Names should generally be unique
+/// across an application, but this is not necessary for correctness, except
+/// when printing expressions. When expressions are printed the output will
+/// not parse correctly since two arrays with the same name cannot be
+/// distinguished once printed.
+Array(const std::string &_name, uint64_t _size,
+      const ref<ConstantExpr> *constantValuesBegin = 0,
+      const ref<ConstantExpr> *constantValuesEnd = 0,
+      Expr::Width _domain = Expr::Int32, Expr::Width _range = Expr::Int8);
+
 private:
   unsigned hashValue;
 
@@ -507,18 +519,6 @@ private:
   Array& operator =(const Array& array);
 
   ~Array();
-
-  /// Array - Construct a new array object.
-  ///
-  /// \param _name - The name for this array. Names should generally be unique
-  /// across an application, but this is not necessary for correctness, except
-  /// when printing expressions. When expressions are printed the output will
-  /// not parse correctly since two arrays with the same name cannot be
-  /// distinguished once printed.
-  Array(const std::string &_name, uint64_t _size,
-        const ref<ConstantExpr> *constantValuesBegin = 0,
-        const ref<ConstantExpr> *constantValuesEnd = 0,
-        Expr::Width _domain = Expr::Int32, Expr::Width _range = Expr::Int8);
 
 public:
   bool isSymbolicArray() const { return constantValues.empty(); }

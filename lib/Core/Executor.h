@@ -300,11 +300,12 @@ private:
   /// \param allocationAlignment If non-zero, the given alignment is
   /// used. Otherwise, the alignment is deduced via
   /// Executor::getAllocationAlignment
+  /// yu hao : set zeroMemory to true for the Linux kernel
   void executeAlloc(ExecutionState &state,
                     ref<Expr> size,
                     bool isLocal,
                     KInstruction *target,
-                    bool zeroMemory=false,
+                    bool zeroMemory=true,
                     const ObjectState *reallocFrom=0,
                     size_t allocationAlignment=0);
 
@@ -557,8 +558,23 @@ public:
 
   // yu hao: add listener service
   kuc::ListenerService *listener_service;
+
+  static ref<Expr> manual_make_symbolic(const std::string &name, unsigned size, Expr::Width width);
+  /// yu hao: create symbolic arguments
+  std::string inputName = "input";
+  uint64_t inputCount = 0;
+  ref<Expr> create_symbolic_arg(llvm::Type *ty);
+
+  // yu hao: useful functions
+  Cell& un_eval(KInstruction *ki, unsigned index, ExecutionState &state) const;
+  // make a mo with one whole symbolic value
+  MemoryObject *create_mo(ExecutionState &state, llvm::Type *ty, llvm::Instruction *inst, const std::string& name);
+  llvm::Module *get_module();
+  bool getMemoryObject(ObjectPair& op, ExecutionState& state, ref<Expr> address);
+  ref<Expr> read_value_from_address(ExecutionState& state, const ref<Expr>& address, Expr::Width type);
+  bool special_function(llvm::Function *f);
 };
-  
+
 } // End klee namespace
 
 #endif /* KLEE_EXECUTOR_H */

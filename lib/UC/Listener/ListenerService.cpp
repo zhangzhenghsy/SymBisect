@@ -7,6 +7,7 @@
 namespace kuc {
     ListenerService::ListenerService(klee::Executor *executor) {
         this->executor = executor;
+        preparation();
     }
 
     ListenerService::~ListenerService() = default;
@@ -67,5 +68,9 @@ namespace kuc {
         for (auto &listener: listeners) {
             listener->executionFailed(state, ki);
         }
+    }
+
+    void ListenerService::preparation() {
+
     }
 }
