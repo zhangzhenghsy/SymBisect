@@ -12,5 +12,5 @@ add_subdirectory(Expr)
 add_subdirectory(Solver)
 add_subdirectory(Module)
 # yu hao:
-add_subdirectory(UC)
+add_subdirectory(Kernel)
 add_subdirectory(Core)
