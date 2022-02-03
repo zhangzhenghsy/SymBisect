@@ -3,9 +3,11 @@
 //
 
 #include "ListenerService.h"
+#include "../Tool_lib/log.h"
 
 namespace kuc {
     ListenerService::ListenerService(klee::Executor *executor) {
+        yhao_start_log();
         this->executor = executor;
         preparation();
     }

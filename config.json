@@ -1,0 +1,4 @@
+{
+  "2_bitcode": "path of bitcode",
+  "3_entry_function": "entry function for under constraint symbolic execution"
+}

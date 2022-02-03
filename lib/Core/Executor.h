@@ -121,11 +121,34 @@ public:
   /// The random number generator.
   RNG theRNG;
 
+    const Cell& eval(KInstruction *ki, unsigned index,
+                     ExecutionState &state) const;
+
+    Cell& getDestCell(ExecutionState &state,
+                      KInstruction *target) {
+      return state.stack.back().locals[target->dest];
+    }
+
+    void bindLocal(KInstruction *target,
+                 ExecutionState &state,
+                 ref<Expr> value);
+
+// do address resolution / object binding / out of bounds checking
+// and perform the operation
+void executeMemoryOperation(ExecutionState &state,
+                            bool isWrite,
+                            ref<Expr> address,
+                            ref<Expr> value /* undef if read */,
+                            KInstruction *target /* undef if write */);
+
+    llvm::Function* getTargetFunction(llvm::Value *calledVal,
+                                      ExecutionState &state);
+
+    std::unique_ptr<KModule> kmodule;
 private:
   static const char *TerminateReasonNames[];
 
-  std::unique_ptr<KModule> kmodule;
-  InterpreterHandler *interpreterHandler;
+    InterpreterHandler *interpreterHandler;
   Searcher *searcher;
 
   ExternalDispatcher *externalDispatcher;
@@ -231,10 +254,7 @@ private:
   /// Return the typeid corresponding to a certain `type_info`
   ref<ConstantExpr> getEhTypeidFor(ref<Expr> type_info);
 
-  llvm::Function* getTargetFunction(llvm::Value *calledVal,
-                                    ExecutionState &state);
-  
-  void executeInstruction(ExecutionState &state, KInstruction *ki);
+    void executeInstruction(ExecutionState &state, KInstruction *ki);
 
   void run(ExecutionState &initialState);
 
@@ -332,16 +352,8 @@ private:
                    KInstruction *ki,
                    llvm::Function *f,
                    std::vector< ref<Expr> > &arguments);
-                   
-  // do address resolution / object binding / out of bounds checking
-  // and perform the operation
-  void executeMemoryOperation(ExecutionState &state,
-                              bool isWrite,
-                              ref<Expr> address,
-                              ref<Expr> value /* undef if read */,
-                              KInstruction *target /* undef if write */);
 
-  void executeMakeSymbolic(ExecutionState &state, const MemoryObject *mo,
+    void executeMakeSymbolic(ExecutionState &state, const MemoryObject *mo,
                            const std::string &name);
 
   /// Create a new state where each input condition has been added as
@@ -367,24 +379,13 @@ private:
   // Used for testing.
   ref<Expr> replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e);
 
-  const Cell& eval(KInstruction *ki, unsigned index, 
-                   ExecutionState &state) const;
-
-  Cell& getArgumentCell(ExecutionState &state,
+    Cell& getArgumentCell(ExecutionState &state,
                         KFunction *kf,
                         unsigned index) {
     return state.stack.back().locals[kf->getArgRegister(index)];
   }
 
-  Cell& getDestCell(ExecutionState &state,
-                    KInstruction *target) {
-    return state.stack.back().locals[target->dest];
-  }
-
-  void bindLocal(KInstruction *target, 
-                 ExecutionState &state, 
-                 ref<Expr> value);
-  void bindArgument(KFunction *kf, 
+    void bindArgument(KFunction *kf,
                     unsigned index,
                     ExecutionState &state,
                     ref<Expr> value);
