@@ -449,11 +449,11 @@ const char *Executor::TerminateReasonNames[] = {
 
 Executor::Executor(LLVMContext &ctx, const InterpreterOptions &opts,
                    InterpreterHandler *ih)
-    : Interpreter(opts), interpreterHandler(ih), searcher(0),
+    : Interpreter(opts), haltExecution(false), interpreterHandler(ih), searcher(0),
       externalDispatcher(new ExternalDispatcher(ctx)), statsTracker(0),
       pathWriter(0), symPathWriter(0), specialFunctionHandler(0), timers{time::Span(TimerInterval)},
       replayKTest(0), replayPath(0), usingSeeds(0),
-      atMemoryLimit(false), inhibitForking(false), haltExecution(false),
+      atMemoryLimit(false), inhibitForking(false),
       ivcEnabled(false), debugLogBuffer(debugBufferString) {
 
 
