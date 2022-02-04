@@ -12,7 +12,7 @@ Linux_kernel_UC_KLEE is an under constraint symbolic execution engine for the Li
 - under constraint symbolic execution
 - terminate state at low priority basic block and stop at target basic block, which could be set in config json
 - handle indirect function call by MLTA default, also accept specify callee from config json
-- easily expanded, just inherit class [Listener](https://github.com/ZHYfeng/Linux_kernel_UC_KLEE/blob/master/lib/Kernel/Listener/Listener.h) and add it in function [preparation()] (https://github.com/ZHYfeng/Linux_kernel_UC_KLEE/blob/master/lib/Kernel/Listener/ListenerService.cpp#L76)
+- easily expanded, just inherit class [Listener](https://github.com/ZHYfeng/Linux_kernel_UC_KLEE/blob/master/lib/Kernel/Listener/Listener.h) and add it in function [preparation()](https://github.com/ZHYfeng/Linux_kernel_UC_KLEE/blob/master/lib/Kernel/Listener/ListenerService.cpp#L76)
 
 ## Build
 
