@@ -52,7 +52,18 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
 
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::Call: {
+            if (isa<DbgInfoIntrinsic>(ki->inst))
+                break;
+
             auto *ci = llvm::cast<llvm::CallInst>(ki->inst);
+            Value *fp = ci->getCalledOperand();
+            if (isa<InlineAsm>(fp)) {
+                break;
+            }
+            Function *f = this->executor->getTargetFunction(fp, state);
+            if (f) {
+                break;
+            }
 
             // pick function form function_map(json) or GlobalCtx(MLTA)
             std::set<llvm::Function *> callee_function_set;
