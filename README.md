@@ -6,6 +6,14 @@ Linux_kernel_UC_KLEE is an under constraint symbolic execution engine for the Li
 - LLVM/Clang: 11
 - OS: Ubuntu 20.04
 
+## Feature
+
+- handle some the Linux kernel functions, e.g., kmalloc()
+- under constraint symbolic execution
+- terminate state at low priority basic block and stop at target basic block, which could be set in config json
+- handle indirect function call by MLTA default, also accept specify callee from config json
+- easily expanded, just inherit class [Listener](https://github.com/ZHYfeng/Linux_kernel_UC_KLEE/blob/master/lib/Kernel/Listener/Listener.h) and add it in function [preparation()](https://github.com/ZHYfeng/Linux_kernel_UC_KLEE/blob/master/lib/Kernel/Listener/ListenerService.cpp#L76)
+
 ## Build
 
 ```shell
@@ -82,3 +90,9 @@ echo "export PATH=$PATH_PROJECT/install/bin:\$PATH" >> environment.sh
 echo "export PKG_CONFIG_PATH=$PATH_PROJECT/install/lib/pkgconfig:\$PKG_CONFIG_PATH" >> environment.sh
 echo "export PATH_PROJECT=$PATH_PROJECT" >> environment.sh
 ```
+
+## Usage
+```shell
+klee --config=config.json
+```
+look at [config.json](https://github.com/ZHYfeng/Linux_kernel_UC_KLEE/blob/master/config.json) to know more about the config json file.
