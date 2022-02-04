@@ -8,7 +8,7 @@ Linux_kernel_UC_KLEE is an under constraint symbolic execution engine for the Li
 
 ## Feature
 
-- handle sonme the Linux kernel functions, e.g., kmalloc()
+- handle some the Linux kernel functions, e.g., kmalloc()
 - under constraint symbolic execution
 - terminate state at low priority basic block and stop at target basic block, which could be set in config json
 - handle indirect function call by MLTA default, also accept specify callee from config json
