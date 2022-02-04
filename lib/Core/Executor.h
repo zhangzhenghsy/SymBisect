@@ -133,9 +133,9 @@ public:
                  ExecutionState &state,
                  ref<Expr> value);
 
-// do address resolution / object binding / out of bounds checking
-// and perform the operation
-void executeMemoryOperation(ExecutionState &state,
+    // do address resolution / object binding / out of bounds checking
+    // and perform the operation
+    void executeMemoryOperation(ExecutionState &state,
                             bool isWrite,
                             ref<Expr> address,
                             ref<Expr> value /* undef if read */,
@@ -144,7 +144,33 @@ void executeMemoryOperation(ExecutionState &state,
     llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                       ExecutionState &state);
 
+
+    // remove state from queue and delete
+    void terminateState(ExecutionState &state);
+    // call exit handler and terminate state
+    void terminateStateEarly(ExecutionState &state, const llvm::Twine &message);
+    // call exit handler and terminate state
+    void terminateStateOnExit(ExecutionState &state);
+    // call error handler and terminate state
+    void terminateStateOnError(ExecutionState &state, const llvm::Twine &message,
+                               enum TerminateReason termReason,
+                               const char *suffix = NULL,
+                               const llvm::Twine &longMessage = "");
+
+    // call error handler and terminate state, for execution errors
+    // (things that should not be possible, like illegal instruction or
+    // unlowered instrinsic, or are unsupported, like inline assembly)
+    void terminateStateOnExecError(ExecutionState &state,
+                                   const llvm::Twine &message,
+                                   const llvm::Twine &info="") {
+        terminateStateOnError(state, message, Exec, NULL, info);
+    }
+
     std::unique_ptr<KModule> kmodule;
+    /// Signals the executor to halt execution at the next instruction
+    /// step.
+    bool haltExecution;
+
 private:
   static const char *TerminateReasonNames[];
 
@@ -214,11 +240,7 @@ private:
   /// Disables forking, set by client. \see setInhibitForking()
   bool inhibitForking;
 
-  /// Signals the executor to halt execution at the next instruction
-  /// step.
-  bool haltExecution;  
-
-  /// Whether implied-value concretization is enabled. Currently
+    /// Whether implied-value concretization is enabled. Currently
   /// false, it is buggy (it needs to validate its writes).
   bool ivcEnabled;
 
@@ -429,27 +451,6 @@ private:
       llvm::Instruction** lastInstruction);
 
   bool shouldExitOn(enum TerminateReason termReason);
-
-  // remove state from queue and delete
-  void terminateState(ExecutionState &state);
-  // call exit handler and terminate state
-  void terminateStateEarly(ExecutionState &state, const llvm::Twine &message);
-  // call exit handler and terminate state
-  void terminateStateOnExit(ExecutionState &state);
-  // call error handler and terminate state
-  void terminateStateOnError(ExecutionState &state, const llvm::Twine &message,
-                             enum TerminateReason termReason,
-                             const char *suffix = NULL,
-                             const llvm::Twine &longMessage = "");
-
-  // call error handler and terminate state, for execution errors
-  // (things that should not be possible, like illegal instruction or
-  // unlowered instrinsic, or are unsupported, like inline assembly)
-  void terminateStateOnExecError(ExecutionState &state, 
-                                 const llvm::Twine &message,
-                                 const llvm::Twine &info="") {
-    terminateStateOnError(state, message, Exec, NULL, info);
-  }
 
   /// bindModuleConstants - Initialize the module constant table.
   void bindModuleConstants();
