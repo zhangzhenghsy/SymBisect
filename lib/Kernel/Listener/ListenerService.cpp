@@ -74,7 +74,10 @@ namespace kuc {
     }
 
     void ListenerService::preparation() {
-        Listener *temp = new UCListener(this->executor);
+        Listener *temp;
+        temp = new UCListener(this->executor);
+        this->pushListener(temp);
+        temp = new PathListener(this->executor);
         this->pushListener(temp);
     }
 }
