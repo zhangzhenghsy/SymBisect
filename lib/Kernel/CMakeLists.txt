@@ -1,2 +1,2 @@
-add_subdirectory(Tool_lib)
+add_subdirectory(ToolLib)
 add_subdirectory(Listener)

@@ -3,8 +3,8 @@
 //
 
 #include "UCListener.h"
-#include "../Tool_lib/log.h"
-#include "../Tool_lib/llvm_related.h"
+#include "../ToolLib/log.h"
+#include "../ToolLib/llvm_related.h"
 #include "../../Core/Executor.h"
 
 
@@ -155,7 +155,7 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
             executor->bindLocal(ki, state, value);
             executor->executeMemoryOperation(state, true, base, value, nullptr);
         } else {
-            // yhao: create mo for non constant pointer
+            /// yu hao: create mo for non-constant pointer
             // e.g. symbolic pointer load address
             // create new mo and symbolic pointer = mo->getBaseExpr();
             yhao_log(1, "make load ret symbolic");

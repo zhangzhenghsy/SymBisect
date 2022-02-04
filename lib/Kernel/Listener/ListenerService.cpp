@@ -3,7 +3,8 @@
 //
 
 #include "ListenerService.h"
-#include "../Tool_lib/log.h"
+#include "../ToolLib/log.h"
+#include "UCListener.h"
 
 namespace kuc {
     ListenerService::ListenerService(klee::Executor *executor) {
@@ -73,6 +74,7 @@ namespace kuc {
     }
 
     void ListenerService::preparation() {
-
+        Listener *temp = new UCListener(this->executor);
+        this->pushListener(temp);
     }
 }
