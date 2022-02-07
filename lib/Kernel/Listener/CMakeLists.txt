@@ -18,4 +18,4 @@ klee_add_component(Listener
         PathListener.h)
 
 set_target_properties(Listener PROPERTIES LINKER_LANGUAGE CXX)
-target_link_libraries(Listener PUBLIC Tool_lib)
+target_link_libraries(Listener PUBLIC Tool_lib MLTA)

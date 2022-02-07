@@ -45,7 +45,7 @@ bool TypeInitializerPass::doInitialization(Module *M) {
              ii != e; ++ii) {
             Instruction *Inst = &*ii;
             unsigned T = Inst->getNumOperands();
-            for (int i = 0; i < T; i++) {
+            for (unsigned i = 0; i < T; i++) {
                 Value *VI = Inst->getOperand(i);
                 if (!VI)
                     continue;

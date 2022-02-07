@@ -12,3 +12,4 @@ set(SOURCES
 
 add_library(MLTA ${SOURCES})
 set_target_properties(MLTA PROPERTIES LINKER_LANGUAGE CXX)
+target_link_libraries(MLTA PUBLIC Tool_lib)

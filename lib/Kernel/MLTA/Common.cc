@@ -53,7 +53,7 @@ string getSourceLine(string fn_str, unsigned lineno) {
     string line;
     sourcefile.seekg(ios::beg);
 
-    for (int n = 0; n < lineno - 1; ++n) {
+    for (unsigned n = 0; n < lineno - 1; ++n) {
         sourcefile.ignore(std::numeric_limits<streamsize>::max(), '\n');
     }
     getline(sourcefile, line);
@@ -82,8 +82,8 @@ string extractMacro(string line, Instruction *I) {
     smatch match;
 
     // detect function macros
-    if (CallInst *CI = dyn_cast<CallInst>(I)) {
-        FnName = getCalledFuncName(I);
+    if (I->getOpcode() == llvm::Instruction::Call) {
+        FnName = getCalledFuncName(I).str();
         caps = "[_A-Z][_A-Z0-9]{2,}";
         std::regex keywords("(\\s*)(for|if|while)(\\s*)(\\()");
 
@@ -230,7 +230,7 @@ string getMacroInfo(Value *V) {
     const char *filename = FN.c_str();
     filename = strchr(filename, '/') + 1;
     filename = strchr(filename, '/') + 1;
-    int idx = filename - FN.c_str();
+    //int idx = filename - FN.c_str();
 
     while (line[0] == ' ' || line[0] == '\t')
         line.erase(line.begin());
@@ -275,7 +275,7 @@ void getSourceCodeInfo(Value *V, string &file,
 
 Argument *getArgByNo(Function *F, int8_t ArgNo) {
 
-    if (ArgNo >= F->arg_size())
+    if ((size_t)ArgNo >= F->arg_size())
         return NULL;
 
     int8_t idx = 0;

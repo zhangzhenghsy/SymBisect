@@ -18,7 +18,8 @@ set(GCC_AND_CLANG_WARNINGS_CXX
   "-Wextra"
   "-Wno-unused-parameter"
   "-Wno-comment"
-  "-Wno-unused-function")
+  "-Wno-unused-function"
+  "-Wno-unused-variable")
 set(GCC_AND_CLANG_WARNINGS_C
   "-Wall"
   "-Wextra"
