@@ -79,7 +79,7 @@ cmake -DCMAKE_BUILD_TYPE=Debug \
   -DENABLE_TCMALLOC=OFF \
   -DENABLE_DOXYGEN=OFF \
   -G "CodeBlocks - Unix Makefiles" \
-  -DCMAKE_INSTALL_PREFIX=$PATH_PROJECT/install
+  -DCMAKE_INSTALL_PREFIX=$PATH_PROJECT/install \
   ..
 make -j
 make install
