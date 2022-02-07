@@ -62,7 +62,7 @@ make install
 cd $PATH_PROJECT/build
 git clone git@github.com:Z3Prover/z3.git
 cd z3
-git checkout z3-4.8.14
+git checkout z3-4.8.9
 python3 scripts/mk_make.py --prefix=$PATH_PROJECT/install
 cd build
 make -j
