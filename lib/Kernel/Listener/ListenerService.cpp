@@ -11,7 +11,6 @@ namespace kuc {
     ListenerService::ListenerService(klee::Executor *executor) {
         yhao_start_log();
         this->executor = executor;
-        preparation();
     }
 
     ListenerService::~ListenerService() = default;

@@ -4376,7 +4376,10 @@ void Executor::runFunctionAsMain(Function *f,
       }
     }
   }
-  
+
+  // yu hao: prepare listener
+  this->listener_service->preparation();
+
   initializeGlobals(*state);
 
   processTree = std::make_unique<PTree>(state);
