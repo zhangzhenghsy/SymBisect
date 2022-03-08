@@ -6,6 +6,7 @@
 #include "../ToolLib/log.h"
 #include "../ToolLib/llvm_related.h"
 #include "../../Core/Executor.h"
+#include "klee/Support/ErrorHandling.h"
 
 
 kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
@@ -20,9 +21,10 @@ void kuc::UCListener::beforeRun(klee::ExecutionState &initialState) {
 
 void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
-    yhao_log(1, inst_to_strID(ki->inst));
-    yhao_log(1, dump_inst_booltin(ki->inst));
-    yhao_dump(1, ki->inst->print, str)
+    //yhao_log(1, inst_to_strID(ki->inst));
+    //yhao_log(1, dump_inst_booltin(ki->inst));
+    yhao_print(ki->inst->print, str)
+    klee::klee_message("%s", str.c_str());
 
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
@@ -31,9 +33,8 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
         case llvm::Instruction::Load: {
 
             klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
-            str = "base: ";
-            yhao_dump_add(1, base->print, str)
-            yhao_log(1, "base: " + str);
+            yhao_print(base->print, str)
+            klee::klee_message("base: %s", str.c_str());
 
             // yhao: symbolic execution
             this->symbolic_before_load(state, ki);
@@ -42,14 +43,17 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
         case llvm::Instruction::Store: {
 
             klee::ref<klee::Expr> value = executor->eval(ki, 0, state).value;
-            str = "value: ";
-            yhao_dump_add(1, value->print, str)
+            yhao_print(value->print, str)
+            klee::klee_message("value: %s", str.c_str());
             if (value->getKind() != klee::Expr::Constant) {
-                yhao_log(1, "non-constant store value");
+                klee::klee_message("non-constant store value");
             }
             klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
-            str = "base: ";
-            yhao_dump_add(1, base->print, str)
+            yhao_print(base->print, str)
+            klee::klee_message("base: %s", str.c_str());
+
+            // yhao: symbolic execution: this should only happen when pointer in arguments
+            this->symbolic_before_store(state, ki);
             break;
         }
         default: {
@@ -65,8 +69,8 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             break;
         }
         case llvm::Instruction::Load: {
-            str = "value: ";
-            yhao_dump_add(1, executor->getDestCell(state, ki).value->print, str)
+            yhao_print(executor->getDestCell(state, ki).value->print, str)
+            klee::klee_message("value: %s", str.c_str());
             symbolic_after_load(state, ki);
             break;
         }
@@ -75,8 +79,10 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             break;
         }
         case llvm::Instruction::BitCast: {
-            yhao_dump(1, ki->inst->getType()->print, str)
-            yhao_dump(1, ki->inst->getOperand(0)->getType()->print, str)
+            yhao_print(ki->inst->getType()->print, str)
+            klee::klee_message("BitCast: %s", str.c_str());
+            yhao_print(ki->inst->getOperand(0)->getType()->print, str)
+            klee::klee_message("BitCast: %s", str.c_str());
             break;
         }
         default: {
@@ -112,12 +118,12 @@ void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KI
 
     auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
     if (real_address) {
-        yhao_log(1, "real_address");
+        klee::klee_message("real_address");
     } else if (map_symbolic_address.find(base) != map_symbolic_address.end()) {
-        yhao_log(1, "find load symbolic");
+        klee::klee_message("find load symbolic");
         executor->un_eval(ki, 0, state).value = map_symbolic_address[base];
     } else {
-        yhao_log(1, "make load symbolic");
+        klee::klee_message("make load symbolic");
         auto ty = ki->inst->getOperand(0)->getType();
         if (ty->getTypeID() == llvm::Type::IntegerTyID || ty->getTypeID() == llvm::Type::PointerTyID) {
 
@@ -131,9 +137,43 @@ void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KI
             executor->un_eval(ki, 0, state).value = mo->getBaseExpr();
             this->map_symbolic_address[base] = mo->getBaseExpr();
             this->map_address_symbolic[mo->getBaseExpr()] = base;
-            yhao_dump(1, mo->getBaseExpr()->print, str);
+            yhao_print(mo->getBaseExpr()->print, str);
+            klee::klee_message("%s", str.c_str());
         } else {
-            yhao_log(3, "symbolic address, type is not integer or pointer");
+            klee::klee_message("symbolic address, type is not integer or pointer");
+        }
+    }
+}
+
+void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::KInstruction *ki) {
+    std::string str;
+    klee::ref <klee::Expr> base = executor->eval(ki, 1, state).value;
+
+    auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
+    if (real_address) {
+        klee::klee_message("real_address");
+    } else if (map_symbolic_address.find(base) != map_symbolic_address.end()) {
+        klee::klee_message("find store symbolic");
+        executor->un_eval(ki, 0, state).value = map_symbolic_address[base];
+    } else {
+        klee::klee_message("make store symbolic");
+        auto ty = ki->inst->getOperand(0)->getType();
+        if (ty->getTypeID() == llvm::Type::IntegerTyID || ty->getTypeID() == llvm::Type::PointerTyID) {
+
+            // yhao: create mo for non constant address
+            // e.g. value load symbolic_address
+            // create new mo and symbolic_address = mo->getBaseExpr();
+            // do not consider address calculation
+            // mainly for the case concrete address + symbolic offset
+            auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
+            klee::MemoryObject *mo = executor->create_mo(state, ty, ki->inst, name);
+            executor->un_eval(ki, 1, state).value = mo->getBaseExpr();
+            this->map_symbolic_address[base] = mo->getBaseExpr();
+            this->map_address_symbolic[mo->getBaseExpr()] = base;
+            yhao_print(mo->getBaseExpr()->print, str);
+            klee::klee_message("%s", str.c_str());
+        } else {
+            klee::klee_message("symbolic address, type is not integer or pointer");
         }
     }
 }
@@ -150,7 +190,7 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
         klee::ref <klee::Expr> base = executor->eval(ki, 0, state).value;
 
         if (map_symbolic_address.find(ret) != map_symbolic_address.end()) {
-            yhao_log(1, "find load ret symbolic");
+            klee::klee_message("find load ret symbolic");
             auto value = map_symbolic_address[ret];
             executor->bindLocal(ki, state, value);
             executor->executeMemoryOperation(state, true, base, value, nullptr);
@@ -158,16 +198,18 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
             /// yu hao: create mo for non-constant pointer
             // e.g. symbolic pointer load address
             // create new mo and symbolic pointer = mo->getBaseExpr();
-            yhao_log(1, "make load ret symbolic");
+            klee::klee_message("make load ret symbolic");
             auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
-            yhao_dump(1, ty->getPointerElementType()->print, str);
-            yhao_log(1, name);
+            klee::klee_message("name: %s", name.c_str());
+            yhao_print(ty->getPointerElementType()->print, str);
+            klee::klee_message("pointer element type: %s", str.c_str());
             klee::MemoryObject *mo = executor->create_mo(state, ty->getPointerElementType(), ki->inst, name);
             executor->bindLocal(ki, state, mo->getBaseExpr());
             executor->executeMemoryOperation(state, true, base, mo->getBaseExpr(), nullptr);
             this->map_symbolic_address[base] = mo->getBaseExpr();
             this->map_address_symbolic[mo->getBaseExpr()] = base;
-            yhao_dump(1, mo->getBaseExpr()->print, str);
+            yhao_print(mo->getBaseExpr()->print, str);
+            klee::klee_message("mo base: %s", str.c_str());
         }
 
     }
@@ -194,7 +236,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
             }
         }
     } else if (!f) {
-        yhao_log(1, "!f");
+        klee::klee_message("!f");
         goto create_return;
     } else {
         return;
@@ -203,7 +245,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
     create_return:
     llvm::Type *resultType = cs->getType();
     if (!resultType->isVoidTy()) {
-        yhao_log(1, "make call return symbolic");
+        klee::klee_message("make call return symbolic");
 
         auto name = create_global_var_name(ki->inst, -1, "call_return");
         auto ty = ki->inst->getType();

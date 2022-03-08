@@ -36,6 +36,8 @@ namespace kuc {
 
         void symbolic_before_load(klee::ExecutionState &state, klee::KInstruction *ki);
 
+        void symbolic_before_store(klee::ExecutionState &state, klee::KInstruction *ki);
+
         void symbolic_after_load(klee::ExecutionState &state, klee::KInstruction *ki);
 
         void symbolic_after_call(klee::ExecutionState &state, klee::KInstruction *ki);

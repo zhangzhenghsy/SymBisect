@@ -4744,7 +4744,12 @@ Cell& Executor::un_eval(KInstruction *ki, unsigned index,
 }
 
 MemoryObject *Executor::create_mo(ExecutionState &state, llvm::Type *ty, llvm::Instruction *inst, const std::string& name) {
+
     auto size = kmodule->targetData->getTypeStoreSize(ty);
+    if (ty->isIntegerTy(8)) {
+        klee_message("ty->isIntegerTy(8)");
+        size = kmodule->targetData->getTypeStoreSize(ty) * 4096;
+    }
     MemoryObject *mo = memory->allocate(size,
             /*isLocal=*/false, /*isGlobal=*/false,
             /*allocSite=*/inst, /*alignment=*/8);
