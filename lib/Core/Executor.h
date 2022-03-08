@@ -344,13 +344,15 @@ private:
   /// used. Otherwise, the alignment is deduced via
   /// Executor::getAllocationAlignment
   /// yu hao : set zeroMemory to true for the Linux kernel
+  /// zheng: symsizeptr for symbolize size log
   void executeAlloc(ExecutionState &state,
                     ref<Expr> size,
                     bool isLocal,
                     KInstruction *target,
                     bool zeroMemory=true,
                     const ObjectState *reallocFrom=0,
-                    size_t allocationAlignment=0);
+                    size_t allocationAlignment=0,
+		    ref<Expr> * symsizeptr=0);
 
   /// Free the given address with checking for errors. If target is
   /// given it will be bound to 0 in the resulting states (this is a
