@@ -81,12 +81,17 @@ public:
 
 template<class T>
 class ref {
-  T *ptr;
+//  T *ptr;
 
 public:
   // default constructor: create a NULL reference
+  T *ptr;
   ref() : ptr(nullptr) {}
   ~ref () { dec (); }
+
+  T *get_ptr(){
+    return ptr;
+  }
 
 private:
   void inc() const {

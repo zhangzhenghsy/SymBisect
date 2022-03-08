@@ -329,6 +329,13 @@ void Expr::dump() const {
   errs() << "\n";
 }
 
+std::string Expr::dump2() {
+  std::string ld;
+  llvm::raw_string_ostream rso(ld);
+  this->print(rso);
+  return ld;
+
+}
 /***/
 
 ref<Expr> ConstantExpr::fromMemory(void *address, Width width) {

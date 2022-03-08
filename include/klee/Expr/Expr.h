@@ -217,6 +217,8 @@ public:
 
   /// dump - Print the expression to stderr.
   void dump() const;
+  ///dump2 return string added by zheng
+  std::string dump2();
 
   /// Returns the pre-computed hash of the current expression
   virtual unsigned hash() const { return hashValue; }

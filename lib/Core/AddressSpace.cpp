@@ -18,6 +18,9 @@
 
 #include "CoreStats.h"
 
+/// zheng:
+#include <iostream>
+
 using namespace klee;
 
 ///
@@ -52,17 +55,21 @@ ObjectState *AddressSpace::getWriteable(const MemoryObject *mo,
   return newObjectState.get();
 }
 
-/// 
 
+/// zheng: used to find a corresponding object for a given constant address
 bool AddressSpace::resolveOne(const ref<ConstantExpr> &addr, 
                               ObjectPair &result) const {
   uint64_t address = addr->getZExtValue();
   MemoryObject hack(address);
+  
+  std::cout << "AddressSpace::resolveOne with 2 args\n";
+  //std::cout << "address:" << address << "\n";
 
   if (const auto res = objects.lookup_previous(&hack)) {
     const auto &mo = res->first;
     // Check if the provided address is between start and end of the object
     // [mo->address, mo->address + mo->size) or the object is a 0-sized object.
+    std::cout << "mo->address: "<< mo->address << " size: " << mo->size <<"\n";
     if ((mo->size==0 && address==mo->address) ||
         (address - mo->address < mo->size)) {
       result.first = res->first;
@@ -74,13 +81,24 @@ bool AddressSpace::resolveOne(const ref<ConstantExpr> &addr,
   return false;
 }
 
+/// zheng: whether the resolve is executed successfully will be stored in return value. 
+/// Whether finding the suitable object will be stored in success variable
+/// 1. check if address is concrete value or symbolic, if concrete then call resolveOne with two arguments
+/// 2. generate an example concrete address. Check if the address is in an object, if yes, then return
+/// 3. if no, split the object lists (ordered list from low address to high address) into two parts with example address.
+/// for each part there is a loop, check if the address (symbolic) can be in the object under constraints, if yes, return the object
 bool AddressSpace::resolveOne(ExecutionState &state,
                               TimingSolver *solver,
                               ref<Expr> address,
                               ObjectPair &result,
                               bool &success) const {
+  std::cout << "\nAddressSpace::resolveOne 4 args\n";
+
+  // search forwards
+  //if the address is constant
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(address)) {
     success = resolveOne(CE, result);
+    std::cout << "success: " << success <<"\n";
     return true;
   } else {
     TimerStatIncrementer timer(stats::resolveTime);
@@ -93,16 +111,23 @@ bool AddressSpace::resolveOne(ExecutionState &state,
     uint64_t example = cex->getZExtValue();
     MemoryObject hack(example);
     const auto res = objects.lookup_previous(&hack);
-
+    
+    std::cout << "uint64_t example (writing address) = " << example << "\n";
+    /// zheng: check with the nearest previous allocated object, whether the unsigned example offset < size, if so, klee think it's the object we want to find.
+    /// zheng: be careful, could we simply use this object? 
+    /// We should since we cannot exclude it basically. But if there is no enough constraints, the result may vary
     if (res) {
       const MemoryObject *mo = res->first;
+      std::cout << "find an object for the example address, check if the address is in the range of object\n";
+      std::cout << "mo->address: " << mo->address << "  mo->size: " << mo->size << "\n";
+      
       if (example - mo->address < mo->size) {
         result.first = res->first;
         result.second = res->second.get();
         success = true;
         return true;
       }
-    }
+   }
 
     // didn't work, now we have to search
        

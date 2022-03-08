@@ -2002,7 +2002,26 @@ Function* Executor::getTargetFunction(Value *calledVal, ExecutionState &state) {
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
+
   Instruction *i = ki->inst;
+  std::string ld;
+  llvm::raw_string_ostream rso(ld);
+  i->print(rso);
+  std::cout << "\n\nExecutor::executeInstruction() ki->inst->print(rso) rso.str() " << rso.str() << "\n";
+  std::cout << "ExecutionState &state: " << &state << "\n";
+  
+  
+  /*MemoryMap objects = state.addressSpace.objects;
+  MemoryMap::iterator tmp=objects.begin();
+  for (; tmp!=objects.end(); ++tmp) {
+    const auto &mo = tmp->first;
+    const ObjectState *os = tmp->second.get();
+    std::cout << "mo->address: " << mo->address << "  mo->size: " << mo->size << " mo->issymsize: "<< mo->issymsize <<"\n";
+    ref<Expr> result = os->read(ConstantExpr::create(0, 4),  8);
+    std::cout << "read result: " << (result.ptr)->dump2() << "\n";
+    //(result.ptr)->dump();
+  }*/
+
   switch (i->getOpcode()) {
     // Control flow
   case Instruction::Ret: {
@@ -3896,14 +3915,25 @@ ObjectState *Executor::bindObjectInState(ExecutionState &state,
   return os;
 }
 
+///zheng: previous logic
+/// 1. check if it's a constant size, if so, allocate direcly
+/// 2. if size is symbolic instead, it generate an example size C1
+/// 3. branch 1, For C1, it tries to decrease it under constraints by dividing 2 recursively as many times as possible. Then call executeAlloc with changed C1
+/// 4. (after fork)In branch2 (with a new constraint that size != C1), then generate a value C2 with constraints, check if size==C2 must be True.
+/// (if there are only two possible values). If so, returns C2, else trying to generate a quite value as size 1<<31 and "found huge malloc, returning 0"  
 void Executor::executeAlloc(ExecutionState &state,
                             ref<Expr> size,
                             bool isLocal,
                             KInstruction *target,
                             bool zeroMemory,
                             const ObjectState *reallocFrom,
-                            size_t allocationAlignment) {
+                            size_t allocationAlignment, ref<Expr> *symsizeptr) {
+
+  std::cout <<"\nFunction Executor::executeAlloc\n";
+  std::cout << "&State: " << &state << "\n";
+  //std::cout<<"size before toUnique(state, size):\n"<<size.get_ptr()->dump2()<<"\n";
   size = toUnique(state, size);
+  std::cout<<"size after toUnique(state, size):\n"<<size.get_ptr()->dump2()<<"\n";
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(size)) {
     const llvm::Value *allocSite = state.prevPC->inst;
     if (allocationAlignment == 0) {
@@ -3912,10 +3942,19 @@ void Executor::executeAlloc(ExecutionState &state,
     MemoryObject *mo =
         memory->allocate(CE->getZExtValue(), isLocal, /*isGlobal=*/false,
                          allocSite, allocationAlignment);
+    //added by zheng
+    if (symsizeptr){
+    std::cout << "store symbolic size in object\n";
+    std::cout << "*symsizeptr" << ((*symsizeptr).ptr)->dump2() << "\n";
+    mo->issymsize = "True";
+    mo->symsize = *symsizeptr;
+    }
+
     if (!mo) {
       bindLocal(target, state, 
                 ConstantExpr::alloc(0, Context::get().getPointerWidth()));
     } else {
+      std::cout << "mo->address: " << mo->address << "  mo->size: " << mo->size << "\n";
       ObjectState *os = bindObjectInState(state, mo, isLocal);
       if (zeroMemory) {
         os->initializeToZero();
@@ -3942,7 +3981,7 @@ void Executor::executeAlloc(ExecutionState &state,
     // exactly two values and just fork (but we need to get rid of
     // return argument first). This shows up in pcre when llvm
     // collapses the size expression with a select.
-
+    std::cout << "the size of object is symbolic\n";
     size = optimizer.optimizeExpr(size, true);
 
     ref<ConstantExpr> example;
@@ -3950,8 +3989,15 @@ void Executor::executeAlloc(ExecutionState &state,
         solver->getValue(state.constraints, size, example, state.queryMetaData);
     assert(success && "FIXME: Unhandled solver failure");
     (void) success;
-    
-    // Try and start with a small example.
+    std::cout << "concretize the symbolic size; size = optimizer.optimizeExpr(size, true);\n";
+    std::cout << "size: " << size.get_ptr()->dump2()<<"\n";
+    std::cout << "example: " << example.get_ptr()->dump2()<<"\n";
+    example = ConstantExpr::alloc(4096, Expr::Int64);
+    std::cout << "set the size to be 4096\n";
+    executeAlloc(state, example, isLocal, target, zeroMemory, reallocFrom, allocationAlignment, &size);
+
+
+/*    // Try and start with a small example.
     Expr::Width W = example->getWidth();
     while (example->Ugt(ConstantExpr::alloc(128, W))->isTrue()) {
       ref<ConstantExpr> tmp = example->LShr(ConstantExpr::alloc(1, W));
@@ -3965,22 +4011,33 @@ void Executor::executeAlloc(ExecutionState &state,
         break;
       example = tmp;
     }
-
+    
+    std::cout << "example after loop: " << example.get_ptr()->dump2()<<"\n";
+    std::cout << "set the size to be 4000\n";
+    example = ConstantExpr::alloc(4000, Expr::Int64);
     StatePair fixedSize = fork(state, EqExpr::create(example, size), true);
     
     if (fixedSize.second) { 
+      std::cout << "size in forked StatePair fixedSize.second: " << size.get_ptr()->dump2()<<"\n";
+      std::cout << "&State: " << &state << "\n";
       // Check for exactly two values
+      // zheng: if exactly two values, then in this branch the size must equal the other concrete value? (since it doesn't equal the previous value now)
       ref<ConstantExpr> tmp;
       bool success = solver->getValue(fixedSize.second->constraints, size, tmp,
                                       fixedSize.second->queryMetaData);
       assert(success && "FIXME: Unhandled solver failure");      
       (void) success;
       bool res;
+
+      ///added by zheng
+      tmp = ConstantExpr::alloc(4000, Expr::Int64);
       success = solver->mustBeTrue(fixedSize.second->constraints,
                                    EqExpr::create(tmp, size), res,
                                    fixedSize.second->queryMetaData);
       assert(success && "FIXME: Unhandled solver failure");      
       (void) success;
+      std::cout << "size (tmp) in fixedSize.second: " << tmp.get_ptr()->dump2()<<"\n";
+      std::cout << "res: " << res <<"\n";
       if (res) {
         executeAlloc(*fixedSize.second, tmp, isLocal,
                      target, zeroMemory, reallocFrom);
@@ -4010,9 +4067,13 @@ void Executor::executeAlloc(ExecutionState &state,
       }
     }
 
-    if (fixedSize.first) // can be zero when fork fails
+    if (fixedSize.first){ 
+	std::cout << "size in forked StatePair fixedSize.first: " << size.get_ptr()->dump2()<<"\n";
+	std::cout << "ExecutionState &state: " << &state << "\n";
+      // can be zero when fork fails
       executeAlloc(*fixedSize.first, example, isLocal, 
-                   target, zeroMemory, reallocFrom);
+                   target, zeroMemory, reallocFrom, allocationAlignment, &size);}
+      */
   }
 }
 
@@ -4082,10 +4143,16 @@ void Executor::executeMemoryOperation(ExecutionState &state,
                                       ref<Expr> address,
                                       ref<Expr> value /* undef if read */,
                                       KInstruction *target /* undef if write */) {
+
+  std::cout << "Executor::executeMemoryOperation \n";
+  std::cout << "address: "<< (address.ptr)->dump2() << "\n";
+  if(isWrite){
+  std::cout << "value: "<< (value.ptr)->dump2() << "\n";}
+  std::cout << "SimplifySymIndices " << SimplifySymIndices << "\n";
   Expr::Width type = (isWrite ? value->getWidth() : 
                      getWidthForLLVMType(target->inst->getType()));
   unsigned bytes = Expr::getMinBytesForWidth(type);
-
+  
   if (SimplifySymIndices) {
     if (!isa<ConstantExpr>(address))
       address = ConstraintManager::simplifyExpr(state.constraints, address);
@@ -4099,6 +4166,8 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   ObjectPair op;
   bool success;
   solver->setTimeout(coreSolverTimeout);
+  /// zheng: try to find the corresponding address, if found, success will be true. 
+  /// Note that If the address is symbolic, then it's just POSSIBLE to be in the found object(instead of mustbe in)
   if (!state.addressSpace.resolveOne(state, solver, address, op, success)) {
     address = toConstant(state, address, "resolveOne failure");
     success = state.addressSpace.resolveOne(cast<ConstantExpr>(address), op);
@@ -4113,8 +4182,22 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     }
     
     ref<Expr> offset = mo->getOffsetExpr(address);
+    std::cout << "object address: " << mo->address << "\n";
+    std::cout << "object size: " << mo->size << "\n";
+    std::cout << "offset: " << (offset.ptr)->dump2() << "\n";
     ref<Expr> check = mo->getBoundsCheckOffset(offset, bytes);
     check = optimizer.optimizeExpr(check, true);
+    std::cout << "check:"  << (check.ptr)->dump2() <<"\n";
+
+    /// zheng: check whether it's symbolic size
+    std::cout << "mo->issymsize: " << mo->issymsize << "\n";
+    if (!mo->issymsize.compare("True")){
+      ref<Expr> symsize = mo->symsize;
+      std::cout << "mo->issymsize True    symsize of object:\n";
+      std::cout << (symsize.ptr)->dump2() << "\n";
+	    check = UltExpr::create(offset, symsize);
+	    std::cout << "new check:\n"  << (check.ptr)->dump2() <<"\n";
+    }
 
     bool inBounds;
     solver->setTimeout(coreSolverTimeout);
@@ -4128,6 +4211,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     }
 
     if (inBounds) {
+      std::cout << "No OOBW! Offset < Size mustBeTrue underconstraints here\n";
       const ObjectState *os = op.second;
       if (isWrite) {
         if (os->readOnly) {
@@ -4147,7 +4231,14 @@ void Executor::executeMemoryOperation(ExecutionState &state,
       }
 
       return;
-    }
+    } else {
+	 /// zheng: it's possible that the (symbolic offset) is larger than the size
+	 /// question, when concretize the address and get the object, is it possible that we don't get the corret object? 
+  	std::cout << "\n\nOOBW detection!!\n";
+	  std::cout << "It's possible that offset is larger than size!!! \n\n";
+    ///return;
+  }
+
   } 
 
   // we are on an error path (no resolution, multiple resolution, one

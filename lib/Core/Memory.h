@@ -45,6 +45,9 @@ private:
   mutable class ReferenceCounter _refCount;
 
 public:
+  /// zheng: add symsize support
+  std::string issymsize;
+  ref<Expr> symsize;
   unsigned id;
   uint64_t address;
 
@@ -79,7 +82,8 @@ public:
   // XXX this is just a temp hack, should be removed
   explicit
   MemoryObject(uint64_t _address) 
-    : id(counter++),
+    : issymsize("False"),
+      id(counter++),
       address(_address),
       size(0),
       isFixed(true),
