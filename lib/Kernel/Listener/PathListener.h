@@ -30,7 +30,6 @@ namespace kuc {
         nlohmann::json config;
         std::set<std::string> target_bbs;
         std::set<std::string> low_priority_bbs;
-        // yu hao: todo: support this
         std::set<std::string> low_priority_functions;
 
         std::string temp_call_cond_name = "temp_call_cond";

@@ -2358,7 +2358,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Function *f = getTargetFunction(fp, state);
 
     if (isa<InlineAsm>(fp)) {
-      terminateStateOnExecError(state, "inline assembly is unsupported");
+      //terminateStateOnExecError(state, "inline assembly is unsupported");
+      klee_warning("inline assembly is unsupported");
       break;
     }
     // evaluate arguments

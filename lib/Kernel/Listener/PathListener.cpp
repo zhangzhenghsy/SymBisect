@@ -108,7 +108,13 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
     if (target_bbs.find(name_bb) != target_bbs.end()) {
         this->executor->haltExecution = true;
     }
+    // for low_priority_bbs
     if (low_priority_bbs.find(name_bb) != low_priority_bbs.end()) {
+        this->executor->terminateState(state);
+    }
+    // for low_priority_functions
+    auto name_f = get_real_function_name(bb->getParent());
+    if (low_priority_functions.find(name_f) != low_priority_functions.end()) {
         this->executor->terminateState(state);
     }
 }

@@ -220,7 +220,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
     llvm::Value *fp = cs->getCalledOperand();
     llvm::Function *f = executor->getTargetFunction(fp, state);
     if (llvm::isa<llvm::InlineAsm>(fp)) {
-        return;
+        goto create_return;;
     }
     if (f && f->isDeclaration()) {
         switch (f->getIntrinsicID()) {
