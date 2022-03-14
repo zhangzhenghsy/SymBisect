@@ -62,14 +62,14 @@ bool AddressSpace::resolveOne(const ref<ConstantExpr> &addr,
   uint64_t address = addr->getZExtValue();
   MemoryObject hack(address);
   
-  std::cout << "AddressSpace::resolveOne with 2 args\n";
+  //std::cout << "AddressSpace::resolveOne with 2 args\n";
   //std::cout << "address:" << address << "\n";
 
   if (const auto res = objects.lookup_previous(&hack)) {
     const auto &mo = res->first;
     // Check if the provided address is between start and end of the object
     // [mo->address, mo->address + mo->size) or the object is a 0-sized object.
-    std::cout << "mo->address: "<< mo->address << " size: " << mo->size <<"\n";
+    //std::cout << "mo->address: "<< mo->address << " size: " << mo->size <<"\n";
     if ((mo->size==0 && address==mo->address) ||
         (address - mo->address < mo->size)) {
       result.first = res->first;
@@ -92,13 +92,13 @@ bool AddressSpace::resolveOne(ExecutionState &state,
                               ref<Expr> address,
                               ObjectPair &result,
                               bool &success) const {
-  std::cout << "\nAddressSpace::resolveOne 4 args\n";
+  //std::cout << "\nAddressSpace::resolveOne 4 args\n";
 
   // search forwards
   //if the address is constant
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(address)) {
     success = resolveOne(CE, result);
-    std::cout << "success: " << success <<"\n";
+    //std::cout << "success: " << success <<"\n";
     return true;
   } else {
     TimerStatIncrementer timer(stats::resolveTime);
@@ -112,14 +112,14 @@ bool AddressSpace::resolveOne(ExecutionState &state,
     MemoryObject hack(example);
     const auto res = objects.lookup_previous(&hack);
     
-    std::cout << "uint64_t example (writing address) = " << example << "\n";
+    //std::cout << "uint64_t example (writing address) = " << example << "\n";
     /// zheng: check with the nearest previous allocated object, whether the unsigned example offset < size, if so, klee think it's the object we want to find.
     /// zheng: be careful, could we simply use this object? 
     /// We should since we cannot exclude it basically. But if there is no enough constraints, the result may vary
     if (res) {
       const MemoryObject *mo = res->first;
-      std::cout << "find an object for the example address, check if the address is in the range of object\n";
-      std::cout << "mo->address: " << mo->address << "  mo->size: " << mo->size << "\n";
+      //std::cout << "find an object for the example address, check if the address is in the range of object\n";
+      //std::cout << "mo->address: " << mo->address << "  mo->size: " << mo->size << "\n";
       
       if (example - mo->address < mo->size) {
         result.first = res->first;

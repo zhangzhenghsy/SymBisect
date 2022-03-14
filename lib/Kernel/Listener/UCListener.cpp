@@ -25,6 +25,18 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     //yhao_log(1, dump_inst_booltin(ki->inst));
     yhao_print(ki->inst->print, str)
     klee::klee_message("%s", str.c_str());
+    
+    llvm::Instruction *i = ki->inst;
+    std::string ld;
+    llvm::raw_string_ostream rso(ld);
+    i->print(rso);
+    std::cout << "\n\nUCListener::beforeExecuteInstruction ki->inst->print(rso) rso.str() " << rso.str() << "\n";
+    std::cout << "ExecutionState &state: " << &state << "\n";
+    std::cout << "bb name i->getParent()->getName().str()" << i->getParent()->getName().str() << "\n";
+    std::string sourceinfo = dump_inst_booltin(ki->inst);
+    if (sourceinfo!= ""){
+    std::cout << "line sourceinfo " << sourceinfo << "\n";
+    }
 
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {

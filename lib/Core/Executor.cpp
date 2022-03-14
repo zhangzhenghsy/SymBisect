@@ -2004,13 +2004,12 @@ Function* Executor::getTargetFunction(Value *calledVal, ExecutionState &state) {
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
   Instruction *i = ki->inst;
-  std::string ld;
-  llvm::raw_string_ostream rso(ld);
-  i->print(rso);
-  std::cout << "\n\nExecutor::executeInstruction() ki->inst->print(rso) rso.str() " << rso.str() << "\n";
-  std::cout << "ExecutionState &state: " << &state << "\n";
-  
-  
+  //std::string ld;
+  //llvm::raw_string_ostream rso(ld);
+  //i->print(rso);
+  //std::cout << "\n\nExecutor::executeInstruction() ki->inst->print(rso) rso.str() " << rso.str() << "\n";
+  //std::cout << "ExecutionState &state: " << &state << "\n";
+  //std::cout << "bb name i->getParent()->getName().str()" << i->getParent()->getName().str() << "\n";
   /*MemoryMap objects = state.addressSpace.objects;
   MemoryMap::iterator tmp=objects.begin();
   for (; tmp!=objects.end(); ++tmp) {
@@ -3929,11 +3928,11 @@ void Executor::executeAlloc(ExecutionState &state,
                             const ObjectState *reallocFrom,
                             size_t allocationAlignment, ref<Expr> *symsizeptr) {
 
-  std::cout <<"\nFunction Executor::executeAlloc\n";
-  std::cout << "&State: " << &state << "\n";
+  //std::cout <<"\nFunction Executor::executeAlloc\n";
+  //std::cout << "&State: " << &state << "\n";
   //std::cout<<"size before toUnique(state, size):\n"<<size.get_ptr()->dump2()<<"\n";
   size = toUnique(state, size);
-  std::cout<<"size after toUnique(state, size):\n"<<size.get_ptr()->dump2()<<"\n";
+  //std::cout<<"size after toUnique(state, size):\n"<<size.get_ptr()->dump2()<<"\n";
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(size)) {
     const llvm::Value *allocSite = state.prevPC->inst;
     if (allocationAlignment == 0) {
@@ -3944,8 +3943,8 @@ void Executor::executeAlloc(ExecutionState &state,
                          allocSite, allocationAlignment);
     //added by zheng
     if (symsizeptr){
-    std::cout << "store symbolic size in object\n";
-    std::cout << "*symsizeptr" << ((*symsizeptr).ptr)->dump2() << "\n";
+    //std::cout << "store symbolic size in object\n";
+    //std::cout << "*symsizeptr" << ((*symsizeptr).ptr)->dump2() << "\n";
     mo->issymsize = "True";
     mo->symsize = *symsizeptr;
     }
@@ -3954,7 +3953,7 @@ void Executor::executeAlloc(ExecutionState &state,
       bindLocal(target, state, 
                 ConstantExpr::alloc(0, Context::get().getPointerWidth()));
     } else {
-      std::cout << "mo->address: " << mo->address << "  mo->size: " << mo->size << "\n";
+      //std::cout << "mo->address: " << mo->address << "  mo->size: " << mo->size << "\n";
       ObjectState *os = bindObjectInState(state, mo, isLocal);
       if (zeroMemory) {
         os->initializeToZero();
@@ -3981,7 +3980,7 @@ void Executor::executeAlloc(ExecutionState &state,
     // exactly two values and just fork (but we need to get rid of
     // return argument first). This shows up in pcre when llvm
     // collapses the size expression with a select.
-    std::cout << "the size of object is symbolic\n";
+    //std::cout << "the size of object is symbolic\n";
     size = optimizer.optimizeExpr(size, true);
 
     ref<ConstantExpr> example;
@@ -3989,11 +3988,11 @@ void Executor::executeAlloc(ExecutionState &state,
         solver->getValue(state.constraints, size, example, state.queryMetaData);
     assert(success && "FIXME: Unhandled solver failure");
     (void) success;
-    std::cout << "concretize the symbolic size; size = optimizer.optimizeExpr(size, true);\n";
-    std::cout << "size: " << size.get_ptr()->dump2()<<"\n";
-    std::cout << "example: " << example.get_ptr()->dump2()<<"\n";
+    //std::cout << "concretize the symbolic size; size = optimizer.optimizeExpr(size, true);\n";
+    //std::cout << "size: " << size.get_ptr()->dump2()<<"\n";
+    //std::cout << "example: " << example.get_ptr()->dump2()<<"\n";
     example = ConstantExpr::alloc(4096, Expr::Int64);
-    std::cout << "set the size to be 4096\n";
+    //std::cout << "set the size to be 4096\n";
     executeAlloc(state, example, isLocal, target, zeroMemory, reallocFrom, allocationAlignment, &size);
 
 
@@ -4144,11 +4143,11 @@ void Executor::executeMemoryOperation(ExecutionState &state,
                                       ref<Expr> value /* undef if read */,
                                       KInstruction *target /* undef if write */) {
 
-  std::cout << "Executor::executeMemoryOperation \n";
-  std::cout << "address: "<< (address.ptr)->dump2() << "\n";
-  if(isWrite){
-  std::cout << "value: "<< (value.ptr)->dump2() << "\n";}
-  std::cout << "SimplifySymIndices " << SimplifySymIndices << "\n";
+  //std::cout << "Executor::executeMemoryOperation \n";
+  //std::cout << "address: "<< (address.ptr)->dump2() << "\n";
+  //if(isWrite){
+  //std::cout << "value: "<< (value.ptr)->dump2() << "\n";}
+  //std::cout << "SimplifySymIndices " << SimplifySymIndices << "\n";
   Expr::Width type = (isWrite ? value->getWidth() : 
                      getWidthForLLVMType(target->inst->getType()));
   unsigned bytes = Expr::getMinBytesForWidth(type);
@@ -4182,21 +4181,21 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     }
     
     ref<Expr> offset = mo->getOffsetExpr(address);
-    std::cout << "object address: " << mo->address << "\n";
-    std::cout << "object size: " << mo->size << "\n";
-    std::cout << "offset: " << (offset.ptr)->dump2() << "\n";
+    //std::cout << "object address: " << mo->address << "\n";
+    //std::cout << "object size: " << mo->size << "\n";
+    //std::cout << "offset: " << (offset.ptr)->dump2() << "\n";
     ref<Expr> check = mo->getBoundsCheckOffset(offset, bytes);
     check = optimizer.optimizeExpr(check, true);
-    std::cout << "check:"  << (check.ptr)->dump2() <<"\n";
+    //std::cout << "check:"  << (check.ptr)->dump2() <<"\n";
 
     /// zheng: check whether it's symbolic size
-    std::cout << "mo->issymsize: " << mo->issymsize << "\n";
+    //std::cout << "mo->issymsize: " << mo->issymsize << "\n";
     if (!mo->issymsize.compare("True")){
       ref<Expr> symsize = mo->symsize;
-      std::cout << "mo->issymsize True    symsize of object:\n";
-      std::cout << (symsize.ptr)->dump2() << "\n";
+      //std::cout << "mo->issymsize True    symsize of object:\n";
+      //std::cout << (symsize.ptr)->dump2() << "\n";
 	    check = UltExpr::create(offset, symsize);
-	    std::cout << "new check:\n"  << (check.ptr)->dump2() <<"\n";
+	    //std::cout << "new check:\n"  << (check.ptr)->dump2() <<"\n";
     }
 
     bool inBounds;
@@ -4211,7 +4210,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     }
 
     if (inBounds) {
-      std::cout << "No OOBW! Offset < Size mustBeTrue underconstraints here\n";
+      //std::cout << "No OOBW! Offset < Size mustBeTrue underconstraints here\n";
       const ObjectState *os = op.second;
       if (isWrite) {
         if (os->readOnly) {
@@ -4235,7 +4234,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
 	 /// zheng: it's possible that the (symbolic offset) is larger than the size
 	 /// question, when concretize the address and get the object, is it possible that we don't get the corret object? 
   	std::cout << "\n\nOOBW detection!!\n";
-	  std::cout << "It's possible that offset is larger than size!!! \n\n";
+	  //std::cout << "It's possible that offset is larger than size!!! \n\n";
     ///return;
   }
 
