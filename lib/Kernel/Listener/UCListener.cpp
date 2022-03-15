@@ -69,8 +69,8 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             break;
         }
         case llvm::Instruction::Load: {
-            yhao_print(executor->getDestCell(state, ki).value->print, str)
-            klee::klee_message("value: %s", str.c_str());
+            //yhao_print(executor->getDestCell(state, ki).value->print, str)
+            //klee::klee_message("value: %s", str.c_str());
             symbolic_after_load(state, ki);
             break;
         }
@@ -114,7 +114,7 @@ std::string kuc::UCListener::create_global_var_name(llvm::Instruction *i, int64_
 
 void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
-    klee::ref <klee::Expr> base = executor->eval(ki, 0, state).value;
+    klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
 
     auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
     if (real_address) {
@@ -147,7 +147,7 @@ void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KI
 
 void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
-    klee::ref <klee::Expr> base = executor->eval(ki, 1, state).value;
+    klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
 
     auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
     if (real_address) {
@@ -185,9 +185,14 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
     if (ty->isPointerTy() && ty->getPointerElementType()->isSized()) {
         auto ret = executor->getDestCell(state, ki).value;
         if (ret->getKind() == klee::Expr::Constant) {
-            return;
+            auto ce = llvm::cast<klee::ConstantExpr>(ret);
+            if (ce->getZExtValue() == 0) {
+
+            } else {
+                return;
+            }
         }
-        klee::ref <klee::Expr> base = executor->eval(ki, 0, state).value;
+        klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
 
         if (map_symbolic_address.find(ret) != map_symbolic_address.end()) {
             klee::klee_message("find load ret symbolic");
@@ -251,7 +256,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
         auto ty = ki->inst->getType();
         unsigned int size = executor->kmodule->targetData->getTypeStoreSize(ty);
         klee::Expr::Width width = executor->getWidthForLLVMType(ty);
-        klee::ref <klee::Expr> symbolic = klee::Executor::manual_make_symbolic(name, size, width);
+        klee::ref<klee::Expr> symbolic = klee::Executor::manual_make_symbolic(name, size, width);
         executor->bindLocal(ki, state, symbolic);
 
 //            auto cs = llvm::cast<llvm::CallBase>(ki->inst);
@@ -264,7 +269,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
     }
 }
 
-std::string kuc::UCListener::get_name(klee::ref <klee::Expr> value) {
+std::string kuc::UCListener::get_name(klee::ref<klee::Expr> value) {
     klee::ReadExpr *revalue;
     if (value->getKind() == klee::Expr::Concat) {
         auto *c_value = llvm::cast<klee::ConcatExpr>(value);
@@ -278,7 +283,7 @@ std::string kuc::UCListener::get_name(klee::ref <klee::Expr> value) {
     return globalName;
 }
 
-void kuc::UCListener::resolve_symbolic_expr(const klee::ref <klee::Expr> &symbolicExpr,
+void kuc::UCListener::resolve_symbolic_expr(const klee::ref<klee::Expr> &symbolicExpr,
                                             std::set<std::string> &relatedSymbolicExpr) {
     if (symbolicExpr->getKind() == klee::Expr::Read) {
         std::string name = get_name(symbolicExpr);

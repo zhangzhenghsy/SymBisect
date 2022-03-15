@@ -845,7 +845,7 @@ void Executor::initializeGlobalObjects(ExecutionState &state) {
       if (v.isConstant())
         constantObjects.emplace_back(os);
     } else {
-      os->initializeToRandom();
+      os->initializeToZero();
     }
   }
 
