@@ -185,12 +185,13 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
     if (ty->isPointerTy() && ty->getPointerElementType()->isSized()) {
         auto ret = executor->getDestCell(state, ki).value;
         if (ret->getKind() == klee::Expr::Constant) {
-            auto ce = llvm::cast<klee::ConstantExpr>(ret);
-            if (ce->getZExtValue() == 0) {
-
-            } else {
-                return;
-            }
+            //auto ce = llvm::cast<klee::ConstantExpr>(ret);
+            //if (ce->getZExtValue() == 0) {
+            //
+            //} else {
+            //    return;
+            //}
+            return;
         }
         klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
 
