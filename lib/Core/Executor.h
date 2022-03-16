@@ -96,6 +96,7 @@ class Executor : public Interpreter {
   friend class StatsTracker;
   friend class MergeHandler;
   friend klee::Searcher *klee::constructUserSearcher(Executor &executor);
+  friend class kuc::ListenerService;
 
 public:
   typedef std::pair<ExecutionState*,ExecutionState*> StatePair;

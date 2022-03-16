@@ -69,8 +69,8 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             break;
         }
         case llvm::Instruction::Load: {
-            //yhao_print(executor->getDestCell(state, ki).value->print, str)
-            //klee::klee_message("value: %s", str.c_str());
+            yhao_print(executor->getDestCell(state, ki).value->print, str)
+            klee::klee_message("value: %s", str.c_str());
             symbolic_after_load(state, ki);
             break;
         }
@@ -185,12 +185,6 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
     if (ty->isPointerTy() && ty->getPointerElementType()->isSized()) {
         auto ret = executor->getDestCell(state, ki).value;
         if (ret->getKind() == klee::Expr::Constant) {
-            //auto ce = llvm::cast<klee::ConstantExpr>(ret);
-            //if (ce->getZExtValue() == 0) {
-            //
-            //} else {
-            //    return;
-            //}
             return;
         }
         klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;

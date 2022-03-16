@@ -6,6 +6,7 @@
 #include "../ToolLib/log.h"
 #include "UCListener.h"
 #include "PathListener.h"
+#include "../../Core/Executor.h"
 
 namespace kuc {
     ListenerService::ListenerService(klee::Executor *executor) {
@@ -56,6 +57,11 @@ namespace kuc {
     }
 
     void ListenerService::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
+        for (auto es: this->executor->removedStates) {
+            if (&state == es) {
+                return;
+            }
+        }
         for (auto &listener: listeners) {
             listener->afterExecuteInstruction(state, ki);
         }
