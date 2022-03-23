@@ -28,6 +28,11 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
             low_priority_functions.insert(temp.get<std::string>());
         }
     }
+    if (config.contains("low_priority_line_list") && config["low_priority_line_list"].is_array()) {
+        for (const auto &temp: config["12_low_priority_line_list"]) {
+            low_priority_lines.insert(temp.get<std::string>());
+        }
+    }
 
     // for MLTA indirect function call
     auto MName = this->executor->get_module()->getName();
@@ -115,6 +120,10 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
     // for low_priority_functions
     auto name_f = get_real_function_name(bb->getParent());
     if (low_priority_functions.find(name_f) != low_priority_functions.end()) {
+        this->executor->terminateState(state);
+    }
+    auto name_l = dump_inst_sourceinfo(ki->inst);
+    if (low_priority_lines.find(name_l) != low_priority_lines.end()) {
         this->executor->terminateState(state);
     }
 }

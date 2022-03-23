@@ -142,6 +142,36 @@ std::string dump_inst_booltin(llvm::Instruction *inst) {
     return res;
 }
 
+// added by zheng
+std::string dump_inst_sourceinfo(llvm::Instruction *inst) {
+    std::string res;
+
+    if (inst != nullptr) {
+//            inst->dump();
+    } else {
+        return res;
+    }
+    auto b = inst->getParent();
+    auto f = b->getParent();
+
+    unsigned int line = 1;
+    std::string Path = get_file_name(f);
+    if (inst->hasMetadata()) {
+        const llvm::DebugLoc &debugInfo = inst->getDebugLoc();
+        if (debugInfo) {
+            Path = debugInfo->getFilename().str();
+            line = debugInfo->getLine();
+        }
+    }
+
+    res +=  Path + ":" + std::to_string(line);
+    //res += Path + "#L" + std::to_string(line);
+    if (line == 1){
+        res = "";
+    }
+    return res;
+}
+
 std::string real_inst_str(std::string str) {
     auto index = str.find_last_of('#');
     if (index == std::string::npos) {
