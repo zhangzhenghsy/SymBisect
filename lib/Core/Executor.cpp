@@ -3842,8 +3842,9 @@ void Executor::callExternalFunction(ExecutionState &state,
 
   bool success = externalDispatcher->executeCall(function, target->inst, args);
   if (!success) {
-    terminateStateOnError(state, "failed external call: " + function->getName(),
-                          External);
+    klee_warning("failed external call:  %s\n", function->getName().str().c_str());
+    //terminateStateOnError(state, "failed external call: " + function->getName(),
+    //                      External);
     return;
   }
 
