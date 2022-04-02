@@ -134,7 +134,7 @@ std::string dump_inst_booltin(llvm::Instruction *inst) {
         }
     }
 
-    res += "https://elixir.bootlin.com/linux/v4.14/source/" + Path + "#L" + std::to_string(line);
+    res += "https://elixir.bootlin.com/linux/v5.5-rc5/source/" + Path + "#L" + std::to_string(line);
     //res += Path + "#L" + std::to_string(line);
     if (line == 1){
         res = "";

@@ -10,6 +10,8 @@
 #include "../MLTA/TypeInitializer.hh"
 #include "../MLTA/CallGraph.hh"
 
+#include "klee/Support/ErrorHandling.h"
+
 
 kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
@@ -28,8 +30,8 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
             low_priority_functions.insert(temp.get<std::string>());
         }
     }
-    if (config.contains("low_priority_line_list") && config["low_priority_line_list"].is_array()) {
-        for (const auto &temp: config["12_low_priority_line_list"]) {
+    if (config.contains("13_low_priority_line_list") && config["13_low_priority_line_list"].is_array()) {
+        for (const auto &temp: config["13_low_priority_line_list"]) {
             low_priority_lines.insert(temp.get<std::string>());
         }
     }
@@ -124,6 +126,7 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
     }
     auto name_l = dump_inst_sourceinfo(ki->inst);
     if (low_priority_lines.find(name_l) != low_priority_lines.end()) {
+        klee::klee_message("reach low priority line list");
         this->executor->terminateState(state);
     }
 }
