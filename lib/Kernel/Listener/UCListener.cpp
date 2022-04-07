@@ -191,6 +191,7 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
     // check value of load, if it is pointer, create mo and symbolic os
     auto ty = ki->inst->getType();
     if (ty->isPointerTy() && ty->getPointerElementType()->isSized()) {
+        // the return value (a pointer) of load instruction
         auto ret = executor->getDestCell(state, ki).value;
         if (ret->getKind() == klee::Expr::Constant) {
             return;

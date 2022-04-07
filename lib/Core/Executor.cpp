@@ -2129,6 +2129,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   case Instruction::Br: {
     BranchInst *bi = cast<BranchInst>(i);
     if (bi->isUnconditional()) {
+      klee::klee_message("Instruction::Br is Unconditional");
       transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
     } else {
       // FIXME: Find a way that we don't have this hidden dependency.
@@ -2136,8 +2137,14 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
              "Wrong operand index!");
       ref<Expr> cond = eval(ki, 0, state).value;
 
+      klee::klee_message("Instruction::Br is conditional Fork()");
+      std::string conditionstr = cond.get_ptr()->dump2();
+      klee::klee_message("Cond: %s",conditionstr.c_str());
       cond = optimizer.optimizeExpr(cond, false);
+     
       Executor::StatePair branches = fork(state, cond, false);
+      klee::klee_message("branches.first: %p branches.second: %p", branches.first, branches.second);
+      //klee::klee_message("branches.second: %p", branches.second);
 
       // NOTE: There is a hidden dependency here, markBranchVisited
       // requires that we still be in the context of the branch
@@ -2355,7 +2362,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     // generate unreachable instructions in cases where it knows the
     // program will crash. So it is effectively a SEGV or internal
     // error.
-    terminateStateOnExecError(state, "reached \"unreachable\" instruction");
+    //terminateStateOnExecError(state, "reached \"unreachable\" instruction");
+    klee_warning("Error reached \"unreachable\" instruction");
     break;
 
   case Instruction::Invoke:
@@ -3268,7 +3276,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   // Other instructions...
   // Unhandled
   default:
-    terminateStateOnExecError(state, "illegal instruction");
+    //terminateStateOnExecError(state, "illegal instruction");
+    klee_warning("illegal instruction");
     break;
   }
 }
@@ -4288,8 +4297,9 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     if (incomplete) {
       terminateStateEarly(*unbound, "Query timed out (resolve).");
     } else {
-      terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
-                            NULL, getAddressInfo(*unbound, address));
+      //terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
+      //                      NULL, getAddressInfo(*unbound, address));
+      klee_warning("memory error: out of bound pointer");
     }
   }
 }
