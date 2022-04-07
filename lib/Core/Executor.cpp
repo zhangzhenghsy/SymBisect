@@ -3734,6 +3734,9 @@ void Executor::callExternalFunction(ExecutionState &state,
   if (specialFunctionHandler->handle(state, function, target, arguments))
     return;
 
+  // yhao:
+  return;
+
   if (ExternalCalls == ExternalCallPolicy::None &&
       !okExternals.count(function->getName().str())) {
     klee_warning("Disallowed call to external function: %s\n",
