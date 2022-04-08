@@ -2382,6 +2382,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
     unsigned numArgs = cs.arg_size();
     Function *f = getTargetFunction(fp, state);
+    if(!f){
+      klee_warning("Call Inst Function name is 0");
+      break;
+    }
+    std::string funcname = f->getName().str();
+    klee::klee_message("Call Inst Function name: %s", funcname.c_str());
+    if(funcname == "llvm.read_register.i64" or funcname == "llvm.write_register.i64"){
+      klee_warning("call function llvm.read_register.i64");
+      break;
+    }
 
     if (isa<InlineAsm>(fp)) {
       //terminateStateOnExecError(state, "inline assembly is unsupported");
@@ -2391,6 +2401,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     // evaluate arguments
     std::vector< ref<Expr> > arguments;
     arguments.reserve(numArgs);
+
+    klee::klee_message( "numArgs: %s", std::to_string(numArgs).c_str() );
 
     for (unsigned j=0; j<numArgs; ++j)
       arguments.push_back(eval(ki, j+1, state).value);
