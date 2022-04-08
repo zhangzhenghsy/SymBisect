@@ -24,6 +24,8 @@ namespace kuc {
 
         void afterRun(klee::ExecutionState &state) override;
 
+        bool CallInstruction(klee::ExecutionState &state, klee::KInstruction *ki) override;
+
         void executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) override;
 
     public:

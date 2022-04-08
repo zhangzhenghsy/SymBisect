@@ -10,7 +10,12 @@
 
 
 kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
-
+    config = executor->config;
+    if (config.contains("13_skip_function_list") && config["13_skip_function_list"].is_array()) {
+        for (const auto &temp: config["13_skip_function_list"]) {
+            skip_functions.insert(temp.get<std::string>());
+        }
+    }
 }
 
 kuc::UCListener::~UCListener() = default;
@@ -93,6 +98,35 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
 
 void kuc::UCListener::afterRun(klee::ExecutionState &state) {
 
+}
+
+bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
+    auto cs = llvm::cast<llvm::CallBase>(ki->inst);
+    llvm::Value *fp = cs->getCalledOperand();
+    llvm::Function *f = executor->getTargetFunction(fp, state);
+    if (llvm::isa<llvm::InlineAsm>(fp)) {
+        return false;
+    }
+    if (f && f->isDeclaration()) {
+        switch (f->getIntrinsicID()) {
+            case llvm::Intrinsic::not_intrinsic: {
+                if (executor->special_function(f)) {
+                    return false;
+                }
+                return true;
+            }
+            default: {
+            }
+        }
+    } else if (f && !f->isDeclaration()) {
+        std::string name = f->getName().str();
+        if (skip_functions.find(name) == skip_functions.end()) {
+
+        } else {
+            return true;
+        }
+    }
+    return false;
 }
 
 void kuc::UCListener::executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) {
@@ -220,7 +254,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
     llvm::Value *fp = cs->getCalledOperand();
     llvm::Function *f = executor->getTargetFunction(fp, state);
     if (llvm::isa<llvm::InlineAsm>(fp)) {
-        goto create_return;;
+        goto create_return;
     }
     if (f && f->isDeclaration()) {
         switch (f->getIntrinsicID()) {
@@ -234,6 +268,13 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
             default: {
                 return;
             }
+        }
+    } else if (f && !f->isDeclaration()) {
+        std::string name = f->getName().str();
+        if (skip_functions.find(name) == skip_functions.end()) {
+            return;
+        } else {
+            goto create_return;
         }
     } else if (!f) {
         klee::klee_message("!f");
