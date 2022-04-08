@@ -15,6 +15,7 @@
 
 kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
+
     if (config.contains("10_target_bb_list") && config["10_target_bb_list"].is_array()) {
         for (const auto &temp: config["10_target_bb_list"]) {
             target_bbs.insert(temp.get<std::string>());
@@ -34,6 +35,13 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
         for (const auto &temp: config["13_low_priority_line_list"]) {
             low_priority_lines.insert(temp.get<std::string>());
         }
+    }
+
+    if (config.contains("14_print_inst")) {
+        print_inst = config["14_print_inst"];
+    }
+    else {
+        print_inst = false;
     }
 
     // for MLTA indirect function call
@@ -56,6 +64,13 @@ void kuc::PathListener::beforeRun(klee::ExecutionState &initialState) {
 }
 
 void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
+
+    if (print_inst){
+        std::string str;
+        yhao_print(ki->inst->print, str)
+        klee::klee_message("inst: %s", str.c_str());
+    }
+    
 
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::Call: {
@@ -109,7 +124,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
 }
 
 void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
-    std::string str;
+
     auto bb = ki->inst->getParent();
     auto name_bb = bb->getName().str();
     if (target_bbs.find(name_bb) != target_bbs.end()) {

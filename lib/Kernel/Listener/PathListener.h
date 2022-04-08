@@ -33,6 +33,7 @@ namespace kuc {
         std::set<std::string> low_priority_functions;
         //added by zheng
         std::set<std::string> low_priority_lines;
+        bool print_inst;
 
         std::string temp_call_cond_name = "temp_call_cond";
         uint64_t temp_call_cond_count = 0;
