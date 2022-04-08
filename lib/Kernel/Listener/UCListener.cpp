@@ -237,7 +237,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
                 if (executor->special_function(f)) {
                     return;
                 }
-                yhao_log(1, "case llvm::Intrinsic::not_intrinsic:");
+                klee::klee_message("case llvm::Intrinsic::not_intrinsic:");
                 goto create_return;
             }
             default: {
