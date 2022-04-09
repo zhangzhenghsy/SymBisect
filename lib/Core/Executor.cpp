@@ -2391,12 +2391,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       klee_warning("Call Inst Function name is 0");
       break;
     }
-    std::string funcname = f->getName().str();
-    klee::klee_message("Call Inst Function name: %s", funcname.c_str());
-    if(funcname == "llvm.read_register.i64" or funcname == "llvm.write_register.i64"){
-      klee_warning("call function llvm.read_register.i64");
-      break;
-    }
 
     if (isa<InlineAsm>(fp)) {
       //terminateStateOnExecError(state, "inline assembly is unsupported");

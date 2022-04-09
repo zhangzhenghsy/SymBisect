@@ -13,6 +13,7 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
     if (config.contains("13_skip_function_list") && config["13_skip_function_list"].is_array()) {
         for (const auto &temp: config["13_skip_function_list"]) {
+            std::string tmp = temp.get<std::string>();
             skip_functions.insert(temp.get<std::string>());
         }
     }
@@ -115,6 +116,11 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
     if (llvm::isa<llvm::InlineAsm>(fp)) {
         return false;
     }
+    std::string name = f->getName().str();
+    if (skip_functions.find(name) != skip_functions.end()) {
+        klee::klee_message("skip function: %s",name.c_str());
+        return true;
+    }
     if (f && f->isDeclaration()) {
         switch (f->getIntrinsicID()) {
             case llvm::Intrinsic::not_intrinsic: {
@@ -125,13 +131,6 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
             }
             default: {
             }
-        }
-    } else if (f && !f->isDeclaration()) {
-        std::string name = f->getName().str();
-        if (skip_functions.find(name) == skip_functions.end()) {
-
-        } else {
-            return true;
         }
     }
     return false;
