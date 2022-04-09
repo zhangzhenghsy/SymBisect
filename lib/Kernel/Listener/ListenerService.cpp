@@ -73,6 +73,19 @@ namespace kuc {
         }
     }
 
+    bool ListenerService::CallInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
+        for (auto es: this->executor->removedStates) {
+            if (&state == es) {
+                return false;
+            }
+        }
+        bool ret = false;
+        for (auto &listener: listeners) {
+            ret = ret || listener->CallInstruction(state, ki);
+        }
+        return ret;
+    }
+
     void ListenerService::executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) {
         for (auto &listener: listeners) {
             listener->executionFailed(state, ki);

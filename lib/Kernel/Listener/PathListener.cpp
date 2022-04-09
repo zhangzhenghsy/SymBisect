@@ -150,6 +150,10 @@ void kuc::PathListener::afterRun(klee::ExecutionState &state) {
 
 }
 
+bool kuc::PathListener::CallInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
+    return false;
+}
+
 void kuc::PathListener::executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) {
 
 }

@@ -2368,6 +2368,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
   case Instruction::Invoke:
   case Instruction::Call: {
+
+    if(listener_service->CallInstruction(state, ki)) {
+        break;
+    }
+
     // Ignore debug intrinsic calls
     if (isa<DbgInfoIntrinsic>(i))
       break;
@@ -3772,9 +3777,6 @@ void Executor::callExternalFunction(ExecutionState &state,
   // check if specialFunctionHandler wants it
   if (specialFunctionHandler->handle(state, function, target, arguments))
     return;
-
-  // yhao:
-  return;
 
   if (ExternalCalls == ExternalCallPolicy::None &&
       !okExternals.count(function->getName().str())) {

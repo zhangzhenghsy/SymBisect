@@ -28,6 +28,7 @@ namespace kuc {
         virtual void beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) = 0;
         virtual void afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) = 0;
         virtual void afterRun(klee::ExecutionState &state) = 0;
+        virtual bool CallInstruction(klee::ExecutionState &state, klee::KInstruction *ki) = 0;
         virtual void executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) = 0;
     };
 }

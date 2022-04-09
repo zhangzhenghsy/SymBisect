@@ -6,6 +6,7 @@
 #define KLEE_UCLISTENER_H
 
 #include "Listener.h"
+#include "../ToolLib/json.hpp"
 
 namespace kuc {
     class UCListener : public Listener {
@@ -22,6 +23,8 @@ namespace kuc {
 
         void afterRun(klee::ExecutionState &state) override;
 
+        bool CallInstruction(klee::ExecutionState &state, klee::KInstruction *ki) override;
+
         void executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) override;
 
         // count for global var name
@@ -30,6 +33,9 @@ namespace kuc {
         std::map<klee::ref<klee::Expr>, klee::ref<klee::Expr>> map_symbolic_address;
         // mo->getBaseExpr() <-> symbolic address
         std::map<klee::ref<klee::Expr>, klee::ref<klee::Expr>> map_address_symbolic;
+
+        nlohmann::json config;
+        std::set<std::string> skip_functions;
 
     private:
         std::string create_global_var_name(llvm::Instruction *i, int64_t index, const std::string &kind);

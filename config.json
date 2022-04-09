@@ -1,0 +1,8 @@
+{
+  "2_bitcode": "path of bitcode",
+  "3_entry_function": "entry function for under constraint symbolic execution",
+  "10_target_bb_list" : [],
+  "11_low_priority_bb_list" : [],
+  "12_low_priority_function_list" : [],
+  "13_skip_function_list": []
+}

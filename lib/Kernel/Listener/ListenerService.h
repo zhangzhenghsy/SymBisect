@@ -41,6 +41,8 @@ namespace kuc {
 
         void afterRun(klee::ExecutionState &state);
 
+        bool CallInstruction(klee::ExecutionState &state, klee::KInstruction *ki);
+
         void executionFailed(klee::ExecutionState &state, klee::KInstruction *ki);
     };
 }
