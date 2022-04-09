@@ -31,14 +31,14 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
             low_priority_functions.insert(temp.get<std::string>());
         }
     }
-    if (config.contains("13_low_priority_line_list") && config["13_low_priority_line_list"].is_array()) {
-        for (const auto &temp: config["13_low_priority_line_list"]) {
+    if (config.contains("90_low_priority_line_list") && config["90_low_priority_line_list"].is_array()) {
+        for (const auto &temp: config["90_low_priority_line_list"]) {
             low_priority_lines.insert(temp.get<std::string>());
         }
     }
 
-    if (config.contains("14_print_inst")) {
-        print_inst = config["14_print_inst"];
+    if (config.contains("91_print_inst")) {
+        print_inst = config["91_print_inst"];
     }
     else {
         print_inst = false;
