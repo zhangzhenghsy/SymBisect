@@ -13,7 +13,6 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
     if (config.contains("13_skip_function_list") && config["13_skip_function_list"].is_array()) {
         for (const auto &temp: config["13_skip_function_list"]) {
-            std::string tmp = temp.get<std::string>();
             skip_functions.insert(temp.get<std::string>());
         }
     }
@@ -58,13 +57,13 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
 
             klee::ref<klee::Expr> value = executor->eval(ki, 0, state).value;
             yhao_print(value->print, str)
-            klee::klee_message("value: %s", str.c_str());
+            klee::klee_message("Store Inst value: %s", str.c_str());
             if (value->getKind() != klee::Expr::Constant) {
                 klee::klee_message("non-constant store value");
             }
             klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
             yhao_print(base->print, str)
-            klee::klee_message("base: %s", str.c_str());
+            klee::klee_message("Store Inst base: %s", str.c_str());
 
             // yhao: symbolic execution: this should only happen when pointer in arguments
             this->symbolic_before_store(state, ki);
@@ -83,7 +82,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             break;
         }
         case llvm::Instruction::Load: {
-            yhao_print(executor->getDestCell(state, ki).value->print, str)
+            yhao_print(executor->getDestCell(state, ki).value->print, str);
             klee::klee_message("value: %s", str.c_str());
             symbolic_after_load(state, ki);
             break;
