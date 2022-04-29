@@ -153,6 +153,10 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
     if (llvm::isa<llvm::InlineAsm>(fp)) {
         return false;
     }
+    if (!f) {
+	klee::klee_message("skip function: unrecognized f");
+	return true;
+    }
     std::string name = f->getName().str();
     if (skip_functions.find(name) != skip_functions.end()) {
         klee::klee_message("skip function: %s",name.c_str());

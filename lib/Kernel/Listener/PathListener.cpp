@@ -86,7 +86,8 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             if (f) {
                 break;
             }
-
+            
+	    break;
             // pick function form function_map(json) or GlobalCtx(MLTA)
             std::set<llvm::Function *> callee_function_set;
             if (this->function_map.find(ci) != this->function_map.end()) {
