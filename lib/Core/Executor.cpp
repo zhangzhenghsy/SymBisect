@@ -3558,7 +3558,7 @@ void Executor::run(ExecutionState &initialState) {
   // main interpreter loop
   while (!states.empty() && !haltExecution) {
     ExecutionState &state = searcher->selectState();
-    klee::klee_message("searcher->selectState() &state: %p", &state);
+    //klee::klee_message("searcher->selectState() &state: %p", &state);
     KInstruction *ki = state.pc;
     stepInstruction(state);
 
@@ -4226,6 +4226,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   solver->setTimeout(time::Span());
 
   if (success) {
+    klee::klee_message("Executor::executeMemoryOperation find the object");
     const MemoryObject *mo = op.first;
 
     if (MaxSymArraySize && mo->size >= MaxSymArraySize) {

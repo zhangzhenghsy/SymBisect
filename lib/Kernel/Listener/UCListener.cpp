@@ -29,8 +29,8 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     std::string str;
     //yhao_log(1, inst_to_strID(ki->inst));
     //yhao_log(1, dump_inst_booltin(ki->inst));
-    //yhao_print(ki->inst->print, str)
-    //klee::klee_message("%s", str.c_str());
+    yhao_print(ki->inst->print, str)
+    klee::klee_message("inst: %s", str.c_str());
     
     klee::klee_message("ExecutionState &state: %p", &state);
     klee::klee_message("bb name i->getParent()->getName().str() %s",ki->inst->getParent()->getName().str().c_str());
@@ -38,16 +38,35 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     if (sourceinfo!= ""){
     klee::klee_message("line sourceinfo %s",sourceinfo.c_str());
     }
+    klee::klee_message("target->dest: %d", ki->dest);
+    int inst_type[] = {llvm::Instruction::GetElementPtr, llvm::Instruction::Load, llvm::Instruction::Store, llvm::Instruction::Ret, llvm::Instruction::ICmp};
+    int *find = std::find(std::begin(inst_type), std::end(inst_type), ki->inst->getOpcode());
+    if (find != std::end(inst_type)){
+    size_t i = 0;
+    while (i < ki->inst->getNumOperands())
+    {
+        klee::klee_message("ki->operands[%zu] vnumber: %d", i, ki->operands[i]);
+        if(ki->operands[i]==-1)
+        {  
+            i++;
+            continue;
+        }
+        klee::ref<klee::Expr> operand = executor->eval(ki, i, state).value;
+        yhao_print(operand->print, str);
+        klee::klee_message("Inst operand %zu: %s", i, str.c_str());
+        i++;
+    }
+    }
+    
 
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
             break;
         }
         case llvm::Instruction::Load: {
-
-            klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
-            yhao_print(base->print, str)
-            klee::klee_message("base: %s", str.c_str());
+            //klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
+            //yhao_print(base->print, str);
+            //klee::klee_message("Load Inst base: %s", str.c_str());
 
             // yhao: symbolic execution
             this->symbolic_before_load(state, ki);
@@ -55,18 +74,30 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
         }
         case llvm::Instruction::Store: {
 
+            /*klee::klee_message("ki->operands[0] vnumber: %d", ki->operands[0]);
             klee::ref<klee::Expr> value = executor->eval(ki, 0, state).value;
             yhao_print(value->print, str)
             klee::klee_message("Store Inst value: %s", str.c_str());
             if (value->getKind() != klee::Expr::Constant) {
                 klee::klee_message("non-constant store value");
             }
+            klee::klee_message("ki->operands[1] vnumber: %d", ki->operands[1]);
             klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
-            yhao_print(base->print, str)
-            klee::klee_message("Store Inst base: %s", str.c_str());
+            yhao_print(base->print, str);
+            klee::klee_message("Store Inst base: %s", str.c_str());*/
 
             // yhao: symbolic execution: this should only happen when pointer in arguments
             this->symbolic_before_store(state, ki);
+            break;
+        }
+        case llvm::Instruction::Ret: {
+//            klee::klee_message("ki->operands[0] vnumber: %d", ki->operands[0]);
+//            klee::ref<klee::Expr> value = executor->eval(ki, 0, state).value;
+//            yhao_print(value->print, str);
+//            klee::klee_message("Ret Inst value: %s", str.c_str());
+            break;
+        }
+        case llvm::Instruction::ICmp: {
             break;
         }
         default: {
@@ -77,14 +108,17 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
 
 void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
+    klee::klee_message("UCListener::afterExecuteInstruction");
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
+            yhao_print(executor->getDestCell(state, ki).value->print, str);
+            klee::klee_message("ICMP Inst value: %s", str.c_str());
             break;
         }
         case llvm::Instruction::Load: {
             yhao_print(executor->getDestCell(state, ki).value->print, str);
-            klee::klee_message("value: %s", str.c_str());
-            symbolic_after_load(state, ki);
+            klee::klee_message("Load Inst value: %s", str.c_str());
+            //symbolic_after_load(state, ki);
             break;
         }
         case llvm::Instruction::Call: {
@@ -97,6 +131,10 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             yhao_print(ki->inst->getOperand(0)->getType()->print, str)
             klee::klee_message("BitCast: %s", str.c_str());
             break;
+        }
+        case llvm::Instruction::ICmp: {
+            yhao_print(executor->getDestCell(state, ki).value->print, str);
+            klee::klee_message("ICMP Inst value: %s", str.c_str());
         }
         default: {
             break;
