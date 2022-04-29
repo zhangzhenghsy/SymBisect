@@ -112,7 +112,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
             yhao_print(executor->getDestCell(state, ki).value->print, str);
-            klee::klee_message("ICMP Inst value: %s", str.c_str());
+            klee::klee_message("GetElementPtr Inst value: %s", str.c_str());
             break;
         }
         case llvm::Instruction::Load: {
