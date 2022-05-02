@@ -4295,7 +4295,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
 
   // we are on an error path (no resolution, multiple resolution, one
   // resolution with out of bounds)
-
+  klee::klee_message("executeMemoryOperation we are on an error path");
   address = optimizer.optimizeExpr(address, true);
   ResolutionList rl;  
   solver->setTimeout(coreSolverTimeout);
@@ -4338,8 +4338,10 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   // XXX should we distinguish out of bounds and overlapped cases?
   if (unbound) {
     if (incomplete) {
+      klee::klee_message("Query timed out (resolve).");
       terminateStateEarly(*unbound, "Query timed out (resolve).");
     } else {
+      klee::klee_message("memory error: out of bound pointer");
       terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
                             NULL, getAddressInfo(*unbound, address));
       //klee_warning("memory error: out of bound pointer");

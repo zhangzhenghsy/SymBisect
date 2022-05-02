@@ -247,8 +247,8 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
     if (real_address) {
         klee::klee_message("real_address");
     } else if (map_symbolic_address.find(base) != map_symbolic_address.end()) {
-        klee::klee_message("find store symbolic");
-        executor->un_eval(ki, 0, state).value = map_symbolic_address[base];
+        klee::klee_message("find corresponding real_address of store symbolic address %s", map_symbolic_address[base].get_ptr()->dump2().c_str());
+        executor->un_eval(ki, 1, state).value = map_symbolic_address[base];
     } else {
         klee::klee_message("make store symbolic");
         auto ty = ki->inst->getOperand(0)->getType();
