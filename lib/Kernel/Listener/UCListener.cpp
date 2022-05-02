@@ -100,6 +100,18 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
         case llvm::Instruction::ICmp: {
             break;
         }
+	case llvm::Instruction::Br: {
+	    klee::klee_message("----- Br Inst print current constraints: -----");
+	    klee::ConstraintSet constraints = state.constraints;
+	    for (auto it = constraints.begin(), ie = constraints.end(); it != ie;) {
+		    klee::ref<klee::Expr> value = *it;
+		    yhao_print(value->print, str);
+		    klee::klee_message("Br constraint: %s", str.c_str());
+		    ++it;
+	    }
+	    klee::klee_message("----------------");
+	
+	}
         default: {
 
         }
