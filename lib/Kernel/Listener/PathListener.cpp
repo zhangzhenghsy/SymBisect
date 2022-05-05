@@ -71,6 +71,22 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
         klee::klee_message("inst: %s", str.c_str());
     }
     
+    
+    int endIndex = state.stack.size() - 1;
+    string calltrace = "";
+    for (int i = 0; i <= endIndex; i++) {
+        auto const &sf = state.stack.at(i);
+        klee::KFunction* kf = sf.kf;
+        llvm::Function* f = kf ? kf->function : 0;
+        if (f)
+        {
+            calltrace.append(f->getName().str());
+            calltrace.append("--");
+        }
+    }
+    calltrace.pop_back();
+    calltrace.pop_back();
+    klee::klee_message("call trace: %s",calltrace.c_str());
 
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::Call: {

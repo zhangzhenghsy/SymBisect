@@ -2400,12 +2400,15 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   case Instruction::Call: {
 
     if(listener_service->CallInstruction(state, ki)) {
+        klee::klee_message("skip function call: listener_service->CallInstruction(state, ki) return true");
         break;
     }
 
     // Ignore debug intrinsic calls
-    if (isa<DbgInfoIntrinsic>(i))
+    if (isa<DbgInfoIntrinsic>(i)){
+      klee::klee_message("skip function call: Ignore debug intrinsic calls");
       break;
+    }
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(8, 0)
     const CallBase &cs = cast<CallBase>(*i);

@@ -39,13 +39,14 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     klee::klee_message("line sourceinfo %s",sourceinfo.c_str());
     }
     klee::klee_message("target->dest: %d", ki->dest);
-    int inst_type[] = {llvm::Instruction::GetElementPtr, llvm::Instruction::Load, llvm::Instruction::Store, llvm::Instruction::Ret, llvm::Instruction::ICmp};
+    int inst_type[] = {llvm::Instruction::GetElementPtr, llvm::Instruction::Load, llvm::Instruction::Store, llvm::Instruction::Ret, llvm::Instruction::ICmp, llvm::Instruction::Call};
     int *find = std::find(std::begin(inst_type), std::end(inst_type), ki->inst->getOpcode());
     if (find != std::end(inst_type)){
     size_t i = 0;
+    klee::klee_message("ki->inst->getNumOperands(): %d", ki->inst->getNumOperands());
     while (i < ki->inst->getNumOperands())
     {
-        klee::klee_message("ki->operands[%zu] vnumber: %d", i, ki->operands[i]);
+        //klee::klee_message("ki->operands[%zu] vnumber: %d", i, ki->operands[i]);
         if(ki->operands[i]==-1)
         {  
             i++;
@@ -100,18 +101,18 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
         case llvm::Instruction::ICmp: {
             break;
         }
-	case llvm::Instruction::Br: {
-	    klee::klee_message("----- Br Inst print current constraints: -----");
-	    klee::ConstraintSet constraints = state.constraints;
-	    for (auto it = constraints.begin(), ie = constraints.end(); it != ie;) {
-		    klee::ref<klee::Expr> value = *it;
-		    yhao_print(value->print, str);
-		    klee::klee_message("Br constraint: %s", str.c_str());
-		    ++it;
-	    }
-	    klee::klee_message("----------------");
+	    case llvm::Instruction::Br: {
+	        klee::klee_message("----- Br Inst print current constraints: -----");
+	        klee::ConstraintSet constraints = state.constraints;
+	        for (auto it = constraints.begin(), ie = constraints.end(); it != ie;) {
+		        klee::ref<klee::Expr> value = *it;
+		        yhao_print(value->print, str);
+		        klee::klee_message("Br constraint: %s", str.c_str());
+		        ++it;
+	        }
+	        klee::klee_message("----------------");
 	
-	}
+    	}
         default: {
 
         }
@@ -180,6 +181,7 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
                 if (executor->special_function(f)) {
                     return false;
                 }
+                klee::klee_message("function: Intrinsic::not_intrinsic");
                 return true;
             }
             default: {
@@ -311,6 +313,7 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
 }
 
 void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KInstruction *ki) {
+    klee::klee_message("symbolic_after_call");
     auto cs = llvm::cast<llvm::CallBase>(ki->inst);
     llvm::Value *fp = cs->getCalledOperand();
     llvm::Function *f = executor->getTargetFunction(fp, state);
@@ -318,6 +321,11 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
         goto create_return;
     }
     if (f && f->isDeclaration()) {
+        klee::klee_message("f->isDeclaration()");
+        std::string name = f->getName().str();
+        if (skip_functions.find(name) != skip_functions.end()) {
+            goto create_return;
+        }
         switch (f->getIntrinsicID()) {
             case llvm::Intrinsic::not_intrinsic: {
                 if (executor->special_function(f)) {
@@ -335,6 +343,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
         if (skip_functions.find(name) == skip_functions.end()) {
             return;
         } else {
+            klee::klee_message("in skip_functions");
             goto create_return;
         }
     } else if (!f) {
