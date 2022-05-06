@@ -131,7 +131,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
         case llvm::Instruction::Load: {
             yhao_print(executor->getDestCell(state, ki).value->print, str);
             klee::klee_message("Load Inst value: %s", str.c_str());
-            //symbolic_after_load(state, ki);
+            symbolic_after_load(state, ki);
             break;
         }
         case llvm::Instruction::Call: {

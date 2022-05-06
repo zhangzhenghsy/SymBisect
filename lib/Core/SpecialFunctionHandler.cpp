@@ -146,6 +146,9 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("__kmalloc", handleKmalloc, true),
   add("iminor", handleIminor, true),
 
+  // zheng: handle kernel function
+  add("memcpy", handleMemcpy, false),
+
 #undef addDNR
 #undef add
 };
@@ -944,4 +947,43 @@ void SpecialFunctionHandler::handleIminor(ExecutionState &state,
     Expr::Width width = executor.getWidthForLLVMType(ty);
     ref<Expr> symbolic = executor.manual_make_symbolic(name, size, width);
     executor.bindLocal(target, state, symbolic);
+}
+
+void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments) {
+    // XXX should type check args
+    assert(arguments.size()==3 && "invalid number of arguments to memcpy");
+
+    ref<Expr> target = arguments[0];
+    ref<Expr> src = arguments[1];
+    ref<Expr> len = arguments[2];
+    klee::klee_message("SpecialFunctionHandler::handleMemcpy");
+    klee::klee_message("target: %s",target.get_ptr()->dump2().c_str());
+    klee::klee_message("src: %s",src.get_ptr()->dump2().c_str());
+    klee::klee_message("len: %s",len.get_ptr()->dump2().c_str());
+
+    ObjectPair op;
+    bool success;
+    if (ConstantExpr *CE = dyn_cast<ConstantExpr>(src)) {
+      success = state.addressSpace.resolveOne(CE, op);
+    } else{
+      klee::klee_message("memcpy not constant src address. Return directly");
+      return;
+    }
+
+    if(!success){
+      klee::klee_message("Not find the corresponding object according to the address. Return directly");
+    }
+
+    const ObjectState *os = op.second;
+    uint64_t length = len->getZExtValue();
+    for(int i =0; i<length, i++){
+      ref<Expr> offset = ConstantExpr::create(i, Context::get().getPointerWidth());
+      ref<Expr> value = os->read(offset, 8);
+
+      ref<Expr> base = AddExpr::create(target, ConstantExpr::create(i, Context::get().getPointerWidth()))
+      executeMemoryOperation(state, true, base, value, 0);
+    }
+
 }

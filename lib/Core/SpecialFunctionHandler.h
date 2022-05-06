@@ -147,6 +147,8 @@ namespace klee {
     // yu hao: handle kernel function
     HANDLER(handleKmalloc);
     HANDLER(handleIminor);
+    // zheng: handle kernel function
+    HADNLER(handleMemcpy);
 #undef HANDLER
   };
 } // End klee namespace
