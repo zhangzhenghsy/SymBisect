@@ -955,11 +955,11 @@ void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
     // XXX should type check args
     assert(arguments.size()==3 && "invalid number of arguments to memcpy");
 
-    ref<Expr> target = arguments[0];
+    ref<Expr> targetaddr = arguments[0];
     ref<Expr> src = arguments[1];
-    ref<Expr> len = arguments[2];
+    ref<ConstantExpr> len = dyn_cast<ConstantExpr>(arguments[2]);
     klee::klee_message("SpecialFunctionHandler::handleMemcpy");
-    klee::klee_message("target: %s",target.get_ptr()->dump2().c_str());
+    klee::klee_message("targetaddr: %s",targetaddr.get_ptr()->dump2().c_str());
     klee::klee_message("src: %s",src.get_ptr()->dump2().c_str());
     klee::klee_message("len: %s",len.get_ptr()->dump2().c_str());
 
@@ -978,12 +978,12 @@ void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
 
     const ObjectState *os = op.second;
     uint64_t length = len->getZExtValue();
-    for(int i =0; i<length, i++){
+    for(uint64_t i =0; i<length; i++){
       ref<Expr> offset = ConstantExpr::create(i, Context::get().getPointerWidth());
       ref<Expr> value = os->read(offset, 8);
 
-      ref<Expr> base = AddExpr::create(target, ConstantExpr::create(i, Context::get().getPointerWidth()))
-      executeMemoryOperation(state, true, base, value, 0);
+      ref<Expr> base = AddExpr::create(targetaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
+      executor.executeMemoryOperation(state, true, base, value, 0);
     }
 
 }
