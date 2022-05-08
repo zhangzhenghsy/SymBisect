@@ -290,6 +290,11 @@ private:
   void initializeGlobalObject(ExecutionState &state, ObjectState *os, 
 			      const llvm::Constant *c,
 			      unsigned offset);
+
+  // yu hao: initialize global with symbolic value
+  void initializeGlobalObject(ExecutionState &state, ObjectState *os,
+                  llvm::Type *ty,
+                  unsigned offset);
   void initializeGlobals(ExecutionState &state);
   void allocateGlobalObjects(ExecutionState &state);
   void initializeGlobalAliases();
@@ -569,6 +574,10 @@ public:
   std::string inputName = "input";
   uint64_t inputCount = 0;
   ref<Expr> create_symbolic_arg(llvm::Type *ty);
+
+  // yu hao: for initialize global
+  std::string global_name = "global";
+  uint64_t global_count = 0;
 
   // yu hao: useful functions
   Cell& un_eval(KInstruction *ki, unsigned index, ExecutionState &state) const;

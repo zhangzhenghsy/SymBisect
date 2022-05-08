@@ -635,6 +635,43 @@ void Executor::initializeGlobalObject(ExecutionState &state, ObjectState *os,
   }
 }
 
+void Executor::initializeGlobalObject(ExecutionState &state, ObjectState *os,
+                                      llvm::Type *ty,
+                                      unsigned offset) {
+    const auto targetData = kmodule->targetData.get();
+    if (auto *vt = dyn_cast<VectorType>(ty)) {
+        unsigned elementSize =
+                targetData->getTypeStoreSize(vt->getElementType());
+        for (unsigned i=0, e=vt->getNumElements(); i != e; ++i)
+            initializeGlobalObject(state, os, vt->getElementType(),
+                                   offset + i*elementSize);
+    } else if (auto *at = dyn_cast<ArrayType>(ty)) {
+        unsigned elementSize =
+                targetData->getTypeStoreSize(at->getElementType());
+        for (unsigned i=0, e=at->getNumElements(); i != e; ++i)
+            initializeGlobalObject(state, os, at->getElementType(),
+                                   offset + i*elementSize);
+    } else if (auto *st = dyn_cast<StructType>(ty)) {
+        const StructLayout *sl =
+                targetData->getStructLayout(cast<StructType>(st));
+        for (unsigned i=0, e=st->getNumElements(); i != e; ++i)
+            initializeGlobalObject(state, os, st->getElementType(i),
+                                   offset + sl->getElementOffset(i));
+    } else if (auto *pt = dyn_cast<PointerType>(ty)) {
+        std::string name = global_name + "_" +std::to_string(global_count++);
+        unsigned int size = kmodule->targetData->getTypeStoreSize(pt);
+        Expr::Width width = getWidthForLLVMType(pt);
+        auto expr = manual_make_symbolic(name, size, width);
+        os->write(offset, expr);
+    } else if (auto *it = dyn_cast<IntegerType>(ty)) {
+        std::string name = global_name + "_" +std::to_string(global_count++);
+        unsigned int size = kmodule->targetData->getTypeStoreSize(it);
+        Expr::Width width = getWidthForLLVMType(it);
+        auto expr = manual_make_symbolic(name, size, width);
+        os->write(offset, expr);
+    }
+}
+
 MemoryObject * Executor::addExternalObject(ExecutionState &state, 
                                            void *addr, unsigned size, 
                                            bool isReadOnly) {
@@ -847,9 +884,19 @@ void Executor::initializeGlobalObjects(ExecutionState &state) {
       initializeGlobalObject(state, os, v.getInitializer(), 0);
       if (v.isConstant())
         constantObjects.emplace_back(os);
+      // yuhao:
+      else
+        goto init_global_with_symbolic;
     } else {
       os->initializeToZero();
+      // yuhao:
+      goto init_global_with_symbolic;
     }
+
+    continue;
+    // yuhao: initialize global object with symbolic value
+    init_global_with_symbolic:
+      initializeGlobalObject(state, os, v.getType()->getElementType(), 0);
   }
 
   // initialise constant memory that is potentially used with external calls
