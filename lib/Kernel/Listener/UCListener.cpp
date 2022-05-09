@@ -8,6 +8,7 @@
 #include "../../Core/Executor.h"
 #include "klee/Support/ErrorHandling.h"
 
+using namespace klee;
 
 kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
@@ -74,6 +75,18 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             break;
         }
         case llvm::Instruction::Store: {
+            /*
+            klee::MemoryMap objects = state.addressSpace.objects;
+            klee::MemoryMap::iterator tmp=objects.begin();
+            klee_message("list all current objects:");
+            for (; tmp!=objects.end(); ++tmp) {
+                const auto &mo = tmp->first;
+                const klee::ObjectState *os = tmp->second.get();
+                klee::klee_message("mo->address: %lu  mo->size: %u  mo->issymsize: %s", mo->address, mo->size, mo->issymsize.c_str());
+                //klee::ref<klee::Expr> result = os->read(klee::ConstantExpr::create(0, 4),  8);
+                //klee::klee_message("read result: %s", (result.ptr)->dump2().c_str());
+            }
+            */
 
             /*klee::klee_message("ki->operands[0] vnumber: %d", ki->operands[0]);
             klee::ref<klee::Expr> value = executor->eval(ki, 0, state).value;
