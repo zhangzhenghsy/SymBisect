@@ -149,6 +149,7 @@ namespace klee {
     HANDLER(handleIminor);
     // zheng: handle kernel function
     HANDLER(handleMemcpy);
+    HANDLER(handleMemcpyR);
 #undef HANDLER
   };
 } // End klee namespace

@@ -148,6 +148,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 
   // zheng: handle kernel function
   add("memcpy", handleMemcpy, false),
+  add("strncpy_from_user", handleMemcpyR, true),
 
 #undef addDNR
 #undef add
@@ -986,4 +987,12 @@ void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
       executor.executeMemoryOperation(state, true, base, value, 0);
     }
 
+}
+
+void SpecialFunctionHandler::handleMemcpyR(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments) {
+    ref<Expr> ret = ConstantExpr::alloc(0, Expr::Int64);
+    executor.bindLocal(target, state, ret);
+    handleMemcpy(state, target, arguments);
 }
