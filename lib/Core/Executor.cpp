@@ -4947,7 +4947,19 @@ MemoryObject *Executor::create_mo(ExecutionState &state, llvm::Type *ty, llvm::I
         klee_message("ty->isIntegerTy(8)");
         size = kmodule->targetData->getTypeStoreSize(ty) * 4096;
     }
-    MemoryObject *mo = memory->allocate(size,
+    // yu hao: add more space for zero length array
+    auto new_size = (uint64_t)size;
+    if (auto *st = dyn_cast<StructType>(ty)) {
+        auto temp_ty = st->getElementType(st->getNumElements()-1);
+        if (auto temp_at = dyn_cast<ArrayType>(temp_ty)) {
+            if (temp_at->getNumElements() == 0) {
+                new_size += 8192;
+                klee_message("create_mo: create more memory for zero length array");
+            }
+        }
+    }
+
+    MemoryObject *mo = memory->allocate(new_size,
             /*isLocal=*/false, /*isGlobal=*/false,
             /*allocSite=*/inst, /*alignment=*/8);
     executeMakeSymbolic(state, mo, name);
