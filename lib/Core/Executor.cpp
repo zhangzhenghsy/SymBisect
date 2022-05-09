@@ -2087,16 +2087,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   //std::cout << "\n\nExecutor::executeInstruction() ki->inst->print(rso) rso.str() " << rso.str() << "\n";
   //std::cout << "ExecutionState &state: " << &state << "\n";
   //std::cout << "bb name i->getParent()->getName().str()" << i->getParent()->getName().str() << "\n";
-  /*MemoryMap objects = state.addressSpace.objects;
-  MemoryMap::iterator tmp=objects.begin();
-  for (; tmp!=objects.end(); ++tmp) {
-    const auto &mo = tmp->first;
-    const ObjectState *os = tmp->second.get();
-    std::cout << "mo->address: " << mo->address << "  mo->size: " << mo->size << " mo->issymsize: "<< mo->issymsize <<"\n";
-    ref<Expr> result = os->read(ConstantExpr::create(0, 4),  8);
-    std::cout << "read result: " << (result.ptr)->dump2() << "\n";
-    //(result.ptr)->dump();
-  }*/
+
 
   switch (i->getOpcode()) {
     // Control flow
@@ -4278,6 +4269,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   if (success) {
     klee::klee_message("Executor::executeMemoryOperation find the object");
     const MemoryObject *mo = op.first;
+    klee::klee_message("mo->addr: %lu mo->size: %d", mo->address, mo->size);
 
     if (MaxSymArraySize && mo->size >= MaxSymArraySize) {
       address = toConstant(state, address, "max-sym-array-size");
