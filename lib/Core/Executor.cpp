@@ -4384,8 +4384,9 @@ void Executor::executeMemoryOperation(ExecutionState &state,
       terminateStateEarly(*unbound, "Query timed out (resolve).");
     } else {
       klee::klee_message("memory error: out of bound pointer");
-      terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
-                            NULL, getAddressInfo(*unbound, address));
+      klee::klee_message("ignore it now");
+      //terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
+      //                      NULL, getAddressInfo(*unbound, address));
       //klee_warning("memory error: out of bound pointer");
     }
   }

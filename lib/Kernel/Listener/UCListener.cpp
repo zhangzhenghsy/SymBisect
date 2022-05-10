@@ -132,9 +132,28 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     }
 }
 
+//added by zheng
+// if skip OOB error, we need to symbolize the dest value
+void kuc::UCListener::symbolize_Inst_return(klee::ExecutionState &state, klee::KInstruction *ki){
+    llvm::Type *ty = ki->inst->getType();
+    auto sym_name = this->create_global_var_name(ki->inst, 0, "symbolic_Inst_return");
+    klee_message("create symbolic return for Load Inst: %s", sym_name.c_str());
+    unsigned int size =  executor->kmodule->targetData->getTypeStoreSize(ty);
+    Expr::Width width = executor->getWidthForLLVMType(ty);
+    ref<Expr> symbolic = executor->manual_make_symbolic(sym_name, size, width);
+    executor->getDestCell(state, ki).value = symbolic;
+}
+
 void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
     klee::klee_message("UCListener::afterExecuteInstruction");
+
+    unsigned index = ki->dest;
+    klee::klee_message("ki->dest: %u", ki->dest);
+    auto result = executor->getDestCell(state, ki).value;
+    if(!result){
+        klee::klee_message("no return value");
+    };
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
             yhao_print(executor->getDestCell(state, ki).value->print, str);
@@ -142,6 +161,10 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             break;
         }
         case llvm::Instruction::Load: {
+            // if skip OOB error, we need to symbolize the dest value
+            if(!result){
+                symbolize_Inst_return(state, ki);
+            }
             yhao_print(executor->getDestCell(state, ki).value->print, str);
             klee::klee_message("Load Inst value: %s", str.c_str());
             symbolic_after_load(state, ki);
@@ -211,6 +234,12 @@ void kuc::UCListener::executionFailed(klee::ExecutionState &state, klee::KInstru
 std::string kuc::UCListener::create_global_var_name(llvm::Instruction *i, int64_t index, const std::string &kind) {
     std::string name;
     name += inst_to_strID(i);
+    //add by zheng
+    std::string sourceinfo = dump_inst_booltin(i);
+    std::size_t pos = sourceinfo.find("#");
+    std::string linenum = sourceinfo.substr(pos);
+    name += linenum;
+
     name += "-" + std::to_string(index);
     name += "-" + kind;
     if (this->count.find(name) == this->count.end()) {

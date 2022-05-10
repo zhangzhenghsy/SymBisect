@@ -52,6 +52,9 @@ namespace kuc {
 
         void resolve_symbolic_expr(const klee::ref<klee::Expr> &symbolicExpr,
                                    std::set<std::string> &relatedSymbolicExpr);
+
+        //added by zheng
+        void symbolize_Inst_return(klee::ExecutionState &state, klee::KInstruction *ki);
     };
 }
 
