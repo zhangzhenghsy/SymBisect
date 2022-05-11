@@ -44,6 +44,10 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
         print_inst = false;
     }
 
+    if (config.contains("92_indirectcall")){
+        indirectcall_map = config["92_indirectcall"];
+    }
+
     // for MLTA indirect function call
     auto MName = this->executor->get_module()->getName();
     GlobalCtx.Modules.push_back(make_pair(this->executor->get_module(), MName));
@@ -65,13 +69,16 @@ void kuc::PathListener::beforeRun(klee::ExecutionState &initialState) {
 
 void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
 
+    //klee::ref<klee::ConstantExpr> True = klee::ConstantExpr::create(true, 8);
+    //klee::klee_message("test True expr: %s",True.ptr->dump2().c_str());
+
+    std::string inst_str;
+    yhao_print(ki->inst->print, inst_str)
     if (print_inst){
-        std::string str;
-        yhao_print(ki->inst->print, str)
-        klee::klee_message("inst: %s", str.c_str());
+        klee::klee_message("inst: %s", inst_str.c_str());
     }
-    
-    
+
+
     int endIndex = state.stack.size() - 1;
     string calltrace = "";
     for (int i = 0; i <= endIndex; i++) {
@@ -102,19 +109,31 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             if (f) {
                 break;
             }
-            
+
+            // pick function form function_map(json)
+            auto line_info = dump_inst_sourceinfo(ki->inst);
+            std::size_t pos = line_info.find("source/");
+            line_info = line_info.substr(pos+1);
+            klee::klee_message("indirectcall_map key line_info: %s", line_info.c_str());
+
+            if (this->indirectcall_map.find(line_info) != this->indirectcall_map.end())
+            {
+                std::string callee_func = this->indirectcall_map[line_info];
+                auto m = this->executor->get_module();
+                llvm::Function *f = m->getFunction(callee_func);
+                auto f_address = klee::Expr::createPointer(reinterpret_cast<std::uint64_t>(&f));
+                klee::klee_message("callee_func found: %s  address: %s", f->getName().str().c_str(), f_address.ptr->dump2().c_str());
+                executor->un_eval(ki, 0, state).value = f_address;
+                break;
+            }
+
 	    break;
-            // pick function form function_map(json) or GlobalCtx(MLTA)
+
+            // pick function form GlobalCtx(MLTA)
             std::set<llvm::Function *> callee_function_set;
-            if (this->function_map.find(ci) != this->function_map.end()) {
-                for (auto temp_f: this->function_map[ci]) {
-                    callee_function_set.insert(temp_f);
-                }
-            } else {
-                auto callee = GlobalCtx.Callees[ci];
-                for (auto temp_f: callee) {
-                    callee_function_set.insert(temp_f);
-                }
+            auto callee = GlobalCtx.Callees[ci];
+            for (auto temp_f: callee) {
+                callee_function_set.insert(temp_f);
             }
 
             // get function address
@@ -130,7 +149,8 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
                 auto v = klee::ConstantExpr::create(0, 1);
                 for (const auto &temp_address: callee_function_address) {
                     auto name = temp_call_cond_name + std::to_string(temp_call_cond_count++);
-                    klee::ref<klee::Expr> temp_symbolic_cond = klee::Executor::manual_make_symbolic(name, 1, 8);
+                    //klee::ref<klee::ConstantExpr> True = klee::ConstantExpr::create(true, 8);
+                    klee::ref<klee::Expr> temp_symbolic_cond =klee::EqExpr::create(klee::Executor::manual_make_symbolic(name, 1, 8), temp_address);
                     v = klee::SelectExpr::create(temp_symbolic_cond, temp_address, v);
                 }
                 executor->un_eval(ki, 0, state).value = v;

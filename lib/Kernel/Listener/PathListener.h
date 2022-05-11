@@ -41,6 +41,8 @@ namespace kuc {
         uint64_t temp_call_cond_count = 0;
         // yu hao: todo: read function map from json
         std::map<llvm::CallInst *, std::set<llvm::Function *>> function_map;
+        // zheng: indirect call map
+        std::map<std::string, std::string> indirectcall_map;
         GlobalContext GlobalCtx;
     };
 }
