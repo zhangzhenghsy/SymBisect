@@ -14,6 +14,7 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
     if (config.contains("13_skip_function_list") && config["13_skip_function_list"].is_array()) {
         for (const auto &temp: config["13_skip_function_list"]) {
+            std::string tmp = temp.get<std::string>();
             skip_functions.insert(temp.get<std::string>());
         }
     }
@@ -91,7 +92,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             /*klee::klee_message("ki->operands[0] vnumber: %d", ki->operands[0]);
             klee::ref<klee::Expr> value = executor->eval(ki, 0, state).value;
             yhao_print(value->print, str)
-            klee::klee_message("Store Inst value: %s", str.c_str());
+            klee::klee_message("value: %s", str.c_str());
             if (value->getKind() != klee::Expr::Constant) {
                 klee::klee_message("non-constant store value");
             }

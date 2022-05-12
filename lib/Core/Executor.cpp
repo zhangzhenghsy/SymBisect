@@ -92,9 +92,6 @@ typedef unsigned TypeSize;
 #include <string>
 #include <sys/mman.h>
 #include <vector>
-//added by zheng for random generator
-#include <cstdlib>
-#include <ctime>
 
 using namespace llvm;
 using namespace klee;
@@ -1155,27 +1152,12 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
     return StatePair(0, &current);
   } else {
     TimerStatIncrementer timer(stats::forkTime);
-    
+    ExecutionState *falseState, *trueState = &current;
 
-   
-    ExecutionState *falseState, *trueState;
-    srand(std::time(0));
-    int randvalue = std::rand()%2;
-    if (randvalue==0){
-      klee::klee_message("test randvalue=0");
-      trueState = &current;
-      ++stats::forks;
-      falseState = trueState->branch();
-      addedStates.push_back(falseState);
-    }
-    else if (randvalue==1) {
-      klee::klee_message("test randvalue=1");
-      falseState = &current;
-      ++stats::forks;
-      trueState = falseState->branch();
-      addedStates.push_back(trueState);
-    }
-    
+    ++stats::forks;
+
+    falseState = trueState->branch();
+    addedStates.push_back(falseState);
 
     if (it != seedMap.end()) {
       std::vector<SeedInfo> seeds = it->second;
@@ -1211,32 +1193,20 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
         std::swap(trueState->coveredLines, falseState->coveredLines);
       }
     }
-    if (randvalue==0){
-      processTree->attach(current.ptreeNode, falseState, trueState);}
-    else {
-      processTree->attach(current.ptreeNode, trueState, falseState);
-    }
+
+    processTree->attach(current.ptreeNode, falseState, trueState);
 
     if (pathWriter) {
       // Need to update the pathOS.id field of falseState, otherwise the same id
       // is used for both falseState and trueState.
-      if (randvalue==0){
-        falseState->pathOS = pathWriter->open(current.pathOS);}
-      else {
-        trueState->pathOS = pathWriter->open(current.pathOS);
-      }
-
+      falseState->pathOS = pathWriter->open(current.pathOS);
       if (!isInternal) {
         trueState->pathOS << "1";
         falseState->pathOS << "0";
       }
     }
     if (symPathWriter) {
-      if (randvalue==0){
-        falseState->symPathOS = symPathWriter->open(current.symPathOS);}
-      else{
-        trueState->symPathOS = symPathWriter->open(current.symPathOS);
-      }
+      falseState->symPathOS = symPathWriter->open(current.symPathOS);
       if (!isInternal) {
         trueState->symPathOS << "1";
         falseState->symPathOS << "0";
