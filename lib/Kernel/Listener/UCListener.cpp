@@ -150,10 +150,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
 
     unsigned index = ki->dest;
     klee::klee_message("ki->dest: %u", ki->dest);
-    auto result = executor->getDestCell(state, ki).value;
-    if(!result){
-        klee::klee_message("no return value");
-    };
+
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
             yhao_print(executor->getDestCell(state, ki).value->print, str);
@@ -162,7 +159,9 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
         }
         case llvm::Instruction::Load: {
             // if skip OOB error, we need to symbolize the dest value
+            auto result = executor->getDestCell(state, ki).value;
             if(!result){
+                klee::klee_message("no return value");
                 symbolize_Inst_return(state, ki);
             }
             yhao_print(executor->getDestCell(state, ki).value->print, str);
@@ -203,8 +202,7 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
         return false;
     }
     if (!f) {
-	klee::klee_message("skip function: unrecognized f");
-	return true;
+	    klee::klee_message("skip function: unrecognized f");
     }
     std::string name = f->getName().str();
     if (skip_functions.find(name) != skip_functions.end()) {

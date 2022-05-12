@@ -2460,7 +2460,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Function *f = getTargetFunction(fp, state);
     if(!f){
       klee_warning("Call Inst Function name is 0");
-      break;
+      //break;
     }
 
     if (isa<InlineAsm>(fp)) {
