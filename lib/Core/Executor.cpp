@@ -92,6 +92,9 @@ typedef unsigned TypeSize;
 #include <string>
 #include <sys/mman.h>
 #include <vector>
+//added by zheng for random generator
+#include <cstdlib>
+#include <ctime>
 
 using namespace llvm;
 using namespace klee;
@@ -2179,8 +2182,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       std::string conditionstr = cond.get_ptr()->dump2();
       klee::klee_message("Cond: %s",conditionstr.c_str());
       cond = optimizer.optimizeExpr(cond, false);
-     
+
+      srand(std::time(0));
+      int randvalue = std::rand()%2;
+      if (randvalue==1){
+        cond = Expr::createIsZero(cond);
+      }
       Executor::StatePair branches = fork(state, cond, false);
+      if (randvalue==1){
+        branches = StatePair(branches.second, branches.first);
+      }
       klee::klee_message("branches.first: %p branches.second: %p", branches.first, branches.second);
       //klee::klee_message("branches.second: %p", branches.second);
 

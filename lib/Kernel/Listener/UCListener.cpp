@@ -14,7 +14,6 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
     if (config.contains("13_skip_function_list") && config["13_skip_function_list"].is_array()) {
         for (const auto &temp: config["13_skip_function_list"]) {
-            std::string tmp = temp.get<std::string>();
             skip_functions.insert(temp.get<std::string>());
         }
     }
