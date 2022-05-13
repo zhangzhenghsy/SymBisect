@@ -2437,6 +2437,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     Value *fp = cs.getCalledValue();
 #endif
 
+    klee::klee_message("fp: %p", fp);
+
     unsigned numArgs = cs.arg_size();
     Function *f = getTargetFunction(fp, state);
     if(!f){
@@ -2509,11 +2511,33 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       /* XXX This is wasteful, no need to do a full evaluate since we
          have already got a value. But in the end the caches should
          handle it for us, albeit with some overhead. */
+      // zheng: the original logic is trying to generate all possible concrete values for the symbolic function address.
+      // then check them one by one whether it's an legalFunction or not.
+      // if not, terminate the state (removed it from added state)
+      // if it is, then execute the function call.
+      // in my project, due to the UC symbolic variables, there may be many possible values of the function address,
+      // the loop cost much time and most of the concretization values are meaningless, thus I don't want this previous logic
+      klee_message("symbolic function address");
+      // check whether we have overwritten the target address via option 92_indirectcall.
+      if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(v)){
+        klee_message("we have stored an concrete value at operand[0]: %s", v.ptr->dump2().c_str());
+        uint64_t addr = CE->getZExtValue();
+        if (legalFunctions.count(addr)) {
+          f = (Function*) addr;
+          std::string fname = f->getName().str();
+          klee_message("it's the correct address of function %s", fname.c_str());
+          executeCall(state, ki, f, arguments);
+        }
+      } else {
+        klee_message("skip it for now");
+      }
+      break;
       do {
         v = optimizer.optimizeExpr(v, true);
         ref<ConstantExpr> value;
         bool success =
             solver->getValue(free->constraints, v, value, free->queryMetaData);
+        klee_message("resolve the symbolic address to concrete value: %s", value.ptr->dump2().c_str());
         assert(success && "FIXME: Unhandled solver failure");
         (void) success;
         StatePair res = fork(*free, EqExpr::create(v, value), true);
@@ -2521,7 +2545,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           uint64_t addr = value->getZExtValue();
           if (legalFunctions.count(addr)) {
             f = (Function*) addr;
-
             // Don't give warning on unique resolution
             if (res.second || !first)
               klee_warning_once(reinterpret_cast<void*>(addr),

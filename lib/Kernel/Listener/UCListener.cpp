@@ -202,7 +202,8 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
         return false;
     }
     if (!f) {
-	    klee::klee_message("skip function: unrecognized f");
+        klee::klee_message("skip function: unrecognized f");
+        return false;
     }
     std::string name = f->getName().str();
     if (skip_functions.find(name) != skip_functions.end()) {
