@@ -4271,9 +4271,9 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   solver->setTimeout(time::Span());
 
   if (success) {
-    klee::klee_message("Executor::executeMemoryOperation find the object");
+    //klee::klee_message("Executor::executeMemoryOperation find the object");
     const MemoryObject *mo = op.first;
-    klee::klee_message("mo->addr: %lu mo->size: %d", mo->address, mo->size);
+    //klee::klee_message("mo->addr: %lu mo->size: %d", mo->address, mo->size);
 
     if (MaxSymArraySize && mo->size >= MaxSymArraySize) {
       address = toConstant(state, address, "max-sym-array-size");
@@ -4940,9 +4940,10 @@ Cell& Executor::un_eval(KInstruction *ki, unsigned index,
 MemoryObject *Executor::create_mo(ExecutionState &state, llvm::Type *ty, llvm::Instruction *inst, const std::string& name) {
 
     auto size = kmodule->targetData->getTypeStoreSize(ty);
+    // if char pointer (likley to be a char array buffer), then allocate 8192 bytes
     if (ty->isIntegerTy(8)) {
         klee_message("ty->isIntegerTy(8)");
-        size = kmodule->targetData->getTypeStoreSize(ty) * 4096;
+        size = kmodule->targetData->getTypeStoreSize(ty) * 8192;
     }
     // yu hao: add more space for zero length array
     auto new_size = (uint64_t)size;
