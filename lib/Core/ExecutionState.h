@@ -198,6 +198,9 @@ public:
   /// @brief Set containing which lines in which files are covered by this state
   std::map<const std::string *, std::set<std::uint32_t>> coveredLines;
 
+  /// @brief zheng: Set containing which lines in which files are covered by this state, not cleared at branch()
+  std::map<const std::string *, std::set<std::uint32_t>> completecoveredLines;
+
   /// @brief Pointer to the process tree of the current state
   /// Copies of ExecutionState should not copy ptreeNode
   PTreeNode *ptreeNode = nullptr;

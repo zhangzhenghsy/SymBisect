@@ -43,6 +43,7 @@ namespace kuc {
         //std::map<llvm::CallInst *, std::set<llvm::Function *>> function_map;
         // zheng: indirect call map
         std::map<std::string, std::string> indirectcall_map;
+        std::map<std::string, std::set<std::string>> whitelist_map;
         GlobalContext GlobalCtx;
     };
 }

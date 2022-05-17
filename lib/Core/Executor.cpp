@@ -1194,6 +1194,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       if (swapInfo) {
         std::swap(trueState->coveredNew, falseState->coveredNew);
         std::swap(trueState->coveredLines, falseState->coveredLines);
+        std::swap(trueState->completecoveredLines, falseState->completecoveredLines);
       }
     }
 

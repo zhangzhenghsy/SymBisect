@@ -363,6 +363,7 @@ void StatsTracker::stepInstruction(ExecutionState &es) {
         // FIXME: This trick no longer works, we should fix this in the line
         // number propogation.
           es.coveredLines[&ii.file].insert(ii.line);
+          es.completecoveredLines[&ii.file].insert(ii.line);
 	es.coveredNew = true;
         es.instsSinceCovNew = 1;
 	++stats::coveredInstructions;

@@ -47,6 +47,14 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
     if (config.contains("92_indirectcall")){
         indirectcall_map = config["92_indirectcall"];
     }
+    if (config.contains("93_whitelist")){
+        std::map<std::string, std::vector<std::string>> whitelist = config["93_whitelist"];
+        for (const auto &temp: whitelist) {
+            for (const auto &whiteline: temp.second){
+                whitelist_map[temp.first].insert(whiteline);
+            }
+        }
+    }
 
     // for MLTA indirect function call
     auto MName = this->executor->get_module()->getName();
@@ -97,6 +105,37 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
 
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::Call: {
+            klee::klee_message("print state.completecoveredLines");
+            std::set<std::string> coveredlines;
+            std::string coveredline;
+            std::map<const std::string*, std::set<unsigned> > cov = state.completecoveredLines;
+            for (const auto &entry : cov) {
+                for (const auto &line : entry.second) {
+                    coveredline = *(entry.first);
+                    coveredline.append(":");
+                    coveredline.append(std::to_string(line));
+                    klee::klee_message("%s", coveredline.c_str());
+                    coveredlines.insert(coveredline);
+                }
+            }
+
+            auto line_info = dump_inst_sourceinfo(ki->inst);
+            std::size_t pos = line_info.find("source/");
+            line_info = line_info.substr(pos+1);
+            klee::klee_message("indirectcall_map/whitelist_map key line_info: %s", line_info.c_str());
+
+            if (this->whitelist_map.find(line_info) != this->whitelist_map.end())
+            {
+                std::set<std::string> whitelist = this->whitelist_map[line_info];
+                for (auto whiteline:whitelist){
+                    klee::klee_message("whiteline: %s", whiteline.c_str());
+                    if (coveredlines.find(whiteline) == coveredlines.end()){
+                        klee::klee_message("%s not in coveredlines, terminate the state", whiteline.c_str());
+                        this->executor->terminateState(state);
+                    }
+                }
+            }
+
             if (isa<DbgInfoIntrinsic>(ki->inst))
                 break;
 
@@ -110,12 +149,9 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
                 break;
             }
 
-            // pick function form function_map(json)
-            auto line_info = dump_inst_sourceinfo(ki->inst);
-            std::size_t pos = line_info.find("source/");
-            line_info = line_info.substr(pos+1);
-            klee::klee_message("indirectcall_map key line_info: %s", line_info.c_str());
 
+
+            // pick function form function_map(json)
             if (this->indirectcall_map.find(line_info) != this->indirectcall_map.end())
             {
                 std::string callee_func = this->indirectcall_map[line_info];
