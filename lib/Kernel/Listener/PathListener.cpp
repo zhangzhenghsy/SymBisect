@@ -79,7 +79,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
 
     //klee::ref<klee::ConstantExpr> True = klee::ConstantExpr::create(true, 8);
     //klee::klee_message("test True expr: %s",True.ptr->dump2().c_str());
-
+    klee::klee_message("PathListener::beforeExecuteInstruction()");
     std::string inst_str;
     yhao_print(ki->inst->print, inst_str)
     if (print_inst){

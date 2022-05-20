@@ -2709,6 +2709,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     case ICmpInst::ICMP_NE: {
       ref<Expr> left = eval(ki, 0, state).value;
       ref<Expr> right = eval(ki, 1, state).value;
+      klee_message("ICMP_NE left: %s    right: %s", left.ptr->dump2().c_str(), right.ptr->dump2().c_str());
       ref<Expr> result = NeExpr::create(left, right);
       bindLocal(ki, state, result);
       break;

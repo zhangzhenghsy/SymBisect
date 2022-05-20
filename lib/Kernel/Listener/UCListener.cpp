@@ -9,6 +9,7 @@
 #include "klee/Support/ErrorHandling.h"
 
 using namespace klee;
+using namespace llvm;
 
 kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
@@ -26,7 +27,7 @@ void kuc::UCListener::beforeRun(klee::ExecutionState &initialState) {
 }
 
 void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
-    klee::klee_message("\n\nUCListener::beforeExecuteInstruction");
+    klee::klee_message("\n\nUCListener::beforeExecuteInstruction()");
     std::string str;
     //yhao_log(1, inst_to_strID(ki->inst));
     //yhao_log(1, dump_inst_booltin(ki->inst));
@@ -112,6 +113,51 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             break;
         }
         case llvm::Instruction::ICmp: {
+            llvm::Instruction *i = ki->inst;
+            CmpInst *ci = cast<CmpInst>(i);
+            ICmpInst *ii = cast<ICmpInst>(ci);
+
+            switch(ii->getPredicate()) {
+                case llvm::ICmpInst::ICMP_EQ: {
+                    klee::ref<Expr> left = executor->eval(ki, 0, state).value;
+                    klee::ref<Expr> right = executor->eval(ki, 1, state).value;
+                    if (left.ptr->dump2() == "0"){
+                        if (this->map_address_symbolic.find(right) != this->map_address_symbolic.end()){
+                            klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[right];
+                            executor->un_eval(ki, 1, state).value = symbolic_pointer;
+                        }
+                    }
+                    else if (right.ptr->dump2() == "0"){
+                        if (this->map_address_symbolic.find(left) != this->map_address_symbolic.end()){
+                            klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[left];
+                            executor->un_eval(ki, 0, state).value = symbolic_pointer;
+                        }
+                    }
+                    break;
+                }
+                case llvm::ICmpInst::ICMP_NE: {
+                    klee::ref<Expr> left = executor->eval(ki, 0, state).value;
+                    klee::ref<Expr> right = executor->eval(ki, 1, state).value;
+                    if (left.ptr->dump2() == "0"){
+                        if (this->map_address_symbolic.find(right) != this->map_address_symbolic.end()){
+                            klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[right];
+                            executor->un_eval(ki, 1, state).value = symbolic_pointer;
+                        }
+                    }
+                    else if (right.ptr->dump2() == "0"){
+                        klee_message("icmp NE right expr is 0");
+                        if (this->map_address_symbolic.find(left) != this->map_address_symbolic.end()){
+                            klee_message("icmp NE left expr is symbolic in fact");
+                            klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[left];
+                            klee_message("symbolic pointer: %s", symbolic_pointer.ptr->dump2().c_str());
+                            executor->un_eval(ki, 0, state).value = symbolic_pointer;
+                        }
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
             break;
         }
 	    case llvm::Instruction::Br: {
@@ -146,7 +192,7 @@ void kuc::UCListener::symbolize_Inst_return(klee::ExecutionState &state, klee::K
 
 void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
-    klee::klee_message("UCListener::afterExecuteInstruction");
+    klee::klee_message("UCListener::afterExecuteInstruction()");
 
     unsigned index = ki->dest;
     klee::klee_message("ki->dest: %u", ki->dest);
@@ -327,6 +373,7 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
         }
         klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
 
+        klee_message("load ret symbolic: %s", ret.get_ptr()->dump2().c_str());
         if (map_symbolic_address.find(ret) != map_symbolic_address.end()) {
             klee::klee_message("find load ret symbolic");
             auto value = map_symbolic_address[ret];
@@ -344,8 +391,8 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
             klee::MemoryObject *mo = executor->create_mo(state, ty->getPointerElementType(), ki->inst, name);
             executor->bindLocal(ki, state, mo->getBaseExpr());
             executor->executeMemoryOperation(state, true, base, mo->getBaseExpr(), nullptr);
-            this->map_symbolic_address[base] = mo->getBaseExpr();
-            this->map_address_symbolic[mo->getBaseExpr()] = base;
+            this->map_symbolic_address[ret] = mo->getBaseExpr();
+            this->map_address_symbolic[mo->getBaseExpr()] = ret;
             yhao_print(mo->getBaseExpr()->print, str);
             klee::klee_message("mo base: %s", str.c_str());
         }
