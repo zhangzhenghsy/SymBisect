@@ -172,6 +172,11 @@ public:
     /// step.
     bool haltExecution;
 
+    /// The set of legal function addresses, used to validate function
+    /// pointers. We use the actual Function* address as the function address.
+    /// zheng: moved to public to enable use in UCpathListener
+    std::set<uint64_t> legalFunctions;
+
 private:
   static const char *TerminateReasonNames[];
 
@@ -214,10 +219,6 @@ private:
   /// Map of globals to their bound address. This also includes
   /// globals that have no representative object (i.e. functions).
   std::map<const llvm::GlobalValue*, ref<ConstantExpr> > globalAddresses;
-
-  /// The set of legal function addresses, used to validate function
-  /// pointers. We use the actual Function* address as the function address.
-  std::set<uint64_t> legalFunctions;
 
   /// When non-null the bindings that will be used for calls to
   /// klee_make_symbolic in order replay.

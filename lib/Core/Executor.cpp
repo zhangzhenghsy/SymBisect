@@ -2055,6 +2055,7 @@ Function* Executor::getTargetFunction(Value *calledVal, ExecutionState &state) {
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
   Instruction *i = ki->inst;
+  klee_message("Executor::executeInstruction()");
   //std::string ld;
   //llvm::raw_string_ostream rso(ld);
   //i->print(rso);
@@ -2418,7 +2419,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
   case Instruction::Invoke:
   case Instruction::Call: {
-
+ 
     if(listener_service->CallInstruction(state, ki)) {
         klee::klee_message("skip function call: listener_service->CallInstruction(state, ki) return true");
         break;
@@ -2502,7 +2503,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         }
       }
 
+      klee_message("previous target ptr 5: %p", getDestCell(state, ki).value.ptr);
       executeCall(state, ki, f, arguments);
+      klee_message("previous target ptr 6: %p", getDestCell(state, ki).value.ptr);
     } else {
       ref<Expr> v = eval(ki, 0, state).value;
 
@@ -2518,7 +2521,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // if it is, then execute the function call.
       // in my project, due to the UC symbolic variables, there may be many possible values of the function address,
       // the loop cost much time and most of the concretization values are meaningless, thus I don't want this previous logic
-      klee_message("symbolic function address");
       // check whether we have overwritten the target address via option 92_indirectcall.
       if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(v)){
         klee_message("we have stored an concrete value at operand[0]: %s", v.ptr->dump2().c_str());
@@ -2527,10 +2529,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           f = (Function*) addr;
           std::string fname = f->getName().str();
           klee_message("it's the correct address of function %s", fname.c_str());
+          klee_message("previous target ptr 3: %p", getDestCell(state, ki).value.ptr);
           executeCall(state, ki, f, arguments);
+          klee_message("previous target ptr 4: %p", getDestCell(state, ki).value.ptr);
         }
-      } else {
-        klee_message("skip it for now");
+        else {
+          klee_message("it's not the correct address of a function skip it for now");
+        }
       }
       break;
       do {

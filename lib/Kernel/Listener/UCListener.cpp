@@ -18,6 +18,10 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
             skip_functions.insert(temp.get<std::string>());
         }
     }
+
+    if (config.contains("92_indirectcall")){
+        indirectcall_map = config["92_indirectcall"];
+    }
 }
 
 kuc::UCListener::~UCListener() = default;
@@ -46,6 +50,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     if (find != std::end(inst_type)){
     size_t i = 0;
     klee::klee_message("ki->inst->getNumOperands(): %d", ki->inst->getNumOperands());
+    
     while (i < ki->inst->getNumOperands())
     {
         //klee::klee_message("ki->operands[%zu] vnumber: %d", i, ki->operands[i]);
@@ -160,13 +165,18 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             }
             break;
         }
-	    case llvm::Instruction::Br: {
-	        klee::klee_message("----- Br Inst print current constraints: -----");
-	        klee::ConstraintSet constraints = state.constraints;
+        case llvm::Instruction::Br: {
+            klee::klee_message("----- Br Inst print current constraints: -----");
+            klee::ConstraintSet constraints = state.constraints;
+            std::set<std::string> constraint_strs;
 	        for (auto it = constraints.begin(), ie = constraints.end(); it != ie;) {
 		        klee::ref<klee::Expr> value = *it;
 		        yhao_print(value->print, str);
-		        klee::klee_message("Br constraint: %s", str.c_str());
+                if (constraint_strs.find(str) == constraint_strs.end())
+                {
+                    klee::klee_message("Br constraint: %s", str.c_str());
+                    constraint_strs.insert(str);
+                }
 		        ++it;
 	        }
 	        klee::klee_message("----------------");
@@ -405,6 +415,14 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
     auto cs = llvm::cast<llvm::CallBase>(ki->inst);
     llvm::Value *fp = cs->getCalledOperand();
     llvm::Function *f = executor->getTargetFunction(fp, state);
+
+    auto line_info = dump_inst_sourceinfo(ki->inst);
+    std::size_t pos = line_info.find("source/");
+    line_info = line_info.substr(pos+1);
+    
+    //ref<Expr> prevvalue = executor->getDestCell(state, ki).value;
+    klee_message("previous target ptr: %p", executor->getDestCell(state, ki).value.ptr);
+
     if (llvm::isa<llvm::InlineAsm>(fp)) {
         goto create_return;
     }
@@ -428,14 +446,31 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
         }
     } else if (f && !f->isDeclaration()) {
         std::string name = f->getName().str();
-        if (skip_functions.find(name) == skip_functions.end()) {
-            return;
-        } else {
+        if (skip_functions.find(name) != skip_functions.end()) {
             klee::klee_message("in skip_functions");
             goto create_return;
+        } else {
+            return;
         }
     } else if (!f) {
         klee::klee_message("!f");
+        if (this->indirectcall_map.find(line_info) != this->indirectcall_map.end()){
+            klee_message("concrete target for indirect call, no need for symbolic call return");
+            return;
+        }
+        //due to some reason it already call executeCall
+        if(executor->getDestCell(state, ki).value.ptr){
+            klee_message("due to some reason it already call executeCall");
+            return;
+        }
+        /*
+        ref<Expr> v = executor->eval(ki, 0, state).value;
+        if (const klee::ConstantExpr *CE = llvm::dyn_cast<klee::ConstantExpr>(v)){
+            uint64_t addr = CE->getZExtValue();
+            if (executor->legalFunctions.count(addr)) {
+                return;
+            }
+        }*/
         goto create_return;
     } else {
         return;
@@ -451,6 +486,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
         unsigned int size = executor->kmodule->targetData->getTypeStoreSize(ty);
         klee::Expr::Width width = executor->getWidthForLLVMType(ty);
         klee::ref<klee::Expr> symbolic = klee::Executor::manual_make_symbolic(name, size, width);
+        klee_message("symbolic return: %s", symbolic.get_ptr()->dump2().c_str());
         executor->bindLocal(ki, state, symbolic);
 
 //            auto cs = llvm::cast<llvm::CallBase>(ki->inst);

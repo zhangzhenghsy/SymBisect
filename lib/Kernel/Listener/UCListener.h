@@ -36,6 +36,7 @@ namespace kuc {
 
         nlohmann::json config;
         std::set<std::string> skip_functions;
+        std::map<std::string, std::string> indirectcall_map;
 
     private:
         std::string create_global_var_name(llvm::Instruction *i, int64_t index, const std::string &kind);
