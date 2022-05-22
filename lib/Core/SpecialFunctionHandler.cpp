@@ -148,7 +148,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 
   // zheng: handle kernel function
   add("memcpy", handleMemcpy, false),
-  add("strncpy_from_user", handleMemcpyR, true),
+  add("strncpy_from_user", handleMemcpyRL, true),
 
 #undef addDNR
 #undef add
@@ -1018,6 +1018,80 @@ void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
 
 }
 
+//  zheng: the difference from handleMemcpy is that  it return length of copy
+void SpecialFunctionHandler::handleMemcpyRL(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments) {
+    // XXX should type check args
+    assert(arguments.size()==3 && "invalid number of arguments to memcpy");
+    klee::klee_message("SpecialFunctionHandler::handleMemcpyRL");
+    //bool symsize = false;
+    uint64_t length = 8192;
+    ObjectPair op, op2;
+    bool success;
+
+    ref<Expr> targetaddr = arguments[0];
+    klee::klee_message("targetaddr: %s",targetaddr.get_ptr()->dump2().c_str());
+
+    if (ConstantExpr* CE1 = dyn_cast<ConstantExpr>(targetaddr)) {
+      success = state.addressSpace.resolveOne(CE1, op);
+    } else{
+      klee::klee_message("memcpy not constant target address. Return directly");
+      return;
+    }
+    if(!success){
+      klee::klee_message("Not find the corresponding target object according to the address. Return directly");
+      return;
+    }
+
+    ref<Expr> srcaddr = arguments[1];
+    klee::klee_message("src: %s",srcaddr.get_ptr()->dump2().c_str());
+    if (ConstantExpr* CE2 = dyn_cast<ConstantExpr>(srcaddr)) {
+      success = state.addressSpace.resolveOne(CE2, op2);
+    } else{
+      klee::klee_message("memcpy not constant src address. Return directly");
+      return;
+    }
+    if(!success){
+      klee::klee_message("Not find the corresponding src object according to the address. Return directly");
+      return;
+    }
+
+    ref<Expr> len = arguments[2];
+    klee::klee_message("len: %s",len.get_ptr()->dump2().c_str());
+    if(ConstantExpr* CE = dyn_cast<ConstantExpr>(len)){
+      length = CE->getZExtValue();
+    }
+    else{
+      //Use hard-coded concrete size.
+      //todo: Compare the symbolic memcpy size and the object size to detect potential OOBW
+      //symsize = true;
+      const MemoryObject * object = op.first;
+      length = std::min(length, (object->address+object->size-dyn_cast<ConstantExpr>(targetaddr)->getZExtValue()));
+      const MemoryObject * object2 = op2.first;
+      length = std::min(length, (object2->address+object2->size-dyn_cast<ConstantExpr>(srcaddr)->getZExtValue()));
+    }
+    klee::klee_message("concrete length: %lu",length);
+
+    const ObjectState *os = op2.second;
+    for(uint64_t i =0; i<length; i++){
+      ref<Expr> offset = ConstantExpr::create(i, Context::get().getPointerWidth());
+      ref<Expr> value = os->read(offset, 8);
+
+      ref<Expr> base = AddExpr::create(targetaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
+      executor.executeMemoryOperation(state, true, base, value, 0);
+    }
+
+    if(ConstantExpr* CE = dyn_cast<ConstantExpr>(len)){
+      executor.bindLocal(target, state, ConstantExpr::alloc(length, Expr::Int64));
+    }
+    else{
+      executor.bindLocal(target, state, len);
+    }
+
+}
+
+//  zheng: the difference from handleMemcpy is that  it return 0
 void SpecialFunctionHandler::handleMemcpyR(ExecutionState &state,
                                           KInstruction *target,
                                           std::vector<ref<Expr> > &arguments) {
