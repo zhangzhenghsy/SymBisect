@@ -984,6 +984,7 @@ void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
       success = state.addressSpace.resolveOne(CE2, op2);
     } else{
       klee::klee_message("memcpy not constant src address. Return directly");
+      // todo: Better solution should be continue symbolizing the target struct
       return;
     }
     if(!success){
@@ -1050,11 +1051,15 @@ void SpecialFunctionHandler::handleMemcpyRL(ExecutionState &state,
       success = state.addressSpace.resolveOne(CE2, op2);
     } else{
       klee::klee_message("memcpy not constant src address. Return directly");
-      return;
+      // It should be normal in execution now we still want to keep execution. 
+      // todo: Better solution should be continue symbolizing the target struct
+      goto returnL;
+      //return;
     }
     if(!success){
       klee::klee_message("Not find the corresponding src object according to the address. Return directly");
-      return;
+      goto returnL;
+      //return;
     }
 
     ref<Expr> len = arguments[2];
@@ -1082,6 +1087,7 @@ void SpecialFunctionHandler::handleMemcpyRL(ExecutionState &state,
       executor.executeMemoryOperation(state, true, base, value, 0);
     }
 
+returnL:
     if(ConstantExpr* CE = dyn_cast<ConstantExpr>(len)){
       executor.bindLocal(target, state, ConstantExpr::alloc(length, Expr::Int64));
     }
