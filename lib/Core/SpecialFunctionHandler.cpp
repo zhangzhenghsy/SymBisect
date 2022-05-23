@@ -1046,6 +1046,8 @@ void SpecialFunctionHandler::handleMemcpyRL(ExecutionState &state,
     }
 
     ref<Expr> srcaddr = arguments[1];
+    ref<Expr> len = arguments[2];
+    const ObjectState *os;
     klee::klee_message("src: %s",srcaddr.get_ptr()->dump2().c_str());
     if (ConstantExpr* CE2 = dyn_cast<ConstantExpr>(srcaddr)) {
       success = state.addressSpace.resolveOne(CE2, op2);
@@ -1062,7 +1064,6 @@ void SpecialFunctionHandler::handleMemcpyRL(ExecutionState &state,
       //return;
     }
 
-    ref<Expr> len = arguments[2];
     klee::klee_message("len: %s",len.get_ptr()->dump2().c_str());
     if(ConstantExpr* CE = dyn_cast<ConstantExpr>(len)){
       length = CE->getZExtValue();
@@ -1078,7 +1079,7 @@ void SpecialFunctionHandler::handleMemcpyRL(ExecutionState &state,
     }
     klee::klee_message("concrete length: %lu",length);
 
-    const ObjectState *os = op2.second;
+    os = op2.second;
     for(uint64_t i =0; i<length; i++){
       ref<Expr> offset = ConstantExpr::create(i, Context::get().getPointerWidth());
       ref<Expr> value = os->read(offset, 8);
