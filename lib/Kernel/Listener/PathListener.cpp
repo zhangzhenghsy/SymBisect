@@ -193,6 +193,27 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             }
             break;
         }
+        case llvm::Instruction::Br:{
+            string BBname = ki->inst->getParent()->getName().str();
+            // for Intrinsic function no need to set the limit
+            if (BBname.find("bc-") == std::string::npos){
+                break;
+            }
+            BBname = BBname.substr(BBname.find("bc-")+3);
+            BBname = BBname.substr(BBname.find("-")+1);
+            string BBkey = calltrace+"-"+BBname;
+            if (state.BBcount.find(BBkey) == state.BBcount.end()){
+                state.BBcount[BBkey] = 1;
+            } else {
+                state.BBcount[BBkey] += 1;
+            }
+            klee::klee_message("BBkey: %s  count: %u", BBkey.c_str(), state.BBcount[BBkey]);
+            // qestion: what if there is an constant time loop which requires loop for more than 100
+            // maybe just do this check when both branches are possible?
+            if (state.BBcount[BBkey] > 100) {
+                this->executor->terminateState(state);
+            }
+        }
     }
 }
 
