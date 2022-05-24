@@ -37,13 +37,6 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
         }
     }
 
-    if (config.contains("91_print_inst")) {
-        print_inst = config["91_print_inst"];
-    }
-    else {
-        print_inst = false;
-    }
-
     if (config.contains("92_indirectcall")){
         indirectcall_map = config["92_indirectcall"];
     }
@@ -80,11 +73,6 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
     //klee::ref<klee::ConstantExpr> True = klee::ConstantExpr::create(true, 8);
     //klee::klee_message("test True expr: %s",True.ptr->dump2().c_str());
     klee::klee_message("PathListener::beforeExecuteInstruction()");
-    std::string inst_str;
-    yhao_print(ki->inst->print, inst_str)
-    if (print_inst){
-        klee::klee_message("inst: %s", inst_str.c_str());
-    }
 
 
     int endIndex = state.stack.size() - 1;

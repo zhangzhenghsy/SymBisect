@@ -19,6 +19,13 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
         }
     }
 
+    if (config.contains("91_print_inst")) {
+        print_inst = config["91_print_inst"];
+    }
+    else {
+        print_inst = false;
+    }
+
     if (config.contains("92_indirectcall")){
         indirectcall_map = config["92_indirectcall"];
     }
@@ -35,8 +42,10 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     std::string str;
     //yhao_log(1, inst_to_strID(ki->inst));
     //yhao_log(1, dump_inst_booltin(ki->inst));
-    yhao_print(ki->inst->print, str)
-    klee::klee_message("inst: %s", str.c_str());
+    if (print_inst){
+        yhao_print(ki->inst->print, str)
+        klee::klee_message("inst: %s", str.c_str());
+    }
     
     klee::klee_message("ExecutionState &state: %p", &state);
     klee::klee_message("bb name i->getParent()->getName().str() %s",ki->inst->getParent()->getName().str().c_str());

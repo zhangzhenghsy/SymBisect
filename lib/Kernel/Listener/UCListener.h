@@ -36,6 +36,7 @@ namespace kuc {
 
         nlohmann::json config;
         std::set<std::string> skip_functions;
+        bool print_inst;
         std::map<std::string, std::string> indirectcall_map;
 
     private:
