@@ -34,6 +34,8 @@
 #include <errno.h>
 #include <sstream>
 
+#include "../Kernel/ToolLib/llvm_related.h"
+
 using namespace llvm;
 using namespace klee;
 
@@ -148,7 +150,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 
   // zheng: handle kernel function
   add("memcpy", handleMemcpy, false),
-  add("strncpy_from_user", handleMemcpyRL, true),
+  add("strncpy_from_user", handleStrncpy_from_user, true),
 
 #undef addDNR
 #undef add
@@ -1103,6 +1105,29 @@ void SpecialFunctionHandler::handleMemcpyR(ExecutionState &state,
                                           KInstruction *target,
                                           std::vector<ref<Expr> > &arguments) {
     ref<Expr> ret = ConstantExpr::alloc(0, Expr::Int64);
+    executor.bindLocal(target, state, ret);
+    handleMemcpy(state, target, arguments);
+}
+
+std::string create_var_name(llvm::Instruction *i, const std::string &kind) {
+    std::string name;
+    name += inst_to_strID(i);
+    std::string sourceinfo = dump_inst_booltin(i);
+    std::size_t pos = sourceinfo.find("#");
+    std::string linenum = sourceinfo.substr(pos);
+    name += linenum;
+    name += "-" + kind;
+    return name;
+}
+
+//  zheng: the difference from handleMemcpy is that  it return symbolic value between 0 and size
+void SpecialFunctionHandler::handleStrncpy_from_user(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments) {
+    auto name = create_var_name(target->inst, "strncpy_from_user_size");
+    ref<Expr> ret = executor.manual_make_symbolic(name, 8, 64);
+    ref<Expr> cond = SleExpr::create(ret, arguments[2]);
+    executor.addConstraint(state, cond);
     executor.bindLocal(target, state, ret);
     handleMemcpy(state, target, arguments);
 }

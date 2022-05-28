@@ -198,7 +198,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             klee::klee_message("BBkey: %s  count: %u", BBkey.c_str(), state.BBcount[BBkey]);
             // qestion: what if there is an constant time loop which requires loop for more than 100
             // maybe just do this check when both branches are possible?
-            if (state.BBcount[BBkey] > 100) {
+            if (state.BBcount[BBkey] > 20) {
                 this->executor->terminateState(state);
             }
         }

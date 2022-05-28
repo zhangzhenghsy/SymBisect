@@ -151,6 +151,7 @@ namespace klee {
     HANDLER(handleMemcpy);
     HANDLER(handleMemcpyR);
     HANDLER(handleMemcpyRL);
+    HANDLER(handleStrncpy_from_user);
 #undef HANDLER
   };
 } // End klee namespace
