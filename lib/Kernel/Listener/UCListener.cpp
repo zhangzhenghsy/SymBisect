@@ -54,7 +54,9 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     klee::klee_message("line sourceinfo %s",sourceinfo.c_str());
     }
     klee::klee_message("target->dest: %d", ki->dest);
-    int inst_type[] = {llvm::Instruction::GetElementPtr, llvm::Instruction::Load, llvm::Instruction::Store, llvm::Instruction::Ret, llvm::Instruction::ICmp, llvm::Instruction::Call};
+    int inst_type[] = {llvm::Instruction::GetElementPtr, llvm::Instruction::Load, llvm::Instruction::Store, llvm::Instruction::Ret,
+    llvm::Instruction::ICmp, llvm::Instruction::Call, llvm::Instruction::Or, llvm::Instruction::Add,
+    llvm::Instruction::Xor};
     int *find = std::find(std::begin(inst_type), std::end(inst_type), ki->inst->getOpcode());
     if (find != std::end(inst_type)){
     size_t i = 0;

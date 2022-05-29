@@ -4340,10 +4340,10 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     } else {
 	 /// zheng: it's possible that the (symbolic offset) is larger than the size
 	 /// question, when concretize the address and get the object, is it possible that we don't get the corret object? 
-  	std::cout << "\n\nOOBW detection!!\n";
+        klee_message("\n\nOOBW detection!!\n");
 	  //std::cout << "It's possible that offset is larger than size!!! \n\n";
     ///return;
-  }
+    }
 
   } 
 

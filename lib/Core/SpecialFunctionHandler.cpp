@@ -151,6 +151,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   // zheng: handle kernel function
   add("memcpy", handleMemcpy, false),
   add("strncpy_from_user", handleStrncpy_from_user, true),
+  add("user_path_at", handleUser_path_at, true),
 
 #undef addDNR
 #undef add
@@ -1130,4 +1131,17 @@ void SpecialFunctionHandler::handleStrncpy_from_user(ExecutionState &state,
     executor.addConstraint(state, cond);
     executor.bindLocal(target, state, ret);
     handleMemcpy(state, target, arguments);
+}
+
+// zheng: symbolize the struct pointed by 4th argument; and return 0
+void SpecialFunctionHandler::handleUser_path_at(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments) {
+    auto ty = target->inst->getOperand(4)->getType();
+    auto name = create_var_name(target->inst, "user_path_at_sympath");
+    MemoryObject *mo = executor.create_mo(state, ty, target->inst, name);
+    executor.un_eval(target, 4, state).value = mo->getBaseExpr();
+
+    ref<Expr> ret = ConstantExpr::alloc(0, Expr::Int32);
+    executor.bindLocal(target, state, ret);
 }
