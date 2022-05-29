@@ -37,6 +37,23 @@ void kuc::UCListener::beforeRun(klee::ExecutionState &initialState) {
 
 }
 
+void print_constraints(klee::ExecutionState &state) {
+    klee::klee_message("----- Br Inst print current constraints: -----");
+    klee::ConstraintSet constraints = state.constraints;
+    std::set<std::string> constraint_strs;
+    std::string str;
+	for (auto it = constraints.begin(), ie = constraints.end(); it != ie;) {
+		klee::ref<klee::Expr> value = *it;
+		yhao_print(value->print, str);
+        if (constraint_strs.find(str) == constraint_strs.end())
+        {
+            klee::klee_message("Br constraint: %s", str.c_str());
+            constraint_strs.insert(str);
+        }
+		++it;
+	}
+	klee::klee_message("----------------"); 
+}
 void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     klee::klee_message("\n\nUCListener::beforeExecuteInstruction()");
     std::string str;
@@ -177,21 +194,11 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             break;
         }
         case llvm::Instruction::Br: {
-            klee::klee_message("----- Br Inst print current constraints: -----");
-            klee::ConstraintSet constraints = state.constraints;
-            std::set<std::string> constraint_strs;
-	        for (auto it = constraints.begin(), ie = constraints.end(); it != ie;) {
-		        klee::ref<klee::Expr> value = *it;
-		        yhao_print(value->print, str);
-                if (constraint_strs.find(str) == constraint_strs.end())
-                {
-                    klee::klee_message("Br constraint: %s", str.c_str());
-                    constraint_strs.insert(str);
-                }
-		        ++it;
-	        }
-	        klee::klee_message("----------------");
-	
+            print_constraints(state);
+            break;
+    	}
+        case llvm::Instruction::Call: {
+            print_constraints(state);
     	}
         default: {
 
