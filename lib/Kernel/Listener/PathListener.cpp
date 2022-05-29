@@ -48,6 +48,12 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
             }
         }
     }
+    if (config.contains("94_looplimit")){
+        looplimit = config["94_looplimit"];
+    }
+    else {
+        looplimit = 30;
+    }
 
     // for MLTA indirect function call
     auto MName = this->executor->get_module()->getName();
@@ -198,7 +204,8 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             klee::klee_message("BBkey: %s  count: %u", BBkey.c_str(), state.BBcount[BBkey]);
             // qestion: what if there is an constant time loop which requires loop for more than 100
             // maybe just do this check when both branches are possible?
-            if (state.BBcount[BBkey] > 20) {
+            if (state.BBcount[BBkey] > looplimit) {
+                klee::klee_message("reach loop limit, terminate the state");
                 this->executor->terminateState(state);
             }
         }

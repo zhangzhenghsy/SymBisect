@@ -43,6 +43,7 @@ namespace kuc {
         // zheng: indirect call map
         std::map<std::string, std::string> indirectcall_map;
         std::map<std::string, std::set<std::string>> whitelist_map;
+        std::uint32_t looplimit;
         GlobalContext GlobalCtx;
     };
 }
