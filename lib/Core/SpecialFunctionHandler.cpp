@@ -152,6 +152,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("memcpy", handleMemcpy, false),
   add("strncpy_from_user", handleStrncpy_from_user, true),
   add("user_path_at", handleUser_path_at, true),
+  add("vzalloc", handleVzalloc, true),
 
 #undef addDNR
 #undef add
@@ -430,6 +431,13 @@ void SpecialFunctionHandler::handleMalloc(ExecutionState &state,
                                   KInstruction *target,
                                   std::vector<ref<Expr> > &arguments) {
   // XXX should type check args
+  assert(arguments.size()==1 && "invalid number of arguments to malloc");
+  executor.executeAlloc(state, arguments[0], false, target);
+}
+
+void SpecialFunctionHandler::handleVzalloc(ExecutionState &state,
+                                  KInstruction *target,
+                                  std::vector<ref<Expr> > &arguments) {
   assert(arguments.size()==1 && "invalid number of arguments to malloc");
   executor.executeAlloc(state, arguments[0], false, target);
 }
