@@ -99,7 +99,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
 
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::Call: {
-            klee::klee_message("print state.completecoveredLines");
+            //klee::klee_message("print state.completecoveredLines");
             std::set<std::string> coveredlines;
             std::string coveredline;
             std::map<const std::string*, std::set<unsigned> > cov = state.completecoveredLines;
@@ -108,7 +108,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
                     coveredline = *(entry.first);
                     coveredline.append(":");
                     coveredline.append(std::to_string(line));
-                    klee::klee_message("%s", coveredline.c_str());
+                    //klee::klee_message("%s", coveredline.c_str());
                     coveredlines.insert(coveredline);
                 }
             }
@@ -116,7 +116,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             auto line_info = dump_inst_sourceinfo(ki->inst);
             std::size_t pos = line_info.find("source/");
             line_info = line_info.substr(pos+1);
-            klee::klee_message("indirectcall_map/whitelist_map key line_info: %s", line_info.c_str());
+            klee::klee_message("key line_info: %s", line_info.c_str());
 
             if (this->whitelist_map.find(line_info) != this->whitelist_map.end())
             {

@@ -153,6 +153,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("strncpy_from_user", handleStrncpy_from_user, true),
   add("user_path_at", handleUser_path_at, true),
   add("vzalloc", handleVzalloc, true),
+  add("_copy_from_user", handleMemcpyR, true),
 
 #undef addDNR
 #undef add
