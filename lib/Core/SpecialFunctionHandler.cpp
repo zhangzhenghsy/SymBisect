@@ -1006,6 +1006,12 @@ void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
 
     ref<Expr> len = arguments[2];
     klee::klee_message("len: %s",len.get_ptr()->dump2().c_str());
+    // object: target object
+    const MemoryObject * object = op.first;
+    klee_message("target obj addr: %lu obj size: %u", object->address, object->size);
+    // object2: source object
+    const MemoryObject * object2 = op2.first;
+    klee_message("src obj addr: %lu obj size: %u", object2->address, object2->size);
     if(ConstantExpr* CE = dyn_cast<ConstantExpr>(len)){
       length = CE->getZExtValue();
     }
@@ -1013,16 +1019,17 @@ void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
       //Use hard-coded concrete size.
       //todo: Compare the symbolic memcpy size and the object size to detect potential OOBW
       //symsize = true;
-      const MemoryObject * object = op.first;
       length = std::min(length, (object->address+object->size-dyn_cast<ConstantExpr>(targetaddr)->getZExtValue()));
-      const MemoryObject * object2 = op2.first;
       length = std::min(length, (object2->address+object2->size-dyn_cast<ConstantExpr>(srcaddr)->getZExtValue()));
     }
     klee::klee_message("concrete length: %lu",length);
 
     const ObjectState *os = op2.second;
+    // baseoffset: from which byte to start copy
+    uint64_t baseoffset = dyn_cast<ConstantExpr>(srcaddr)->getZExtValue() - object2->address;
+    klee::klee_message("baseoffset: %lu", baseoffset);
     for(uint64_t i =0; i<length; i++){
-      ref<Expr> offset = ConstantExpr::create(i, Context::get().getPointerWidth());
+      ref<Expr> offset = ConstantExpr::create((baseoffset + i), Context::get().getPointerWidth());
       ref<Expr> value = os->read(offset, 8);
 
       ref<Expr> base = AddExpr::create(targetaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
@@ -1077,6 +1084,15 @@ void SpecialFunctionHandler::handleMemcpyRL(ExecutionState &state,
     }
 
     klee::klee_message("len: %s",len.get_ptr()->dump2().c_str());
+    // object: target object
+    const MemoryObject * object;
+    object  = op.first;
+    klee_message("target obj addr: %lu obj size: %u", object->address, object->size);
+    // object2: source object
+    const MemoryObject * object2;
+    object2 = op2.first;
+    klee_message("src obj addr: %lu obj size: %u", object2->address, object2->size);
+
     if(ConstantExpr* CE = dyn_cast<ConstantExpr>(len)){
       length = CE->getZExtValue();
     }
@@ -1084,16 +1100,18 @@ void SpecialFunctionHandler::handleMemcpyRL(ExecutionState &state,
       //Use hard-coded concrete size.
       //todo: Compare the symbolic memcpy size and the object size to detect potential OOBW
       //symsize = true;
-      const MemoryObject * object = op.first;
       length = std::min(length, (object->address+object->size-dyn_cast<ConstantExpr>(targetaddr)->getZExtValue()));
-      const MemoryObject * object2 = op2.first;
       length = std::min(length, (object2->address+object2->size-dyn_cast<ConstantExpr>(srcaddr)->getZExtValue()));
     }
     klee::klee_message("concrete length: %lu",length);
 
     os = op2.second;
+    // baseoffset: from which byte to start copy
+    uint64_t baseoffset;
+    baseoffset = dyn_cast<ConstantExpr>(srcaddr)->getZExtValue() - object2->address;
+    klee::klee_message("baseoffset: %lu", baseoffset);
     for(uint64_t i =0; i<length; i++){
-      ref<Expr> offset = ConstantExpr::create(i, Context::get().getPointerWidth());
+      ref<Expr> offset = ConstantExpr::create((baseoffset + i), Context::get().getPointerWidth());
       ref<Expr> value = os->read(offset, 8);
 
       ref<Expr> base = AddExpr::create(targetaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
