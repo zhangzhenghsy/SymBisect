@@ -4588,7 +4588,10 @@ void Executor::runFunctionAsMain(Function *f,
   processTree = std::make_unique<PTree>(state);
   // yu hao: add listener service
   this->listener_service->beforeRun(*state);
+  auto current_time = std::time(NULL);
   run(*state);
+  auto execute_time = std::time(NULL)-current_time;
+  klee_message("execute_time: %ld", execute_time);
   this->listener_service->afterRun(*state);
   processTree = nullptr;
 

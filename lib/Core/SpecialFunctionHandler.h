@@ -149,7 +149,7 @@ namespace klee {
     HANDLER(handleIminor);
     // zheng: handle kernel function
     HANDLER(handleMemcpy);
-    HANDLER(handleMemcpyR);
+    HANDLER(handleMemcpyRZ);
     HANDLER(handleMemcpyRL);
     HANDLER(handleStrncpy_from_user);
     HANDLER(handleUser_path_at);
