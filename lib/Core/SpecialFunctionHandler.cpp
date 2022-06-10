@@ -153,7 +153,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("strncpy_from_user", handleStrncpy_from_user, true),
   add("user_path_at", handleUser_path_at, true),
   add("vzalloc", handleVzalloc, true),
-  add("_copy_from_user", handleMemcpyR, true),
+  add("_copy_from_user", handleMemcpyRZ, true),
+  add("_copy_to_user", handleMemcpyRZ, true),
 
 #undef addDNR
 #undef add
@@ -1129,7 +1130,7 @@ returnL:
 }
 
 //  zheng: the difference from handleMemcpy is that  it return 0
-void SpecialFunctionHandler::handleMemcpyR(ExecutionState &state,
+void SpecialFunctionHandler::handleMemcpyRZ(ExecutionState &state,
                                           KInstruction *target,
                                           std::vector<ref<Expr> > &arguments) {
     ref<Expr> ret = ConstantExpr::alloc(0, Expr::Int64);
