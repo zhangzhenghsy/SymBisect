@@ -230,7 +230,7 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
     }
     auto name_l = dump_inst_sourceinfo(ki->inst);
     if (low_priority_lines.find(name_l) != low_priority_lines.end()) {
-        klee::klee_message("reach low priority line list");
+        klee::klee_message("reach low priority line list terminate the state");
         this->executor->terminateState(state);
     }
 }

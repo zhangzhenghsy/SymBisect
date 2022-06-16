@@ -42,12 +42,20 @@ void print_constraints(klee::ExecutionState &state) {
     klee::ConstraintSet constraints = state.constraints;
     std::set<std::string> constraint_strs;
     std::string str;
+    std::map<const std::string, std::set<std::string>> constraint_lines = state.constraint_lines;
 	for (auto it = constraints.begin(), ie = constraints.end(); it != ie;) {
 		klee::ref<klee::Expr> value = *it;
 		yhao_print(value->print, str);
         if (constraint_strs.find(str) == constraint_strs.end())
         {
-            klee::klee_message("Br constraint: %s", str.c_str());
+            klee::klee_message("\nBr constraint: %s", str.c_str());
+            if (constraint_lines.find(str) != constraint_lines.end()){
+                klee::klee_message("constraint_lines:");
+                for (auto it2 = constraint_lines[str].begin(); it2 != constraint_lines[str].end(); it2++)
+                {
+                    klee::klee_message("line: %s", (*it2).c_str());/* code */
+                }
+            }
             constraint_strs.insert(str);
         }
 		++it;
@@ -257,6 +265,20 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
         case llvm::Instruction::ICmp: {
             yhao_print(executor->getDestCell(state, ki).value->print, str);
             klee::klee_message("ICMP Inst value: %s", str.c_str());
+            break;
+        }
+        case llvm::Instruction::Br: {
+            std::string sourceinfo = dump_inst_booltin(ki->inst);
+            // what if the cond is a And cond? we will miss the first one?
+            if(state.constraints.size() > 0){
+                std::string finalconstraint_str;
+                auto ie = state.constraints.end()-1;
+                klee::ref<klee::Expr> value = *ie;
+                yhao_print(value->print, finalconstraint_str);
+                state.constraint_lines[finalconstraint_str].insert(sourceinfo);
+                klee_message("add constraint: %s\n at line: %s", finalconstraint_str.c_str(), sourceinfo.c_str());
+            }
+            break;
         }
         default: {
             break;
