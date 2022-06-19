@@ -268,6 +268,10 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             break;
         }
         case llvm::Instruction::Br: {
+            BranchInst *bi = cast<BranchInst>(ki->inst);
+            if (bi->isUnconditional()) {
+                break;
+            }
             std::string sourceinfo = dump_inst_booltin(ki->inst);
             // what if the cond is a And cond? we will miss the first one?
             if(state.constraints.size() > 0){
