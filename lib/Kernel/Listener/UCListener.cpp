@@ -162,38 +162,38 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
                 case llvm::ICmpInst::ICMP_EQ: {
                     klee::ref<Expr> left = executor->eval(ki, 0, state).value;
                     klee::ref<Expr> right = executor->eval(ki, 1, state).value;
-                    if (left.ptr->dump2() == "0"){
-                        if (this->map_address_symbolic.find(right) != this->map_address_symbolic.end()){
-                            klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[right];
-                            executor->un_eval(ki, 1, state).value = symbolic_pointer;
-                        }
+                    //if (left.ptr->dump2() == "0"){
+                    if (this->map_address_symbolic.find(right) != this->map_address_symbolic.end()){
+                        klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[right];
+                        executor->un_eval(ki, 1, state).value = symbolic_pointer;
                     }
-                    else if (right.ptr->dump2() == "0"){
-                        if (this->map_address_symbolic.find(left) != this->map_address_symbolic.end()){
-                            klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[left];
-                            executor->un_eval(ki, 0, state).value = symbolic_pointer;
-                        }
+                    //}
+                    //else if (right.ptr->dump2() == "0"){
+                    if (this->map_address_symbolic.find(left) != this->map_address_symbolic.end()){
+                        klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[left];
+                        executor->un_eval(ki, 0, state).value = symbolic_pointer;
                     }
+                    //}
                     break;
                 }
                 case llvm::ICmpInst::ICMP_NE: {
                     klee::ref<Expr> left = executor->eval(ki, 0, state).value;
                     klee::ref<Expr> right = executor->eval(ki, 1, state).value;
-                    if (left.ptr->dump2() == "0"){
-                        if (this->map_address_symbolic.find(right) != this->map_address_symbolic.end()){
-                            klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[right];
-                            executor->un_eval(ki, 1, state).value = symbolic_pointer;
-                        }
+                    //if (left.ptr->dump2() == "0"){
+                    if (this->map_address_symbolic.find(right) != this->map_address_symbolic.end()){
+                        klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[right];
+                        executor->un_eval(ki, 1, state).value = symbolic_pointer;
                     }
-                    else if (right.ptr->dump2() == "0"){
-                        klee_message("icmp NE right expr is 0");
-                        if (this->map_address_symbolic.find(left) != this->map_address_symbolic.end()){
-                            klee_message("icmp NE left expr is symbolic in fact");
-                            klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[left];
-                            klee_message("symbolic pointer: %s", symbolic_pointer.ptr->dump2().c_str());
-                            executor->un_eval(ki, 0, state).value = symbolic_pointer;
-                        }
+                    //}
+                    //else if (right.ptr->dump2() == "0"){
+                    //    klee_message("icmp NE right expr is 0");
+                    if (this->map_address_symbolic.find(left) != this->map_address_symbolic.end()){
+                        klee_message("icmp NE left expr is symbolic in fact");
+                        klee::ref<Expr> symbolic_pointer = this->map_address_symbolic[left];
+                        klee_message("symbolic pointer: %s", symbolic_pointer.ptr->dump2().c_str());
+                        executor->un_eval(ki, 0, state).value = symbolic_pointer;
                     }
+                    //}
                     break;
                 }
                 default:
