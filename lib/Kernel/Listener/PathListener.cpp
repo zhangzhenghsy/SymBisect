@@ -188,6 +188,18 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             break;
         }
         case llvm::Instruction::Br:{
+            Instruction *i = ki->inst;
+            BranchInst *bi = cast<BranchInst>(i);
+            if (bi->isUnconditional()) {
+                break;
+            }
+            klee::ref<klee::Expr> cond = executor->eval(ki, 0, state).value;
+            std::string conditionstr = cond.get_ptr()->dump2();
+            //std::string conditionstr = executor->eval(ki, 0, state).value.get_ptr()->dump2();
+            if (conditionstr == "true" || conditionstr == "false")
+            {
+                break;
+            }
             string BBname = ki->inst->getParent()->getName().str();
             // for Intrinsic function no need to set the limit
             if (BBname.find("bc-") == std::string::npos){
