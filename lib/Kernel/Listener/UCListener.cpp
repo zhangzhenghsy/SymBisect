@@ -48,9 +48,9 @@ void print_constraints(klee::ExecutionState &state) {
 		yhao_print(value->print, str);
         if (constraint_strs.find(str) == constraint_strs.end())
         {
-            klee::klee_message("\nBr constraint: %s", str.c_str());
+            klee::klee_message("Br constraint: %s", str.c_str());
             if (constraint_lines.find(str) != constraint_lines.end()){
-                klee::klee_message("constraint_lines:");
+                //klee::klee_message("constraint_lines:");
                 for (auto it2 = constraint_lines[str].begin(); it2 != constraint_lines[str].end(); it2++)
                 {
                     klee::klee_message("line: %s", (*it2).c_str());/* code */

@@ -1234,6 +1234,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 }
 
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
+  klee_message("addConstraint state: %p", &state);
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(condition)) {
     if (!CE->isTrue())
       llvm::report_fatal_error("attempt to add invalid constraint");
@@ -2193,6 +2194,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         cond = Expr::createIsZero(cond);
       }
       Executor::StatePair branches = fork(state, cond, false);
+      ExecutionState * state2 = branches.second;
+
       if (randvalue==1){
         branches = StatePair(branches.second, branches.first);
       }
@@ -2210,6 +2213,12 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), *branches.first);
       if (branches.second)
         transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), *branches.second);
+
+      if(state2) {
+        ExecutionState& newstate = *state2;
+        klee_message("this->listener_service->afterExecuteInstruction(newstate, ki) newstate: %p", &newstate);
+        this->listener_service->afterExecuteInstruction(newstate, ki);
+      }
     }
     break;
   }
