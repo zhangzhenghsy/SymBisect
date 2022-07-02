@@ -188,6 +188,9 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             break;
         }
         case llvm::Instruction::Br:{
+            break;
+            // move the loop limit terminate to Executor.cpp
+            /*
             Instruction *i = ki->inst;
             BranchInst *bi = cast<BranchInst>(i);
             if (bi->isUnconditional()) {
@@ -220,6 +223,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
                 klee::klee_message("reach loop limit, terminate the state");
                 this->executor->terminateState(state);
             }
+            */
         }
     }
 }

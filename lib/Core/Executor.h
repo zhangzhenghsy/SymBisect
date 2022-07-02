@@ -278,7 +278,12 @@ private:
   /// Return the typeid corresponding to a certain `type_info`
   ref<ConstantExpr> getEhTypeidFor(ref<Expr> type_info);
 
-    void executeInstruction(ExecutionState &state, KInstruction *ki);
+  void executeInstruction(ExecutionState &state, KInstruction *ki);
+
+  /// add by zheng: check whether the BB loop limit is reached, terminate the state if so
+  void checkLoopLimit(ExecutionState &state, KInstruction *ki, bool terminate);
+  /// add by zheng: log the new added constraint when forking states at the branch 
+  void logNewConstraint(ExecutionState &state, KInstruction *ki);
 
   void run(ExecutionState &initialState);
 

@@ -95,6 +95,8 @@ typedef unsigned TypeSize;
 //added by zheng for random generator
 #include <cstdlib>
 #include <ctime>
+#include "../Kernel/ToolLib/llvm_related.h"
+#include "../Kernel/ToolLib/log.h"
 
 using namespace llvm;
 using namespace klee;
@@ -1234,7 +1236,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 }
 
 void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
-  klee_message("addConstraint state: %p", &state);
+  //klee_message("addConstraint state: %p", &state);
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(condition)) {
     if (!CE->isTrue())
       llvm::report_fatal_error("attempt to add invalid constraint");
@@ -2055,6 +2057,68 @@ Function* Executor::getTargetFunction(Value *calledVal, ExecutionState &state) {
   }
 }
 
+std::string getCalltrace(ExecutionState &state) {
+  int endIndex = state.stack.size() - 1;
+  std::string calltrace = "";
+  for (int i = 0; i <= endIndex; i++) {
+      auto const &sf = state.stack.at(i);
+      klee::KFunction* kf = sf.kf;
+      llvm::Function* f = kf ? kf->function : 0;
+      if (f)
+      {
+          calltrace.append(f->getName().str());
+          calltrace.append("--");
+      }
+  }
+  calltrace.pop_back();
+  calltrace.pop_back();
+  return calltrace;
+}
+void Executor::checkLoopLimit(ExecutionState &state, KInstruction *ki, bool terminate = false) {
+  unsigned int looplimit;
+  if (config.contains("94_looplimit")){
+        looplimit = config["94_looplimit"];
+  } else {
+    looplimit = 10;
+  }
+  std::string BBname = ki->inst->getParent()->getName().str();
+  // for Intrinsic function no need to set the limit
+  if (BBname.find("bc-") == std::string::npos){
+      return;
+  }
+  BBname = BBname.substr(BBname.find("bc-")+3);
+  BBname = BBname.substr(BBname.find("-")+1);
+  std::string calltrace = getCalltrace(state);
+  std::string BBkey = calltrace+"-"+BBname;
+  if (state.BBcount.find(BBkey) == state.BBcount.end()){
+      state.BBcount[BBkey] = 1;
+  } else {
+      state.BBcount[BBkey] += 1;
+  }
+  klee::klee_message("checkLoopLimit() for state : %p BBkey: %s  count: %u", &state, BBkey.c_str(), state.BBcount[BBkey]);
+  // question: what if there is an constant time loop which requires loop for more than the limit
+  // answer:  just call this function when both branches are possible
+  if (terminate){
+    if (state.BBcount[BBkey] > looplimit) {
+      klee::klee_message("reach loop limit, terminate the state");
+      terminateState(state);
+    }
+  }
+}
+
+void Executor::logNewConstraint(ExecutionState &state, KInstruction *ki) {
+  std::string sourceinfo = dump_inst_booltin(ki->inst);
+  // what if the cond is a And cond? we will miss the first one?
+  if(state.constraints.size() > 0){
+    std::string finalconstraint_str;
+    auto ie = state.constraints.end()-1;
+    klee::ref<klee::Expr> value = *ie;
+    yhao_print(value->print, finalconstraint_str);
+    state.constraint_lines[finalconstraint_str].insert(sourceinfo);
+    klee_message("add constraint: %s\n at line: %s", finalconstraint_str.c_str(), sourceinfo.c_str());
+  }
+}
+
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
   Instruction *i = ki->inst;
@@ -2213,9 +2277,16 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), *branches.first);
       if (branches.second)
         transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), *branches.second);
-
-      if(state2) {
+      
+      // only when both paths are feasible, we only to check loop limit and add the missing listener_service->afterExecuteInstruction
+      if (branches.first && branches.second) {
         ExecutionState& newstate = *state2;
+        klee_message("logNewConstraint for state : %p and newstate : %p", &state, &newstate);
+        logNewConstraint(state, ki);
+        logNewConstraint(newstate, ki);
+        // should we log the BB execution number when there is only one path feasible?
+        checkLoopLimit(state, ki);
+        checkLoopLimit(newstate, ki, true);
         klee_message("this->listener_service->afterExecuteInstruction(newstate, ki) newstate: %p", &newstate);
         this->listener_service->afterExecuteInstruction(newstate, ki);
       }

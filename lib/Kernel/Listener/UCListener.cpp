@@ -268,6 +268,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             break;
         }
         case llvm::Instruction::Br: {
+            /*
             BranchInst *bi = cast<BranchInst>(ki->inst);
             if (bi->isUnconditional()) {
                 break;
@@ -282,6 +283,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
                 state.constraint_lines[finalconstraint_str].insert(sourceinfo);
                 klee_message("add constraint: %s\n at line: %s", finalconstraint_str.c_str(), sourceinfo.c_str());
             }
+            */
             break;
         }
         default: {
