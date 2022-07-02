@@ -29,6 +29,12 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     if (config.contains("92_indirectcall")){
         indirectcall_map = config["92_indirectcall"];
     }
+
+    if (config.contains("95_kernelversion")){
+        kernelversion = config["95_kernelversion"];
+    } else {
+        kernelversion = "v5.4";
+    }
 }
 
 kuc::UCListener::~UCListener() = default;
@@ -74,7 +80,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     
     klee::klee_message("ExecutionState &state: %p", &state);
     klee::klee_message("bb name i->getParent()->getName().str() %s",ki->inst->getParent()->getName().str().c_str());
-    std::string sourceinfo = dump_inst_booltin(ki->inst);
+    std::string sourceinfo = dump_inst_booltin(ki->inst, kernelversion);
     if (sourceinfo!= ""){
     klee::klee_message("line sourceinfo %s",sourceinfo.c_str());
     }
@@ -336,7 +342,7 @@ std::string kuc::UCListener::create_global_var_name(llvm::Instruction *i, int64_
     std::string name;
     name += inst_to_strID(i);
     //add by zheng
-    std::string sourceinfo = dump_inst_booltin(i);
+    std::string sourceinfo = dump_inst_booltin(i, kernelversion);
     std::size_t pos = sourceinfo.find("#");
     std::string linenum = sourceinfo.substr(pos);
     name += linenum;

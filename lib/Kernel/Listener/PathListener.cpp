@@ -48,12 +48,12 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
             }
         }
     }
-    if (config.contains("94_looplimit")){
-        looplimit = config["94_looplimit"];
+    if (config.contains("95_kernelversion")){
+        kernelversion = config["95_kernelversion"];
+    } else {
+        kernelversion = "v5.8-rc6";
     }
-    else {
-        looplimit = 30;
-    }
+
 
     // for MLTA indirect function call
     auto MName = this->executor->get_module()->getName();

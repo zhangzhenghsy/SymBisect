@@ -2107,7 +2107,14 @@ void Executor::checkLoopLimit(ExecutionState &state, KInstruction *ki, bool term
 }
 
 void Executor::logNewConstraint(ExecutionState &state, KInstruction *ki) {
-  std::string sourceinfo = dump_inst_booltin(ki->inst);
+  std::string kernelversion;
+  if (config.contains("95_kernelversion")){
+    kernelversion = config["95_kernelversion"];
+  } else {
+    kernelversion = "v5.4";
+  }
+
+  std::string sourceinfo = dump_inst_booltin(ki->inst, kernelversion);
   // what if the cond is a And cond? we will miss the first one?
   if(state.constraints.size() > 0){
     std::string finalconstraint_str;
@@ -2277,7 +2284,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), *branches.first);
       if (branches.second)
         transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), *branches.second);
-      
+
       // only when both paths are feasible, we only to check loop limit and add the missing listener_service->afterExecuteInstruction
       if (branches.first && branches.second) {
         ExecutionState& newstate = *state2;

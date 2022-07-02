@@ -1139,9 +1139,11 @@ void SpecialFunctionHandler::handleMemcpyRZ(ExecutionState &state,
 }
 
 std::string create_var_name(llvm::Instruction *i, const std::string &kind) {
+    // kernelversion doesn't influence the return value
+    std::string kernelversion = "v5.4";
     std::string name;
     name += inst_to_strID(i);
-    std::string sourceinfo = dump_inst_booltin(i);
+    std::string sourceinfo = dump_inst_booltin(i, kernelversion);
     std::size_t pos = sourceinfo.find("#");
     std::string linenum = sourceinfo.substr(pos);
     name += linenum;

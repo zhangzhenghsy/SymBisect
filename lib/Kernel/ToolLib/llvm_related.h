@@ -19,7 +19,7 @@ std::string get_structure_name(std::string name);
 
 void dump_inst(llvm::Instruction *inst);
 
-std::string dump_inst_booltin(llvm::Instruction *inst);
+std::string dump_inst_booltin(llvm::Instruction *inst, std::string kernelversion);
 std::string dump_inst_sourceinfo(llvm::Instruction *inst);
 
 std::string real_inst_str(std::string str);
