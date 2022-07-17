@@ -4369,7 +4369,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   if (success) {
     //klee::klee_message("Executor::executeMemoryOperation find the object");
     const MemoryObject *mo = op.first;
-    //klee::klee_message("mo->addr: %lu mo->size: %d", mo->address, mo->size);
+    klee::klee_message("success find object according to address: %s mo->addr: %lu mo->size: %d", address.get_ptr()->dump2().c_str(), mo->address, mo->size);
 
     if (MaxSymArraySize && mo->size >= MaxSymArraySize) {
       address = toConstant(state, address, "max-sym-array-size");
@@ -4417,10 +4417,12 @@ void Executor::executeMemoryOperation(ExecutionState &state,
         }          
       } else {
         ref<Expr> result = os->read(offset, type);
+        //klee_message("read result:%s", result.get_ptr()->dump2().c_str());
         
         if (interpreterOpts.MakeConcreteSymbolic)
           result = replaceReadWithSymbolic(state, result);
-        
+
+        //klee_message("after replaceReadWithSymbolic read result:%s", result.get_ptr()->dump2().c_str());
         bindLocal(target, state, result);
       }
 
@@ -4593,6 +4595,7 @@ void Executor::runFunctionAsMain(Function *f,
   KFunction *kf = kmodule->functionMap[f];
   assert(kf);
   Function::arg_iterator ai = f->arg_begin(), ae = f->arg_end();
+  klee_message("Entry function name: %s", f->getName().str().c_str());
     if (f->getName().str() == "main") {
         /// yu hao: init arguments for main function
         /// yu hao: not work for under constraint symbolic execution

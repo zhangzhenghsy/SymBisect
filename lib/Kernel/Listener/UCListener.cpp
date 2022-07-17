@@ -35,12 +35,71 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     } else {
         kernelversion = "v5.4";
     }
+
+    if (config.contains("96_concolic_map")){
+        concolic_map = config["96_concolic_map"];
+    }
 }
 
 kuc::UCListener::~UCListener() = default;
 
-void kuc::UCListener::beforeRun(klee::ExecutionState &initialState) {
+// used for concolic execution
+void kuc::UCListener::beforeRun(klee::ExecutionState &state) {
+    klee_message("\nUCListener::beforeRun");
+    KInstruction *ki = state.pc;
+    KFunction *kf = state.stack.back().kf;
+    Function *f = kf->function;
+    Function::arg_iterator ai = f->arg_begin(), ae = f->arg_end();
+    uint64_t index = 0;
+    std::string str;
+    int base = 10;
+    char *end;
 
+    for (; ai != ae; ai++) {
+        if (concolic_map.find(std::to_string(index)) == concolic_map.end()) {continue;}
+        // map of {nth byte, value}
+        std::map<std::string, uint64_t> local_concolic_map = concolic_map[std::to_string(index)];
+
+        auto argument = state.stack.back().locals[kf->getArgRegister(index)].value;
+        klee_message("index: %lu Argument type: %d argument: %s", index, ai->getType()->getTypeID(), argument.get_ptr()->dump2().c_str());
+        auto ty = ai->getType();
+
+        if(ty->getTypeID() == llvm::Type::PointerTyID ){
+            std::string name = "input_"+std::to_string(index)+"(pointer)";
+            klee::klee_message("name: %s", name.c_str());
+            yhao_print(ty->getPointerElementType()->print, str);
+            klee::klee_message("pointer element type: %s", str.c_str());
+            // create an object corresponding to the pointer
+            klee::MemoryObject *mo = executor->create_mo(state, ty->getPointerElementType(), ki->inst, name);
+            this->map_symbolic_address[argument] = mo->getBaseExpr();
+            this->map_address_symbolic[mo->getBaseExpr()] = argument;
+            klee_message("mo base: %lu mo size: %u", mo->address, mo->size);
+
+            klee::ObjectPair op;
+            state.addressSpace.resolveOne(mo->getBaseExpr(), op);
+            const ObjectState *os = op.second;
+            // add constraint for each byte in local_concolic_map
+            for (auto it = local_concolic_map.begin(); it != local_concolic_map.end(); ++it){
+                // it-> first is string
+                uint64_t offset_value =  std::strtoull(it->first.c_str(), &end, base);
+                uint64_t value = it->second;
+                ref<Expr> offset = klee::ConstantExpr::create(offset_value, Context::get().getPointerWidth());
+                ref<Expr> readvalue = os->read(offset, 8);
+
+                ref<Expr> cond = EqExpr::create(readvalue, klee::ConstantExpr::create(value, 8));
+                klee_message("add constraint: %s", cond.get_ptr()->dump2().c_str());
+                state.addConstraint(cond);
+            }
+        } else if (ty->getTypeID() == llvm::Type::IntegerTyID) {
+            // if the argument type is IntegerTy (int, char......) then no need to create an object, add the constraint directly 
+            uint64_t value = local_concolic_map["0"];
+            klee_message("cast<IntegerType>(ty)->getBitWidth(): %u", cast<IntegerType>(ty)->getBitWidth());
+            ref<Expr> cond = EqExpr::create(argument, klee::ConstantExpr::create(value, cast<IntegerType>(ty)->getBitWidth()));
+            klee_message("add constraint: %s", cond.get_ptr()->dump2().c_str());
+            state.addConstraint(cond);
+        }
+        index ++;
+    }
 }
 
 void print_constraints(klee::ExecutionState &state) {
@@ -68,6 +127,7 @@ void print_constraints(klee::ExecutionState &state) {
 	}
 	klee::klee_message("----------------"); 
 }
+
 void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     klee::klee_message("\n\nUCListener::beforeExecuteInstruction()");
     std::string str;
@@ -433,6 +493,7 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
         if (ret->getKind() == klee::Expr::Constant) {
             return;
         }
+        // type of base is pointer of pointer (char ** for example)
         klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
 
         klee_message("load ret symbolic: %s", ret.get_ptr()->dump2().c_str());
@@ -445,8 +506,14 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
             /// yu hao: create mo for non-constant pointer
             // e.g. symbolic pointer load address
             // create new mo and symbolic pointer = mo->getBaseExpr();
-            klee::klee_message("make load ret symbolic");
-            auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
+            klee::klee_message("make symbolic load ret concolic with creating a concolic object");
+            std::string name;
+            std::string retstr = ret.get_ptr()->dump2();
+            if(retstr.substr(0,21) == "(ReadLSB w64 0 input_") {
+                name = "input_"+retstr.substr(21,22)+"(pointer)";
+            } else {
+                name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
+            }
             klee::klee_message("name: %s", name.c_str());
             yhao_print(ty->getPointerElementType()->print, str);
             klee::klee_message("pointer element type: %s", str.c_str());

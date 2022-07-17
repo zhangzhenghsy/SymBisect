@@ -51,7 +51,7 @@ kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
     if (config.contains("95_kernelversion")){
         kernelversion = config["95_kernelversion"];
     } else {
-        kernelversion = "v5.8-rc6";
+        kernelversion = "v5.4";
     }
 
 

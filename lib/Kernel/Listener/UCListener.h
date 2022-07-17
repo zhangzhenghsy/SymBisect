@@ -38,6 +38,8 @@ namespace kuc {
         std::set<std::string> skip_functions;
         bool print_inst;
         std::map<std::string, std::string> indirectcall_map;
+        std::string kernelversion;
+        std::map<std::string,std::map<std::string, uint64_t>> concolic_map;
 
     private:
         std::string create_global_var_name(llvm::Instruction *i, int64_t index, const std::string &kind);
