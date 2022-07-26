@@ -7,6 +7,7 @@
 #include "../ToolLib/llvm_related.h"
 #include "../../Core/Executor.h"
 #include "klee/Support/ErrorHandling.h"
+#include <string>
 
 using namespace klee;
 using namespace llvm;
@@ -180,6 +181,16 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
 
             // yhao: symbolic execution
             this->symbolic_before_load(state, ki);
+            //klee::MemoryMap objects = state.addressSpace.objects;
+            //klee::MemoryMap::iterator tmp=objects.begin();
+            //klee_message("list all current objects:");
+            //for (; tmp!=objects.end(); ++tmp) {
+            //    const auto &mo = tmp->first;
+            //    if(std::to_string(mo->address) == executor->eval(ki, 0, state).value->dump2()){
+            //        klee::klee_message("mo->address: %s  mo->size: %u  mo->issymsize: %s",  std::to_string(mo->address).c_str(), mo->size, mo->issymsize.c_str());
+            //    }
+            //}
+
             break;
         }
         case llvm::Instruction::Store: {
@@ -411,9 +422,10 @@ std::string kuc::UCListener::create_global_var_name(llvm::Instruction *i, int64_
     name += "-" + kind;
     if (this->count.find(name) == this->count.end()) {
         this->count[name] = 0;
+    } else {
+        this->count[name] = this->count[name] + 1;
     }
     name += "-" + std::to_string(this->count[name]);
-    this->count[name] = this->count[name] + 1;
     return name;
 }
 
@@ -471,6 +483,7 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
             // do not consider address calculation
             // mainly for the case concrete address + symbolic offset
             auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
+            //std::string name = base.get_ptr()->dump2();
             klee::MemoryObject *mo = executor->create_mo(state, ty, ki->inst, name);
             executor->un_eval(ki, 1, state).value = mo->getBaseExpr();
             this->map_symbolic_address[base] = mo->getBaseExpr();
@@ -496,10 +509,11 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
         // type of base is pointer of pointer (char ** for example)
         klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
 
-        klee_message("load ret symbolic: %s", ret.get_ptr()->dump2().c_str());
+        //klee_message("load ret symbolic: %s", ret.get_ptr()->dump2().c_str());
         if (map_symbolic_address.find(ret) != map_symbolic_address.end()) {
-            klee::klee_message("find load ret symbolic");
+            klee::klee_message("find load ret symbolic in map_symbolic_address");
             auto value = map_symbolic_address[ret];
+            klee::klee_message("corresponding concrete address: %s:", value.get_ptr()->dump2().c_str());
             executor->bindLocal(ki, state, value);
             executor->executeMemoryOperation(state, true, base, value, nullptr);
         } else {
@@ -509,11 +523,13 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
             klee::klee_message("make symbolic load ret concolic with creating a concolic object");
             std::string name;
             std::string retstr = ret.get_ptr()->dump2();
-            if(retstr.substr(0,21) == "(ReadLSB w64 0 input_") {
-                name = "input_"+retstr.substr(21,22)+"(pointer)";
+            //klee::klee_message("retstr: %s  retstr.length():%u", retstr.c_str(), retstr.length());
+            if(retstr.substr(0,21) == "(ReadLSB w64 0 input_" && (retstr.length() == 23)) {
+                name = "input_"+retstr.substr(21,1)+"(pointer)";
             } else {
                 name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
             }
+            //std::string name = retstr;
             klee::klee_message("name: %s", name.c_str());
             yhao_print(ty->getPointerElementType()->print, str);
             klee::klee_message("pointer element type: %s", str.c_str());
