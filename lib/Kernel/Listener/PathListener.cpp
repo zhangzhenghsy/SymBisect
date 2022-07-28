@@ -80,6 +80,13 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
     //klee::klee_message("test True expr: %s",True.ptr->dump2().c_str());
     klee::klee_message("PathListener::beforeExecuteInstruction()");
 
+    auto line_info = dump_inst_sourceinfo(ki->inst);
+    if (line_info != ""){
+        std::size_t pos = line_info.find("source/");
+        line_info = line_info.substr(pos+1);
+        state.completecoveredLines.insert(line_info);
+        klee::klee_message("insert new line in completecoveredLines: %s", line_info.c_str());
+    }
 
     int endIndex = state.stack.size() - 1;
     string calltrace = "";
@@ -100,18 +107,19 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::Call: {
             //klee::klee_message("print state.completecoveredLines");
-            std::set<std::string> coveredlines;
-            std::string coveredline;
-            std::map<const std::string*, std::set<unsigned> > cov = state.completecoveredLines;
-            for (const auto &entry : cov) {
-                for (const auto &line : entry.second) {
-                    coveredline = *(entry.first);
-                    coveredline.append(":");
-                    coveredline.append(std::to_string(line));
-                    //klee::klee_message("%s", coveredline.c_str());
-                    coveredlines.insert(coveredline);
-                }
-            }
+            std::set<std::string> coveredlines = state.completecoveredLines;
+            //std::string coveredline;
+            //std::map<const std::string*, std::set<unsigned> > cov = state.completecoveredLines;
+            //klee::klee_message("print all current coveredlines:");
+            //for (const auto &entry : cov) {
+            //    for (const auto &line : entry.second) {
+            //        coveredline = *(entry.first);
+            //        coveredline.append(":");
+            //        coveredline.append(std::to_string(line));
+            //        klee::klee_message("%s", coveredline.c_str());
+            //        coveredlines.insert(coveredline);
+            //    }
+            //}
 
             auto line_info = dump_inst_sourceinfo(ki->inst);
             std::size_t pos = line_info.find("source/");

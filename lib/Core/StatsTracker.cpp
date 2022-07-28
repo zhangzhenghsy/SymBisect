@@ -363,7 +363,8 @@ void StatsTracker::stepInstruction(ExecutionState &es) {
         // FIXME: This trick no longer works, we should fix this in the line
         // number propogation.
           es.coveredLines[&ii.file].insert(ii.line);
-          es.completecoveredLines[&ii.file].insert(ii.line);
+          //es.completecoveredLines[&ii.file].insert(ii.line);
+          //klee::klee_message("insert new line in completecoveredLines: %s:%s", ii.file.c_str(), std::to_string(ii.line).c_str());
 	es.coveredNew = true;
         es.instsSinceCovNew = 1;
 	++stats::coveredInstructions;

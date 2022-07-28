@@ -199,7 +199,8 @@ public:
   std::map<const std::string *, std::set<std::uint32_t>> coveredLines;
 
   /// @brief zheng: Set containing which lines in which files are covered by this state, not cleared at branch()
-  std::map<const std::string *, std::set<std::uint32_t>> completecoveredLines;
+  /// std::map<const std::string *, std::set<std::uint32_t>> completecoveredLines;
+  std::set<std::string> completecoveredLines;
 
   /// @brief zheng: Log the BB executed times in the state, used in loop limitation.
   std::map<const std::string, std::uint32_t> BBcount;
