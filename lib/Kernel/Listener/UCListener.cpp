@@ -56,8 +56,18 @@ void kuc::UCListener::beforeRun(klee::ExecutionState &state) {
     int base = 10;
     char *end;
 
+    klee_message("print concolic_map:");
+    for(const auto& elem : concolic_map)
+    {
+        klee_message("\nindex of argu: %s", elem.first.c_str());
+        for(const auto& localelem : elem.second){
+            klee_message("index: %s  value: %lu", localelem.first.c_str(), localelem.second);
+        }
+    }
+
     for (; ai != ae; ai++) {
-        if (concolic_map.find(std::to_string(index)) == concolic_map.end()) {continue;}
+        klee_message("\nindex: %s", std::to_string(index).c_str());
+        if (concolic_map.find(std::to_string(index)) == concolic_map.end()) {index ++;continue;}
         // map of {nth byte, value}
         std::map<std::string, uint64_t> local_concolic_map = concolic_map[std::to_string(index)];
 
