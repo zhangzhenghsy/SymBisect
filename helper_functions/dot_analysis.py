@@ -20,7 +20,16 @@ def write_postdompng(PATH, funcname):
     graph = graphs[0]
     graph.write_png(output)
 
+# get dictionary of dominator: dominatees
 def get_domdic(PATH):
+    jsonfile = PATH.replace(".dot", "_node_all_doms.json")
+    if os.path.exists(jsonfile):
+        with open(jsonfile) as f:
+            node_all_doms = json.load(f)
+        #print(jsonfile, "already exists")
+        return node_all_doms
+    
+    print("generate node_all_doms for ", PATH)
     graphs = pydot.graph_from_dot_file(PATH)
     graph = graphs[0]
     
@@ -54,6 +63,8 @@ def get_domdic(PATH):
             node_all_doms[node] = alldoms
         #print(node)
         #print(node_all_doms[node])
+    with open(jsonfile, 'w') as f:
+        json.dump(node_all_doms, f, indent=4, sort_keys=True)
     return node_all_doms
 
 def get_alldoms(node_direct_doms, node, node_all_doms):
@@ -95,26 +106,18 @@ def get_node_mustnodes(PATH, funcname):
     postdomdic = get_domdic(postdomPATH)
     #print("get_domdic(domPATH) done:",time.time()-t0)
     #print("\npostdomdic:\n",json.dumps(postdomdic, sort_keys=True, indent=4))
-    for node in postdomdic:
-        if node in domdic:
-            doms = domdic[node]+postdomdic[node]
-            doms = list(set(doms))
-            doms.sort(key = lambda x:int(x.split("-")[-1]))
-            domdic[node] = doms
-        else:
-            domdic[node] = postdomdic[node]
     #print("\ncombineddomdic:\n",json.dumps(domdic, sort_keys=True, indent=4))
 
     node_mustnodes = {}
-    for node in domdic:
-        if node == "Post dominance root node":
-            continue
-        doms = domdic[node]
-        for dom in doms:
-            if dom not in node_mustnodes:
-                node_mustnodes[dom] = [node]
-            else:
-                node_mustnodes[dom] += [node]
+
+    node_premustnodes = get_node_premustnodes(PATH, funcname)
+    node_postmustnodes = get_node_postmustnodes(PATH, funcname)
+    node_mustnodes = node_premustnodes
+    for dom in node_postmustnodes:
+        if dom not in node_mustnodes:
+            node_mustnodes[dom] = node_postmustnodes[dom]
+        else:
+            node_mustnodes[dom] += node_postmustnodes[dom]
     for node in node_mustnodes:
         node_mustnodes[node].sort(key = lambda x:int(x.split("-")[-1]))
     #print("\nnode_mustnodes:\n",json.dumps(node_mustnodes, sort_keys=True, indent=4))
@@ -138,6 +141,41 @@ def get_node_premustnodes(PATH, funcname):
     for node in node_mustnodes:
         node_mustnodes[node].sort(key = lambda x:int(x.split("-")[-1]))
     return node_mustnodes
+
+def get_node_postmustnodes(PATH, funcname):
+    domPATH = PATH+"/postdoms/postdomonly."+funcname+".dot"
+    domdic = get_domdic(domPATH)
+
+    node_mustnodes = {}
+    for node in domdic:
+        if node == "Post dominance root node":
+            continue
+        doms = domdic[node]
+        for dom in doms:
+            if dom not in node_mustnodes:
+                node_mustnodes[dom] = [node]
+            else:
+                node_mustnodes[dom] += [node]
+
+    for node in node_mustnodes:
+        node_mustnodes[node].sort(key = lambda x:int(x.split("-")[-1]))
+    return node_mustnodes
+
+def get_func_BB_premustBBs(PATH, funclist):
+    #BB:BBlist: if BB is executed, then all BBs in BBlist must be executed
+    BB_mustBBs = {}
+    for func in funclist:
+        func_BB_mustBBs = get_node_premustnodes(PATH, func)
+        BB_mustBBs.update(func_BB_mustBBs)
+    return BB_mustBBs
+
+def get_func_BB_postmustBBs(PATH, funclist):
+    #BB:BBlist: if BB is executed, then all BBs in BBlist must be executed
+    BB_mustBBs = {}
+    for func in funclist:
+        func_BB_mustBBs = get_node_postmustnodes(PATH, func)
+        BB_mustBBs.update(func_BB_mustBBs)
+    return BB_mustBBs
 
 if __name__ == "__main__":
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0/"

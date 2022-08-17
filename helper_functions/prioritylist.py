@@ -5,6 +5,7 @@ import json
 import time
 import dot_analysis
 import concolic
+import copy
 
 def command(string1):
     p=subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -679,7 +680,6 @@ def generate_kleeconfig(PATH, option = "", parameterlist = []):
         print("size of low_priority_line_list_doms:", len(low_priority_line_list_doms))
         config["90_low_priority_line_list"] = low_priority_line_list_doms
         output = PATH+"/config_cover_doms.json"
-    elif option == "doms_union"
     else:
         config["90_low_priority_line_list"] = []
         output = PATH+"/config_cover.json"
@@ -962,6 +962,140 @@ def get_line_blacklist_filterwithdoms(PATH):
     with open(PATH+"/line_blacklist_filterwithdoms.json","w") as f:
         json.dump(blacklist, f, indent=4, sort_keys=True)
 
+def get_whiteBBlist(PATH):
+    whitelist = get_completewhitelist(PATH)
+    with open(PATH+"/line_BBinfo.json") as f:
+        line_BBinfo = json.load(f)
+    whiteBBlist = []
+    for line in whitelist:
+        if line in line_BBinfo:
+            whiteBBlist += line_BBinfo[line]
+    return whiteBBlist
+
+# get the BBs which dominate anyline in whitelist, and union them with previous whiteBBlist
+def get_BB_whitelist_predoms(PATH):
+    whiteBBlist = get_whiteBBlist(PATH)
+    funclist = [BB.split(".bc-")[1].split("-")[0] for BB in whiteBBlist]
+    funclist = list(set(funclist))
+
+    BB_mustBBs = dot_analysis.get_func_BB_premustBBs(PATH, funclist)
+    total_mustBBs = copy.deepcopy(whiteBBlist)
+    for whiteBB in whiteBBlist:
+        if whiteBB not in BB_mustBBs:
+            continue
+        total_mustBBs += BB_mustBBs[whiteBB]
+    total_mustBBs = list(set(total_mustBBs))
+    total_mustBBs.sort()
+    return total_mustBBs
+
+# get the lines which dominate anyline in whitelist, and union them with previous whitelist
+def get_line_whitelist_predoms(PATH):
+    with open(PATH+"/BB_lineinfo.json") as f:
+        BB_lineinfo = json.load(f)
+    
+    BB_whitelist_doms = get_BB_whitelist_predoms(PATH)
+    line_whitelist_doms = []
+    for BB in BB_whitelist_doms:
+        if BB not in BB_lineinfo:
+            continue
+        line_whitelist_doms += BB_lineinfo[BB]
+    
+    line_whitelist_doms = list(set(line_whitelist_doms))
+    line_whitelist_doms.sort()
+    with open(PATH+"/line_whitelist_predoms.json", 'w') as f:
+        json.dump(line_whitelist_doms, f, indent=4, sort_keys=True)
+    return line_whitelist_doms
+
+# get the BBs which post dominate anyline in whitelist, and union them with previous whiteBBlist
+# We don't need to generate the post dominate BBs for function in call trace (they are terminated due to bug in refkernel)
+def get_BB_whitelist_postdoms(PATH, calltracefunclist):
+    whiteBBlist = get_whiteBBlist(PATH)
+    funclist = [BB.split(".bc-")[1].split("-")[0] for BB in whiteBBlist]
+    funclist = list(set(funclist))
+ 
+    if calltracefunclist:
+        print("don't get_BB_whitelist_postdoms for calltrac function :", [func for func in calltracefunclist if func in funclist])
+        funclist = [func for func in funclist if func not in calltracefunclist]
+
+    BB_mustBBs = dot_analysis.get_func_BB_postmustBBs(PATH, funclist)
+    total_mustBBs = whiteBBlist
+    for whiteBB in whiteBBlist:
+        if whiteBB not in BB_mustBBs:
+            continue
+        total_mustBBs += BB_mustBBs[whiteBB]
+
+    total_mustBBs = list(set(total_mustBBs))
+    total_mustBBs.sort()
+    return total_mustBBs
+
+# get the lines which post dominate anyline in whitelist, and union them with previous whitelist
+def get_line_whitelist_postdoms(PATH, calltracefunclist = []):
+    with open(PATH+"/BB_lineinfo.json") as f:
+        BB_lineinfo = json.load(f)
+    
+    BB_whitelist_doms = get_BB_whitelist_postdoms(PATH, calltracefunclist)
+    line_whitelist_doms = []
+    for BB in BB_whitelist_doms:
+        if BB not in BB_lineinfo:
+            continue
+        line_whitelist_doms += BB_lineinfo[BB]
+
+    line_whitelist_doms = list(set(line_whitelist_doms))
+    line_whitelist_doms.sort()
+    with open(PATH+"/line_whitelist_postdoms.json", 'w') as f:
+        json.dump(line_whitelist_doms, f, indent=4, sort_keys=True)
+    return line_whitelist_doms
+
+def get_line_blacklist_doms_postdoms_calltrace(PATH):
+    with open(PATH +"/func_line_blacklist.json") as f:
+        func_line_blacklist = json.load(f)
+    line_func = {}
+    for func in func_line_blacklist:
+        for line in func_line_blacklist[func]:
+            line_func[line] = func
+
+    with open(PATH +"/line_blacklist_filterwithBB.json") as f:
+        blacklist = json.load(f)
+    
+    if os.path.exists(PATH+"/calltracefunclist"):
+        with open(PATH+"/calltracefunclist", "r") as f:
+            calltracefunclist = f.readlines()
+            calltracefunclist = [line[:-1] for line in calltracefunclist]
+    else:
+        print("no", PATH+" calltracefunclist")
+    line_whitelist_predoms = get_line_whitelist_predoms(PATH)
+    line_whitelist_postdoms = get_line_whitelist_postdoms(PATH, calltracefunclist)
+    
+    line_blacklist_doms_postdoms_calltrace = []
+    for line in blacklist:
+        func = line_func[line]
+        if line in line_whitelist_predoms:
+            print("filter ", func, line, " Predominate")
+            continue
+        if line in line_whitelist_postdoms:
+            print("filter ", func, line, " Postdominate")
+            continue
+        line_blacklist_doms_postdoms_calltrace += [line]
+    with open(PATH+"/line_blacklist_doms_postdoms_calltrace.json","w") as f:
+        json.dump(line_blacklist_doms_postdoms_calltrace, f, indent=4, sort_keys=True)
+
+
+def get_line_blacklist_filterwithfunctioncall_predoms(PATH):
+    with open(PATH +"/line_blacklist_filterwithfunctioncall.json") as f:
+        low_priority_line_list_func = json.load(f)
+    low_priority_line_list_func_predom = []
+
+    if not os.path.exists(PATH +"/line_whitelist_predoms.json"):
+        get_line_whitelist_predoms(PATH)
+    with open(PATH +"/line_whitelist_predoms.json") as f:
+        line_whitelist_predoms = json.load(f)
+    for line in low_priority_line_list_func:
+        if line not in line_whitelist_predoms:
+            low_priority_line_list_func_predom += [line]
+        else:
+            print("filter blacklist_func with predoms", line)
+    with open(PATH+"/line_blacklist_func_predoms.json", 'w') as f:
+        json.dump(low_priority_line_list_func_predom, f, indent=4, sort_keys=True)
 
 if __name__ == "__main__":
     #link_bclist(filelist)
@@ -1037,6 +1171,10 @@ if __name__ == "__main__":
     #(cd ~/repos/Linux_kernel_UC_KLEE;source environment.sh);cd PATH;mkdir doms;mkdir postdoms;cd doms;opt -dot-dom-only ../built-in_tag.bc;cd ../postdoms;opt -dot-postdom-only ../built-in_tag.bc
     elif option == "get_line_blacklist_filterwithdoms":
         get_line_blacklist_filterwithdoms(PATH)
+    elif option == "get_line_blacklist_filterwithfunctioncall_predoms":
+        get_line_blacklist_filterwithfunctioncall_predoms(PATH)
+    elif option == "get_line_blacklist_doms_postdoms_calltrace":
+        get_line_blacklist_doms_postdoms_calltrace(PATH)
     #12) get config file
     elif option == "generate_kleeconfig_filterwithfunctioncall":
         generate_kleeconfig(PATH, "functioncall")
