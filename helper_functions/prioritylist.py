@@ -479,18 +479,81 @@ def get_line_whitelist(PATH):
     with open(PATH +"/line_whitelist.json", 'w') as f:
         json.dump(whitelist,f, indent=4, sort_keys=True)
 
+# given an addr, get the complete addrs of the corresponding function
+# s_buf is the dumpresult, addr_buf is the address of each line in s_buf (used for index function, which is more efficiency)
+# addr example : ffffffff81004471
+def get_func_addrs(PATH, addr, s_buf, addr_buf):
+    t0 = time.time()
+    #linelist = [line for line in s_buf if line.startswith(addr)]
+    #print("get_func_addrs cost time1: ",  time.time()-t0)
+    #if len(linelist) > 1:
+    #    print("multiple corresponding lines in dumpresult: ", linelist)
+    #line = linelist[0]
+    #index = s_buf.index(line)
+    index = addr_buf.index(addr)
+
+    previndex = index-1
+    while not s_buf[previndex].endswith(">:\n"):
+        previndex -= 1
+    funcname = s_buf[previndex].split("<")[1].split(">:")[0]
+    while not s_buf[index] == "\n":
+        index += 1
+    addrlist = s_buf[previndex+1:index]
+    addrlist = [line.split(":")[0] for line in addrlist if ":" in line]
+    print(addr, "get_func_addrs() ", funcname, s_buf[previndex+1][:16], s_buf[index-1][:16], "addrlist:", len(addrlist))
+    return set(addrlist)
+
+def get_complete_func_addrs(PATH):
+    t0 = time.time()
+    cover = PATH+"/cover"
+    with open(cover,'r') as f:
+        bbcover = f.readlines()
+    with open(PATH+"/dumpresult", "r") as f:
+        s_buf = f.readlines()
+    addr_buf = []
+    for line in s_buf:
+        if line.startswith("ff") and ":" in line:
+            addr_buf += [line.split(":")[0]]
+        else:
+            addr_buf += [""]
+    print("generate addr_buf correctly:", len(addr_buf)==len(s_buf))
+
+    coveraddrs = [line[2:-1] for line in bbcover]
+    complete_func_addrs = set()
+
+    for coveraddr in coveraddrs:
+        if coveraddr in complete_func_addrs:
+            continue
+        complete_func_addrs = complete_func_addrs.union(get_func_addrs(PATH, coveraddr, s_buf, addr_buf))
+    print("get_complete_func_addrs cost time: ", time.time()-t0)
+    return complete_func_addrs
+
 # for each func in debuginfo (from vmlinux), get the corresponding source code line numbers from debuginfo
+# update: consider the inlined function, that we should not collect the source code lines from the whole debuginfo. 
+# Instead, we should collect the completelines from the functions in the coverage
 # it requires the debuginfo
 # it will be used in get_line_blacklist()
 def get_line_completelist(PATH):
     debuginfo = PATH+"/tmp_o"
     func_completelist = {}
     completelist = []
+
+    complete_func_addrs = get_complete_func_addrs(PATH)
+    t0 = time.time()
+    addr = "0xff"
     with open(debuginfo,"r") as f:
         s_buf = f.readlines()
+    #count = 0
     for line in s_buf:
+        #if count%1000 == 0:
+        #    print("count:", count, "time:",time.time()-t0)
+        #count += 1
         line = line[:-1]
         if "??" in line:
+            continue
+        if line.startswith("0xff"):
+            addr = line.split(":")[0][2:]
+        if addr not in complete_func_addrs:
             continue
         if "(inlined by)" not in line:
             func = line.split(" ")[1]
@@ -510,6 +573,7 @@ def get_line_completelist(PATH):
         json.dump(func_completelist, f, indent=4, sort_keys=True)
     with open(PATH+"/line_completelist.json", 'w') as f:
         json.dump(completelist, f, indent=4, sort_keys=True)
+    print("get_line_completelist cost time:", time.time()-t0)
 
 
 # for each func in func_line_whitelist, get the source code line numbers in the first BB, which is missed in coverage files.
