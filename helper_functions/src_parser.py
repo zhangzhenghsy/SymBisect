@@ -79,7 +79,7 @@ def build_func_map(s_buf):
                 if cnt == 0:
                     #We have found a out-most {} pair, it *may* be a function. 
                     func_head = _detect_func_head(s_buf,prev_pos)
-                    print("func_head:",func_head)
+                    #print("func_head:",func_head)
                     if func_head:
                         (func,arg_cnt) = func_head
                         #update: head contains multiple lines
@@ -90,8 +90,8 @@ def build_func_map(s_buf):
                                 print("startline:",startline)
                                 if funcname+'(' in s_buf[startline-1]:
                                     break
-                                #if s_buf[startline-1].startswith("(") and funcname in s_buf[startline-2]:
-                                #    break
+                                if s_buf[startline-1].startswith("(") and funcname in s_buf[startline-2]:
+                                    break
                                 startline -=1
                             cur_func_inf[(startline,i+LINE_BASE)] = func_head
                             cur_func_inf_r[(func,startline)] = ((startline,i+LINE_BASE),arg_cnt)
@@ -102,7 +102,6 @@ def build_func_map(s_buf):
                         #NOTE: Sometimes one file can have multiple functions with same name, due to #if...#else.
                         #So to mark a function we need both name and its location.
                             cur_func_inf_r[(func,prev_pos[0])] = ((prev_pos[0],i+LINE_BASE),arg_cnt)
-                    print("L103")
                 elif cnt < 0:
                     print('!!! Syntax error: ' + s_buf[i])
                     print('prev_pos: %d:%d' % adj_lno_tuple(prev_pos))
@@ -110,7 +109,6 @@ def build_func_map(s_buf):
                     l1 = max(i-5,0)
                     l2 = min(i+5,len(s_buf)-1)
                     print(''.join([s_buf[i] for i in range(l1,l2+1)]))
-                    print("L108")
                     return
             elif s_buf[i][j] == '"' and in_comment == 0:
                 in_str = not in_str
@@ -124,11 +122,12 @@ def build_func_map(s_buf):
                 #Block comment end
                 in_comment -= 1
         #print(len(cur_func_inf_r))
-    print("before return:",len(cur_func_inf_r))
+    #print("before return:",len(cur_func_inf_r))
     return cur_func_inf_r
 
 #pos is the position of leading '{' of a potential function.
 def _detect_func_head(s_buf,pos):
+    #print(" _detect_func_head pos:", pos)
     def _back(pos):
         i = pos[0]
         j = pos[1]
@@ -139,7 +138,7 @@ def _detect_func_head(s_buf,pos):
         p = _back(p)
         if not p:
             break
-        if s_buf[p[0]][p[1]] in ('\n',' ','\t'):
+        if s_buf[p[0]][p[1]] in ('\n',' ','\t', '\\'):
             continue
         elif s_buf[p[0]][p[1]] == ')':
             cnt = 1
