@@ -6,6 +6,7 @@ import time
 import dot_analysis
 import concolic
 import copy
+import src_parser
 
 def command(string1):
     p=subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -276,7 +277,7 @@ def get_cover_lineinfo(PATH, cover, output):
     lineinfolist = []
     for line in s_buf:
         #print(line[:-1])
-        number = long(line[:-1],16)
+        number = int(line[:-1],16)
         #number = 4*(number/4)
         lineinfos = get_lineinfo(debug_buf, st, ed, number)
         for lineinfo in lineinfos:
@@ -318,12 +319,12 @@ def get_lineinfo(s_buf, st, ed, number):
         st -=1
     while "(inlined by)" in s_buf[ed]:
         ed -=1
-    mid = (st+ed)/2
+    mid = (int)((st+ed)/2)
     while "(inlined by)" in s_buf[mid]:
         mid -=1
     #print st,ed,mid
     line = s_buf[mid]
-    midnumber = long(line.split(":")[0], 16)
+    midnumber = int(line.split(":")[0], 16)
     #print "number:",hex(number),"midnumber:",hex(midnumber)
 
     if st == mid:
@@ -331,7 +332,7 @@ def get_lineinfo(s_buf, st, ed, number):
             line = s_buf[lineindex]
             if "(inlined by)" in line:
                 continue
-            midnumber = long(line.split(":")[0], 16)
+            midnumber = int(line.split(":")[0], 16)
             if midnumber == number:
                 return get_singleinfo(s_buf, lineindex)
         return []
@@ -465,15 +466,22 @@ def get_line_whitelist(PATH):
         addr,func,info = line.split(" ")
         if func not in func_whitelist:
             func_whitelist[func] = [info]
-            whitelist += [info]
+            #whitelist += [info]
             continue
         if info != func_whitelist[func][-1]:
             func_whitelist[func] += [info]
-            whitelist += [info]
+            #whitelist += [info]
     
     for func in func_whitelist:
         func_whitelist[func] = refine_lineinfolist(func_whitelist[func])
-    whitelist = refine_lineinfolist(whitelist)
+    print("\nfilter lines in func_whitelist according to funcrange")
+    func_whitelist = filter_funclist_funcrange(func_whitelist)
+    #whitelist = refine_lineinfolist(whitelist)
+    #whitelist2 = []
+    for func in func_whitelist:
+        whitelist += func_whitelist[func]
+    whitelist = list(set(whitelist))
+
     with open(PATH +"/func_line_whitelist.json", 'w') as f:
         json.dump(func_whitelist,f, indent=4, sort_keys=True)
     with open(PATH +"/line_whitelist.json", 'w') as f:
@@ -499,9 +507,11 @@ def get_func_addrs(PATH, addr, s_buf, addr_buf):
     while not s_buf[index] == "\n":
         index += 1
     addrlist = s_buf[previndex+1:index]
+    nopaddrlist = [line for line in addrlist if "nop" in line]
     addrlist = [line.split(":")[0] for line in addrlist if ":" in line]
-    print(addr, "get_func_addrs() ", funcname, s_buf[previndex+1][:16], s_buf[index-1][:16], "addrlist:", len(addrlist))
-    return set(addrlist)
+    nopaddrlist = [line.split(":")[0] for line in nopaddrlist if ":" in line]
+    #print(addr, "get_func_addrs() ", funcname, s_buf[previndex+1][:16], s_buf[index-1][:16], "addrlist:", len(addrlist))
+    return set(addrlist),set(nopaddrlist)
 
 def get_complete_func_addrs(PATH):
     t0 = time.time()
@@ -520,13 +530,20 @@ def get_complete_func_addrs(PATH):
 
     coveraddrs = [line[2:-1] for line in bbcover]
     complete_func_addrs = set()
+    complete_nop_addrs = set()
 
     for coveraddr in coveraddrs:
         if coveraddr in complete_func_addrs:
+            #print(coveraddr, "is already in complete_func_addrs")
             continue
-        complete_func_addrs = complete_func_addrs.union(get_func_addrs(PATH, coveraddr, s_buf, addr_buf))
+        if coveraddr in complete_nop_addrs:
+            print("should not be executed")
+            continue
+        func_addrs, nop_addrs = get_func_addrs(PATH, coveraddr, s_buf, addr_buf)
+        complete_func_addrs = complete_func_addrs.union(func_addrs)
+        complete_nop_addrs = complete_nop_addrs.union(nop_addrs)
     print("get_complete_func_addrs cost time: ", time.time()-t0)
-    return complete_func_addrs
+    return complete_func_addrs,complete_nop_addrs
 
 # for each func in debuginfo (from vmlinux), get the corresponding source code line numbers from debuginfo
 # update: consider the inlined function, that we should not collect the source code lines from the whole debuginfo. 
@@ -538,7 +555,7 @@ def get_line_completelist(PATH):
     func_completelist = {}
     completelist = []
 
-    complete_func_addrs = get_complete_func_addrs(PATH)
+    complete_func_addrs, complete_nop_addrs= get_complete_func_addrs(PATH)
     t0 = time.time()
     addr = "0xff"
     with open(debuginfo,"r") as f:
@@ -555,30 +572,99 @@ def get_line_completelist(PATH):
             addr = line.split(":")[0][2:]
         if addr not in complete_func_addrs:
             continue
+        if addr in complete_nop_addrs:
+            continue
         if "(inlined by)" not in line:
             func = line.split(" ")[1]
             info = line.split(" ")[3]
         else:
             func = line.split("inlined by) ")[1].split(" ")[0]
             info = line.split("inlined by) ")[1].split(" ")[2]
+        #if func == "irq_work_queue":
+        #    print(line)
         if func not in func_completelist:
             func_completelist[func] = []
         if info not in func_completelist[func]:
             func_completelist[func] += [info]
-            completelist += [info]
+            #completelist += [info]
     for func in func_completelist:
         func_completelist[func] = refine_lineinfolist(func_completelist[func])
-    completelist = refine_lineinfolist(completelist)
+    print("\nfilter lines in func_completelist according to funcrange")
+    func_completelist = filter_funclist_funcrange(func_completelist)
+    #completelist = refine_lineinfolist(completelist)
+    for func in func_completelist:
+        completelist += func_completelist[func]
+    print("any line in func_completelist is duplicate in different func:", len(completelist) == len(set(completelist)))
     with open(PATH+"/func_line_completelist.json", 'w') as f:
         json.dump(func_completelist, f, indent=4, sort_keys=True)
     with open(PATH+"/line_completelist.json", 'w') as f:
         json.dump(completelist, f, indent=4, sort_keys=True)
     print("get_line_completelist cost time:", time.time()-t0)
 
+def filter_complete_white_blacklist_funcrange(PATH):
+    commit = PATH.split("/")[-1]
+    string1 = "cd /home/zzhan173/repos/linux/;git checkout -f "+commit
+    command(string1)
+
+    print("\nfilter lines in func_completelist according to funcrange")
+    with open(PATH +"/func_line_completelist.json") as f:
+        func_line_completelist = json.load(f)
+    func_line_completelist = filter_funclist_funcrange(func_line_completelist)
+    with open(PATH+"/func_line_completelist.json", 'w') as f:
+        json.dump(func_line_completelist, f, indent=4, sort_keys=True)
+
+    print("\nfilter lines in func_whitelist according to funcrange")
+    with open(PATH +"/func_line_whitelist.json") as f:
+        func_line_whitelist = json.load(f)
+    func_line_whitelist = filter_funclist_funcrange(func_line_whitelist)
+    with open(PATH+"/func_line_whitelist.json", 'w') as f:
+        json.dump(func_line_whitelist, f, indent=4, sort_keys=True)
+
+    print("\nfilter lines in func_blacklist according to funcrange")
+    with open(PATH +"/func_line_blacklist.json") as f:
+        func_line_blacklist = json.load(f)
+    func_line_blacklist = filter_funclist_funcrange(func_line_blacklist)
+    with open(PATH+"/func_line_blacklist.json", 'w') as f:
+        json.dump(func_line_blacklist, f, indent=4, sort_keys=True)
+
+
+def filter_funclist_funcrange(func_linelist):
+    repo = "/home/zzhan173/repos/linux/"
+    filename_func_range = {}
+    
+    filenamelist = []
+    for func in func_linelist:
+        #print(func)
+        linelist = func_linelist[func]
+        removelines = []
+        for line in linelist:
+            #print(line)
+            filename = line.split(":")[0]
+            if filename not in filename_func_range:
+                #print(filename)
+                filename_func_range[filename] = src_parser.get_file_funcrange(repo, filename)
+            # parse file fail
+            if not filename_func_range[filename]:
+                continue
+            func_range = filename_func_range[filename]
+            # Some function in llvm bc file not defined in source code explicitly. For example, PageHead, https://elixir.bootlin.com/linux/v5.5-rc5/source/include/linux/page-flags.h#L550. In this case, we shouldn't remove it
+            # Another case is that the function is not defined in this file, then we should remove it. For example, do_syscall_64 ./arch/x86/include/asm/paravirt.h:762
+            if func not in func_range:
+                if any(line in func_range[F] for F in func_range):
+                    removelines += [line]
+                continue
+            #print(func_range[func])
+            if line not in func_range[func]:
+                removelines += [line]
+        for line in removelines:
+            print("filter_funclist_funcrange:", func, line)
+            func_linelist[func].remove(line)
+    return func_linelist
+
 
 # for each func in func_line_whitelist, get the source code line numbers in the first BB, which is missed in coverage files.
 # it's a makeup for line_whitelist, trying to avoid FP when generating line_blacklist
-# it requires dumpresult of vmlinux, and debuginfo
+# it requires dumpresintof vmlinux, and debuginfo
 def get_line_entryBBlist(PATH):
     with open(PATH +"/func_line_whitelist.json") as f:
         line_whitelist = json.load(f)
@@ -615,7 +701,7 @@ def get_line_entryBBlist(PATH):
                 #    break
                 if not dumpresult[index].startswith("ffff"):
                     break
-                addr = long(dumpresult[index][:16],16)
+                addr = int(dumpresult[index][:16],16)
                 #print hex(addr)
                 lineinfos = get_lineinfo(debug_buf, st, ed, addr)
                 #source code line information
@@ -623,13 +709,26 @@ def get_line_entryBBlist(PATH):
                 func_entrylist[func] += linelist
                 index += 1
             func_entrylist[func] = list(set(func_entrylist[func]))
-            entrylist += func_entrylist[func]
+            #entrylist += func_entrylist[func]
             #func_entrylist[func].sort()
             #print func,func_entrylist[func]
         index +=1 
     for func in func_entrylist:
         func_entrylist[func] = refine_lineinfolist(func_entrylist[func])
-    entrylist = refine_lineinfolist(entrylist) 
+    func_entrylist = filter_funclist_funcrange(func_entrylist)
+    for func in func_entrylist:
+        entrylist += func_entrylist[func]
+
+    line_func = {}
+    for func in func_entrylist:
+        for line in func_entrylist[func]:
+            if line not in line_func:
+                line_func[line] = []
+            line_func[line] += [func]
+    for line in line_func:
+        if len(line_func[line]) > 1:
+            print("duplicate line:", line, line_func[line])
+    print("no duplicate entry line in different func(should be True):", len(entrylist) == len(set(entrylist)))
     with open(PATH+"/func_line_entryBBlist.json", 'w') as f:
         json.dump(func_entrylist, f, indent=4, sort_keys=True)
     with open(PATH+"/line_entryBBlist.json", 'w') as f:
@@ -649,6 +748,9 @@ def get_line_blacklist(PATH):
         func_line_entryBBlist = json.load(f)
 
     for func in func_line_whitelist:
+        if func not in func_line_completelist:
+            print(func, "not in func_line_completelist")
+            continue
         whitelist = func_line_whitelist[func]
         if func in func_line_entryBBlist:
             entryBBlist = func_line_entryBBlist[func]
@@ -882,8 +984,9 @@ def get_completewhitelist(PATH):
 
 def get_line_blacklist_filterwithBB(PATH):
     with open(PATH +"/line_blacklist.json") as f:
-        blacklist = json.load(f)
-
+        Blacklist = json.load(f)
+    with open(PATH +"/func_line_blacklist.json") as f:
+        func_blacklist = json.load(f)
     #with open(PATH +"/line_whitelist.json") as f:
     #    line_whitelist = json.load(f)
 
@@ -899,24 +1002,49 @@ def get_line_blacklist_filterwithBB(PATH):
         BB_lineinfo = json.load(f)
     with open(PATH+"/line_BBinfo.json") as f:
         line_BBinfo = json.load(f)
-
-    for blackline in blacklist:
-        if blackline not in line_BBinfo:
-            continue
-        BBlist = line_BBinfo[blackline]
-        # all lines that are in the same BB of given line
-        linelist = []
-        for BB in BBlist:
-            linelist += BB_lineinfo[BB]
-        #print blackline,BB,linelist
-        if any(line in whitelist for line in linelist):
-            filterlist += [blackline]
-            print("filter line:",blackline)
-
+    
+    for func in func_blacklist:
+        print("\n\n",func)
+        blacklist = func_blacklist[func]
+        for blackline in blacklist:
+            print("\n",blackline)
+            #if blackline in whitelist:
+            #    print("filter line:", func, blackline, "due to it's in whitelist")
+            #    filterlist += [blackline]
+            #    continue
+            if blackline not in line_BBinfo:
+                print("not in line_BBinfo")
+                continue
+            Filter = False
+            BBlist = line_BBinfo[blackline]
+            preBBlist = copy.copy(BBlist)
+            print(blackline, func, len(BBlist), BBlist)
+            BBlist = [BB for BB in BBlist if BB.split(".bc-")[1].split("-")[0] == func]
+            if len(preBBlist) != len(BBlist):
+                print(len(BBlist), BBlist)
+                print("after filterwith funcname ",len(BBlist), BBlist)
+            # all lines that are in the same BB of given line
+            linelist = []
+            for BB in BBlist:
+                linelist = BB_lineinfo[BB]
+                #linelist += BB_lineinfo[BB]
+                #print blackline,BB,linelist
+                #if any(line in whitelist for line in linelist):
+                for line in linelist:
+                    if line in whitelist:
+                        filterlist += [blackline]
+                        print("filter line:", func, blackline, "due to:",BB, line)
+                        Filter = True
+                        break
+            if Filter:
+                break
+    
+    print("Blacklist:",Blacklist)
     for filterline in filterlist:
-        blacklist.remove(filterline)
+        print("remove",filterline)
+        Blacklist.remove(filterline)
     with open(PATH+"/line_blacklist_filterwithBB.json","w") as f:
-        json.dump(blacklist, f, indent=4, sort_keys=True)
+        json.dump(Blacklist, f, indent=4, sort_keys=True)
 
 # get the source code line numbers which contain function call
 def get_line_blacklist_filterwithfunctioncall(PATH):
@@ -1161,6 +1289,21 @@ def get_line_blacklist_filterwithfunctioncall_predoms(PATH):
     with open(PATH+"/line_blacklist_func_predoms.json", 'w') as f:
         json.dump(low_priority_line_list_func_predom, f, indent=4, sort_keys=True)
 
+def check_duplicate_func_linelist(PATH):
+    for linelist in ["func_line_completelist.json" , "func_line_whitelist.json", "func_line_entryBBlist.json", "func_line_blacklist.json"]:
+        print(linelist)
+        with open(PATH +"/" + linelist) as f:
+        #with open(PATH +"/func_line_whitelist.json") as f:
+            func_line_completelist = json.load(f)
+        line_func = {}
+        for func in func_line_completelist:
+            for line in func_line_completelist[func]:
+                if line not in line_func:
+                    line_func[line] = []
+                line_func[line] += [func]
+        for line in line_func:
+            if len(line_func[line]) > 1:
+                print(line, line_func[line])
 if __name__ == "__main__":
     #link_bclist(filelist)
     
@@ -1216,10 +1359,12 @@ if __name__ == "__main__":
     #8) blacklist = completelist - whitelist - entryBBlist
     elif option == "get_line_blacklist":
         get_line_blacklist(PATH)
+    elif option == "filter_complete_white_blacklist_funcrange":
+        filter_complete_white_blacklist_funcrange(PATH)
     #elif option == "get_dbginfo":
     #    get_dbginfo(sys.argv[2],sys.argv[3])
     #8.5) get built-in_tag.ll from built-in.ll
-    #9) if any line in a BB is in whitelist, then all lines in BB shouldn't be in blacklist
+    #9) if any line in a llvm BB is in whitelist, then all lines in BB shouldn't be in blacklist
     elif option == "get_line_blacklist_filterwithBB":
         #get debug symbol information from .ll file. Mapping between !num and file,lineNo
         get_dbginfo(PATH)
@@ -1252,3 +1397,5 @@ if __name__ == "__main__":
         generate_kleeconfig(PATH, "BB")
     elif option == "generate_kleeconfig_filterwithdoms":
         generate_kleeconfig(PATH, "doms")
+    elif option == "check_duplicate_func_linelist":
+        check_duplicate_func_linelist(PATH)

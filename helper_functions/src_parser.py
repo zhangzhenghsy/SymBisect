@@ -41,22 +41,27 @@ def build_func_map(s_buf):
     #global cur_func_inf_r
     #cur_func_inf.clear()
     #cur_func_inf_r.clear()
+    dbg = False
     cur_func_inf = {}
     cur_func_inf_r = {}
     cnt = 0
     prev_pos = (0,0)
-    in_str = False
+    in_str = False  
     in_comment = 0
     ifelse=False
     numberif=0
     #TODO: Maybe we should utilize lexer to avoid all the mess below.
     for i in range(len(s_buf)):
-        print(i, s_buf[i])
+        if dbg:
+            print(i+1, s_buf[i][:-1])
         #print("size of cur_func_inf_r:", len(cur_func_inf_r))
         if s_buf[i].startswith('#else'):
             #print "#else",i
             numberif +=1
             ifelse=True
+            if dbg:
+                print("numberif:", numberif)
+                print("ifelse:", ifelse)
         if ifelse:
             if s_buf[i].startswith('#if'):
                 numberif +=1
@@ -67,34 +72,60 @@ def build_func_map(s_buf):
             continue
         for j in range(len(s_buf[i])):
             if s_buf[i][j] == '{':
+                if dbg:
+                    print("in_str:", in_str , "in_comment:", in_comment)
                 if in_str or in_comment > 0:
+                    continue
+                if s_buf[i][j-1] == "'" and  s_buf[i][j+1] == "\'":
                     continue
                 if cnt == 0:
                     prev_pos = (i,j)
                 cnt += 1
+                if dbg:
+                    print("linenum :" , i+1 , j+1 , "cnt :", cnt)
             elif s_buf[i][j] == '}':
+                if dbg:
+                    print("in_str:", in_str , "in_comment:", in_comment)
                 if in_str or in_comment > 0:
                     continue
+                if s_buf[i][j-1] == "'" and  s_buf[i][j+1] == "\'":
+                    continue
                 cnt -= 1
+                if dbg:
+                    print("linenum :" , i+1 , j+1 ,  "cnt :", cnt)
                 if cnt == 0:
                     #We have found a out-most {} pair, it *may* be a function. 
                     func_head = _detect_func_head(s_buf,prev_pos)
-                    #print("func_head:",func_head)
+                    if dbg:
+                        print("func_head:",func_head)
                     if func_head:
                         (func,arg_cnt) = func_head
                         #update: head contains multiple lines
                         if func_head[0]+'(' not in s_buf[prev_pos[0]-LINE_BASE]:
-                            startline=prev_pos[0]-1
-                            funcname=func_head[0]
+                            startline = prev_pos[0]  # funcname {} may be in the same line
+                            funcname = func_head[0]
+                            skip = False
                             while True:
-                                print("startline:",startline)
-                                if funcname+'(' in s_buf[startline-1]:
+                                if dbg:
+                                    print("startline:",startline+1, s_buf[startline][:-1])
+                                if funcname+'(' in s_buf[startline] :
                                     break
-                                if s_buf[startline-1].startswith("(") and funcname in s_buf[startline-2]:
+                                if s_buf[startline].startswith("#define "+funcname):
                                     break
-                                startline -=1
-                            cur_func_inf[(startline,i+LINE_BASE)] = func_head
-                            cur_func_inf_r[(func,startline)] = ((startline,i+LINE_BASE),arg_cnt)
+                                if s_buf[startline].startswith("(") and funcname in s_buf[startline-1]:
+                                    break
+                                startline -= 1
+                                if startline < 0:
+                                    if dbg:
+                                        print("don't find func_head")
+                                    skip = True
+                                    break
+                            if skip:
+                                continue
+                            cur_func_inf[(startline+1, i+LINE_BASE)] = func_head
+                            cur_func_inf_r[(func, startline+1)] = ((startline+1, i+LINE_BASE),arg_cnt)
+                            if dbg:
+                                print("add element to cur_func_inf", func, (startline+1, i+LINE_BASE))
                             #cur_func_inf[(prev_pos[0]-1,i+1)] = func_head
                             #cur_func_inf_r[(func,prev_pos[0]-1)] = ((prev_pos[0]-1,i+1),arg_cnt)
                         else:
@@ -102,25 +133,47 @@ def build_func_map(s_buf):
                         #NOTE: Sometimes one file can have multiple functions with same name, due to #if...#else.
                         #So to mark a function we need both name and its location.
                             cur_func_inf_r[(func,prev_pos[0])] = ((prev_pos[0],i+LINE_BASE),arg_cnt)
+                            if dbg:
+                                print("add element to cur_func_inf (L120)", func, (prev_pos[0],i+LINE_BASE))
                 elif cnt < 0:
                     print('!!! Syntax error: ' + s_buf[i])
-                    print('prev_pos: %d:%d' % adj_lno_tuple(prev_pos))
-                    print('------------Context Dump--------------')
-                    l1 = max(i-5,0)
-                    l2 = min(i+5,len(s_buf)-1)
-                    print(''.join([s_buf[i] for i in range(l1,l2+1)]))
-                    return
+                    if dbg:
+                        print('prev_pos: %d:%d' % adj_lno_tuple(prev_pos))
+                        print('------------Context Dump--------------')
+                        l1 = max(i-5,0)
+                        l2 = min(i+5,len(s_buf)-1)
+                        print(''.join([s_buf[i] for i in range(l1,l2+1)]))
+                    return None
             elif s_buf[i][j] == '"' and in_comment == 0:
+                # '"'
+                if s_buf[i][j-1] == "'" and s_buf[i][j+1] == "'":
+                    continue
+                # '\"'
+                if s_buf[i][j-2:j+2] == "'\\\"'":
+                    continue
+                # "\""
+                if in_str and s_buf[i][j-1] == "\\":
+                    j2 = j-2
+                    while s_buf[i][j2] == "\\":
+                        j2 -= 2
+                    if  s_buf[i][j2+1] == "\\":
+                        continue
                 in_str = not in_str
+                if dbg:
+                    print("linenum:", i+1, "in_str:", in_str)
             elif s_buf[i][j] == '/' and j + 1 < len(s_buf[i]) and s_buf[i][j+1] == '/' and not in_str:
                 #Line comment, skip this line
                 break
             elif s_buf[i][j] == '/' and j + 1 < len(s_buf[i]) and s_buf[i][j+1] == '*' and not in_str:
                 #Block comment start
                 in_comment += 1
+                if dbg:
+                    print("linenum:", i+1, "in_comment:", in_comment)
             elif s_buf[i][j] == '*' and j + 1 < len(s_buf[i]) and s_buf[i][j+1] == '/' and not in_str:
                 #Block comment end
                 in_comment -= 1
+                if dbg:
+                    print("linenum:", i+1, "in_comment:", in_comment)
         #print(len(cur_func_inf_r))
     #print("before return:",len(cur_func_inf_r))
     return cur_func_inf_r
@@ -194,8 +247,10 @@ def get_file_funcrange(repo, filename):
     try:
         cur_func_inf_r = build_func_map(f_buf)
     except:
+        print("\n"+filename, "build_func_map fail\n")
         return None
     if not cur_func_inf_r:
+        print(filename, "cur_func_inf_r:",cur_func_inf_r)
         return None
 
     func_range = {}
@@ -215,6 +270,7 @@ def get_files_funcrange(repo, filenamelist):
     for filename in filenamelist:
         func_range = get_file_funcrange(repo, filename)
         if not func_range:
+            print("func_range :")
             continue
         for func in func_range:
             if func not in total_func_range:
@@ -228,5 +284,5 @@ if __name__ == "__main__":
     #filename = "security/tomoyo/audit.c"
     filename = sys.argv[1]
     func_range = get_file_funcrange(repo, filename)
-    print(func_range)
+    #print(func_range)
     print(json.dumps(func_range, sort_keys=True, indent=4))
