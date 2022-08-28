@@ -973,16 +973,37 @@ def get_dbginfo(PATH, bbfile=None):
 
 #get line whitelist (including coverage whitelist and entryBBlinelist)
 def get_completewhitelist(PATH):
-    with open(PATH +"/line_whitelist.json") as f:
-        line_whitelist = json.load(f)
-    with open(PATH +"/line_entryBBlist.json") as f:
-        line_entryBBlist = json.load(f)
+    #with open(PATH +"/line_whitelist.json") as f:
+    #    line_whitelist = json.load(f)
+    #with open(PATH +"/line_entryBBlist.json") as f:
+    #    line_entryBBlist = json.load(f)
+    with open(PATH +"/func_line_whitelist.json") as f:
+        func_line_whitelist = json.load(f)
+    with open(PATH +"/func_line_entryBBlist.json") as f:
+        func_line_entryBBlist = json.load(f)
+    with open(PATH +"/func_line_completelist.json") as f:
+        func_line_completelist = json.load(f)
 
-    whitelist = line_whitelist+line_entryBBlist
+    whitelist = []
+    for func in func_line_whitelist:
+        if func in func_line_entryBBlist:
+            for line in func_line_entryBBlist[func]:
+                if line not in func_line_whitelist[func] and line in func_line_completelist[func]:
+                    func_line_whitelist[func] += [line]
+                    print("add entryBB line to func_whitelist", func, line)
+            func_line_whitelist[func].sort()
+        whitelist += func_line_whitelist[func]
+    whitelist.sort()
+
+    with open(PATH+"/func_line_completewhitelist.json", 'w') as f:
+        json.dump(func_line_whitelist, f, indent=4, sort_keys=True)
+    with open(PATH+"/completewhitelist.json", 'w') as f:
+        json.dump(whitelist, f, indent=4, sort_keys=True)
     whitelist = refine_lineinfolist(whitelist)
     return whitelist
 
 def get_line_blacklist_filterwithBB(PATH):
+    dbg = False
     with open(PATH +"/line_blacklist.json") as f:
         Blacklist = json.load(f)
     with open(PATH +"/func_line_blacklist.json") as f:
@@ -990,13 +1011,17 @@ def get_line_blacklist_filterwithBB(PATH):
     #with open(PATH +"/line_whitelist.json") as f:
     #    line_whitelist = json.load(f)
 
+
     #with open(PATH +"/line_entryBBlist.json") as f:
     #    line_entryBBlist = json.load(f)
    
     #whitelist = line_whitelist+line_entryBBlist
     #whitelist = refine_lineinfolist(whitelist)
-    whitelist = get_completewhitelist(PATH)
-    filterlist = []
+    if not os.path.exists(PATH +"/func_line_completewhitelist.json"):
+        whitelist = get_completewhitelist(PATH)
+    with open(PATH +"/func_line_completewhitelist.json") as f:
+        func_line_completewhitelist = json.load(f)
+    total_filterlist = []
 
     with open(PATH+"/BB_lineinfo.json") as f:
         BB_lineinfo = json.load(f)
@@ -1004,10 +1029,13 @@ def get_line_blacklist_filterwithBB(PATH):
         line_BBinfo = json.load(f)
     
     for func in func_blacklist:
-        print("\n\n",func)
+        #print("\n",func)
+        filterlist = []
         blacklist = func_blacklist[func]
+        if func not in func_line_completewhitelist:
+            continue
         for blackline in blacklist:
-            print("\n",blackline)
+            #print(blackline)
             #if blackline in whitelist:
             #    print("filter line:", func, blackline, "due to it's in whitelist")
             #    filterlist += [blackline]
@@ -1018,11 +1046,8 @@ def get_line_blacklist_filterwithBB(PATH):
             Filter = False
             BBlist = line_BBinfo[blackline]
             preBBlist = copy.copy(BBlist)
-            print(blackline, func, len(BBlist), BBlist)
-            BBlist = [BB for BB in BBlist if BB.split(".bc-")[1].split("-")[0] == func]
-            if len(preBBlist) != len(BBlist):
-                print(len(BBlist), BBlist)
-                print("after filterwith funcname ",len(BBlist), BBlist)
+            if dbg:
+                print(blackline, func, len(BBlist), BBlist)
             # all lines that are in the same BB of given line
             linelist = []
             for BB in BBlist:
@@ -1031,18 +1056,25 @@ def get_line_blacklist_filterwithBB(PATH):
                 #print blackline,BB,linelist
                 #if any(line in whitelist for line in linelist):
                 for line in linelist:
-                    if line in whitelist:
+                    # don't consider the inlined lines. Thus we check if line is in the func_line_completewhitelist[func] instead of the whole completewhitelist
+                    if line in func_line_completewhitelist[func]:
                         filterlist += [blackline]
+                        total_filterlist += [blackline]
                         print("filter line:", func, blackline, "due to:",BB, line)
                         Filter = True
                         break
-            if Filter:
-                break
-    
-    print("Blacklist:",Blacklist)
-    for filterline in filterlist:
-        print("remove",filterline)
-        Blacklist.remove(filterline)
+                if Filter:
+                    break
+        for filterline in filterlist:
+            #print("remove",filterline, "from", func)
+            func_blacklist[func].remove(filterline)
+    total_filterlist = list(set(total_filterlist))
+
+    for line in total_filterlist:
+        Blacklist.remove(line)
+    with open(PATH+"/func_line_blacklist_filterwithBB.json","w") as f:
+        json.dump(func_blacklist, f, indent=4, sort_keys=True)
+
     with open(PATH+"/line_blacklist_filterwithBB.json","w") as f:
         json.dump(Blacklist, f, indent=4, sort_keys=True)
 
