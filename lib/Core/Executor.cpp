@@ -4369,7 +4369,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   if (success) {
     //klee::klee_message("Executor::executeMemoryOperation find the object");
     const MemoryObject *mo = op.first;
-    klee::klee_message("success find object according to address: %s mo->addr: %lu mo->size: %d", address.get_ptr()->dump2().c_str(), mo->address, mo->size);
+    //klee::klee_message("success find object according to address: %s mo->addr: %lu mo->size: %d", address.get_ptr()->dump2().c_str(), mo->address, mo->size);
 
     if (MaxSymArraySize && mo->size >= MaxSymArraySize) {
       address = toConstant(state, address, "max-sym-array-size");

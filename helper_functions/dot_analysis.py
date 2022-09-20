@@ -3,8 +3,15 @@ import json
 import sys,os
 import time
 import copy
+import os,sys
+import subprocess
 
 testPATH = "/home/zzhan173/repos/Linux_kernel_UC_KLEE/configs/033724d6/04300d66f0a0/domfiles/domonly.fbcon_modechanged.dot"
+
+def command(string1):
+    p=subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    result=p.stdout.readlines()
+    return result
 
 def write_dompng(PATH, funcname):
     PATH = PATH+"/doms/domonly."+funcname+".dot"
@@ -29,7 +36,7 @@ def get_domdic(PATH):
         #print(jsonfile, "already exists")
         return node_all_doms
     
-    print("generate node_all_doms for ", PATH)
+    #print("generate node_all_doms for ", PATH)
     graphs = pydot.graph_from_dot_file(PATH)
     graph = graphs[0]
     
@@ -127,6 +134,9 @@ def get_node_mustnodes(PATH, funcname):
 # if a BB is reached, what previous BBs must be executed
 def get_node_premustnodes(PATH, funcname):
     domPATH = PATH+"/doms/domonly."+funcname+".dot"
+    if not os.path.exists(domPATH):
+        print(domPATH, "not exists")
+        return {}
     domdic = get_domdic(domPATH)
 
     node_mustnodes = {}
@@ -144,6 +154,9 @@ def get_node_premustnodes(PATH, funcname):
 
 def get_node_postmustnodes(PATH, funcname):
     domPATH = PATH+"/postdoms/postdomonly."+funcname+".dot"
+    if not os.path.exists(domPATH):
+        print(domPATH, "not exists")
+        return {}
     domdic = get_domdic(domPATH)
 
     node_mustnodes = {}
@@ -176,6 +189,14 @@ def get_func_BB_postmustBBs(PATH, funclist):
         func_BB_mustBBs = get_node_postmustnodes(PATH, func)
         BB_mustBBs.update(func_BB_mustBBs)
     return BB_mustBBs
+
+def get_dom_files(PATH):
+    string1 = "cd "+PATH+";mkdir doms;cd doms;/data4/zheng/Linux_kernel_UC_KLEE/install/bin/opt  -dot-dom-only ../built-in_tag.bc"
+    print(string1)
+    result = command(string1)
+    string1 = "cd "+PATH+";mkdir postdoms;cd postdoms;/data4/zheng/Linux_kernel_UC_KLEE/install/bin/opt -dot-postdom-only ../built-in_tag.bc"
+    print(string1)
+    result = command(string1)
 
 if __name__ == "__main__":
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0/"

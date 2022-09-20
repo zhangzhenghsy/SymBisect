@@ -7,6 +7,9 @@ import dot_analysis
 import concolic
 import copy
 import src_parser
+import compilebc
+import shutil
+import cfg_analysis
 
 def command(string1):
     p=subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -18,7 +21,7 @@ def command_err(string1):
     result=p.stderr.readlines()
     return result
 
-home_path = "/home/zzhan173/repos/Linux_kernel_UC_KLEE/build/llvm-project/build/"
+home_path = "/data4/zheng/Linux_kernel_UC_KLEE/build/llvm-project/build/"
 def link_bclist(filelist, PATH, output="built-in.bc"):
     previouskernel = "/home/zzhan173/repos/linux/"
     newkernel = PATH+"/source/"
@@ -257,6 +260,17 @@ def get_vmlinux_dbginfo(PATH):
     t1=time.time()
     print(PATH,(t1-t0))
 
+def get_vmlinux_dbginfo_func(PATH, func):
+    funcaddrs = get_funcname_addrs(PATH, func)
+    with open("addrs_"+func, "w") as f:
+        for addr in funcaddrs:
+            f.write(addr+"\n")
+    image=PATH+"/"+"vmlinux"
+    with open("addrs_"+func, "r") as fi:
+        with open(PATH+"/tmp_o_"+func,'w') as fo:
+            subprocess.call([ADDR2LINE,'-afip','-e',image],stdin=fi, stdout=fo)
+
+# step1.1
 #[PATH]: path of directory which stores the coverage file/debuginfo file
 #extract sourceinfo for coverage from debuginfo and store the info in coverlineinfo file
 def get_cover_lineinfo(PATH, cover, output):
@@ -281,7 +295,7 @@ def get_cover_lineinfo(PATH, cover, output):
         #number = 4*(number/4)
         lineinfos = get_lineinfo(debug_buf, st, ed, number)
         for lineinfo in lineinfos:
-            lineinfolist += [str(hex(number))[:-1]+" "+lineinfo[0]+" "+lineinfo[1]]
+            lineinfolist += [str(hex(number))+" "+lineinfo[0]+" "+lineinfo[1]]
             #print str(hex(number))[:-1],lineinfo[0],lineinfo[1]
             if lineinfo[0] not in funclist:
                 funclist += [lineinfo[0]]
@@ -301,6 +315,7 @@ def get_cover_lineinfo(PATH, cover, output):
     #print "number of functions:",len(funclist)
     #print funclist
 
+# step1.3
 def link_bclist_fromcover(PATH):
     coverlineinfo = PATH+"/coverlineinfo"
     with open (coverlineinfo,"r") as f:
@@ -312,6 +327,17 @@ def link_bclist_fromcover(PATH):
     else:
         print("filelist isnot in the reverse 3th line")
     link_bclist(filelist, PATH, "built-in.bc")
+
+# step1.3 
+def get_tagbcfile(PATH):
+    shutil.copy(PATH+"/built-in.bc", "/data4/zheng/Linux_kernel_UC_KLEE/built-in.bc")
+    string1 = "cd /data4/zheng/Linux_kernel_UC_KLEE;build/llvm-project/build/bin/opt -load build/llvm-project/build/lib/libbbTag.so -bbtag built-in.bc > built-in_tag.bc"
+    print(string1)
+    command(string1)
+    shutil.copy("/data4/zheng/Linux_kernel_UC_KLEE/built-in_tag.bc", PATH+"/built-in_tag.bc")
+    string1 = "cd "+PATH+";/data4/zheng/Linux_kernel_UC_KLEE/install/bin/llvm-dis built-in.bc;/data4/zheng/Linux_kernel_UC_KLEE/install/bin/llvm-dis built-in_tag.bc"
+    print(string1)
+    command(string1)
 
 # given the address, get the information in the debuginfo    
 def get_lineinfo(s_buf, st, ed, number):
@@ -482,9 +508,28 @@ def get_line_whitelist(PATH):
         whitelist += func_whitelist[func]
     whitelist = list(set(whitelist))
 
-    with open(PATH +"/func_line_whitelist.json", 'w') as f:
+    with open(PATH +"/func_line_whitelist_v0.json", 'w') as f:
         json.dump(func_whitelist,f, indent=4, sort_keys=True)
-    with open(PATH +"/line_whitelist.json", 'w') as f:
+    with open(PATH +"/line_whitelist_v0.json", 'w') as f:
+        json.dump(whitelist,f, indent=4, sort_keys=True)
+
+    func_line_entryBBlist = get_line_entryBBlist(PATH)
+    for func in func_whitelist:
+        if func not in func_line_entryBBlist:
+            print(func, "not in func_line_entryBBlist")
+            continue
+        for line in func_line_entryBBlist[func]:
+            if line not in func_whitelist[func]:
+                func_whitelist[func] += [line]
+        func_whitelist[func].sort()
+    
+    line_whitelist = []
+    for func in func_whitelist:
+        line_whitelist += func_whitelist[func]
+    line_whitelist.sort()
+    with open(PATH +"/func_line_whitelist_v1.json", 'w') as f:
+        json.dump(func_whitelist,f, indent=4, sort_keys=True)
+    with open(PATH +"/line_whitelist_v1.json", 'w') as f:
         json.dump(whitelist,f, indent=4, sort_keys=True)
 
 # given an addr, get the complete addrs of the corresponding function
@@ -635,6 +680,8 @@ def filter_funclist_funcrange(func_linelist):
     filenamelist = []
     for func in func_linelist:
         #print(func)
+        if any(ele in func for ele in ["do_sys_", "dentry_kill", "tomoyo_round2"]):
+            continue
         linelist = func_linelist[func]
         removelines = []
         for line in linelist:
@@ -666,7 +713,7 @@ def filter_funclist_funcrange(func_linelist):
 # it's a makeup for line_whitelist, trying to avoid FP when generating line_blacklist
 # it requires dumpresintof vmlinux, and debuginfo
 def get_line_entryBBlist(PATH):
-    with open(PATH +"/func_line_whitelist.json") as f:
+    with open(PATH +"/func_line_whitelist_v0.json") as f:
         line_whitelist = json.load(f)
 
     dumpresult = PATH+"/dumpresult"
@@ -733,6 +780,7 @@ def get_line_entryBBlist(PATH):
         json.dump(func_entrylist, f, indent=4, sort_keys=True)
     with open(PATH+"/line_entryBBlist.json", 'w') as f:
         json.dump(entrylist, f, indent=4, sort_keys=True)
+    return func_entrylist
     #print(func_entrylist['do_mount'])
 
 def get_line_blacklist(PATH):
@@ -741,43 +789,27 @@ def get_line_blacklist(PATH):
     with open(PATH +"/func_line_completelist.json") as f:
         func_line_completelist = json.load(f)
 
-    with open(PATH +"/func_line_whitelist.json") as f:
+    with open(PATH +"/func_line_whitelist_v1.json") as f:
         func_line_whitelist = json.load(f)
 
-    with open(PATH +"/func_line_entryBBlist.json") as f:
-        func_line_entryBBlist = json.load(f)
 
     for func in func_line_whitelist:
         if func not in func_line_completelist:
             print(func, "not in func_line_completelist")
             continue
         whitelist = func_line_whitelist[func]
-        if func in func_line_entryBBlist:
-            entryBBlist = func_line_entryBBlist[func]
-        else:
-            entryBBlist = []
         blacklist = []
         for lineinfo in func_line_completelist[func]:
-            if lineinfo not in whitelist and lineinfo not in entryBBlist:
+            if lineinfo not in whitelist:
                 blacklist += [lineinfo]
-        blacklist = list(set(blacklist))
-        #blacklist.sort()
+        #blacklist = list(set(blacklist))
+        blacklist.sort()
         func_line_blacklist[func] = blacklist
         line_blacklist += blacklist
     
     for func in func_line_blacklist:
         func_line_blacklist[func] = refine_lineinfolist(func_line_blacklist[func])
     line_blacklist = refine_lineinfolist(line_blacklist)
-    ##delete the repo path prefix of the line info
-    #BasePath = "/home/zzhan173/repos/linux/"
-    #line_blacklist2 = {}
-    #for func in line_blacklist:
-    #    line_blacklist2[func] = []
-    #    for info in line_blacklist[func]:
-    #        newinfo = info.replace(BasePath, "")
-    #        line_blacklist2[func] += [newinfo]
-        #print func
-        #print line_blacklist2[func]
 
     with open(PATH+"/func_line_blacklist.json", 'w') as f:
         json.dump(func_line_blacklist, f, indent=4, sort_keys=True)
@@ -799,7 +831,20 @@ def get_line_blacklist(PATH):
 #    blacklist.sort()
 #    return blacklist
 
-def generate_kleeconfig(PATH, option = "", parameterlist = []):
+def get_low_priority_bb_list(PATH, MustBBs):
+    low_priority_bb_list = []
+    for MustBB in MustBBs:
+        func = MustBB.split("built-in.bc-")[1].split("-")[0]
+        BB_reachBBs = cfg_analysis.get_BB_reachBBs(PATH, func)
+        print(json.dumps(BB_reachBBs, sort_keys=True, indent=4))
+        blackBBs = [BB for BB in BB_reachBBs if MustBB not in BB_reachBBs[BB]]
+        blackBBs.remove(MustBB)
+        low_priority_bb_list += blackBBs
+    low_priority_bb_list = list(set(low_priority_bb_list))
+    low_priority_bb_list.sort()
+    return low_priority_bb_list
+
+def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
     config = {}
 
     #bcfile = PATH+"/do_mount_tag.bc"
@@ -818,37 +863,44 @@ def generate_kleeconfig(PATH, option = "", parameterlist = []):
     config["10_target_bb_list"] = target_bb_list
     
     low_priority_bb_list = []
+    if MustBBs:
+        low_priority_bb_list = get_low_priority_bb_list(PATH, MustBBs)
     config["11_low_priority_bb_list"] = low_priority_bb_list
     
     low_priority_function_list = []
     config["12_low_priority_function_list"] = low_priority_function_list
     config["13_skip_function_list"] = ["llvm.read_register.i64", "llvm.write_register.i64"]
     
-    with open(PATH + "/line_blacklist_filterwithBB.json") as f:
-        low_priority_line_list_BB = json.load(f)
-    print("size of low_priority_line_list_BB:", len(low_priority_line_list_BB))
-    with open(PATH +"/line_blacklist_filterwithfunctioncall.json") as f:
-        low_priority_line_list_func = json.load(f)
-    print("size of low_priority_line_list_func:", len(low_priority_line_list_func))
+    #with open(PATH + "/line_blacklist_filterwithBB.json") as f:
+    #    low_priority_line_list_BB = json.load(f)
+    #print("size of low_priority_line_list_BB:", len(low_priority_line_list_BB))
+    #with open(PATH +"/line_blacklist_filterwithfunctioncall.json") as f:
+    #    low_priority_line_list_func = json.load(f)
+    #print("size of low_priority_line_list_func:", len(low_priority_line_list_func))
     #with open(PATH + "/line_blacklist_filterwithdoms.json") as f:
     #    low_priority_line_list_doms = json.load(f)
     #print("size of low_priority_line_list_doms:", len(low_priority_line_list_doms))
 
-    if option == "functioncall":
-        config["90_low_priority_line_list"] = low_priority_line_list_func
-        output = PATH+"/config_cover_func.json"
-    elif option == "BB":
-        config["90_low_priority_line_list"] = low_priority_line_list_BB
-        output = PATH+"/config_cover_BB.json"
-    elif option == "doms":
-        with open(PATH + "/line_blacklist_filterwithdoms.json") as f:
-            low_priority_line_list_doms = json.load(f)
-        print("size of low_priority_line_list_doms:", len(low_priority_line_list_doms))
-        config["90_low_priority_line_list"] = low_priority_line_list_doms
-        output = PATH+"/config_cover_doms.json"
-    else:
-        config["90_low_priority_line_list"] = []
-        output = PATH+"/config_cover.json"
+    #if option == "functioncall":
+    #    config["90_low_priority_line_list"] = low_priority_line_list_func
+    #    output = PATH+"/config_cover_func.json"
+    #elif option == "BB":
+    #    config["90_low_priority_line_list"] = low_priority_line_list_BB
+    #    output = PATH+"/config_cover_BB.json"
+    #elif option == "doms":
+    #    with open(PATH + "/line_blacklist_filterwithdoms.json") as f:
+    #        low_priority_line_list_doms = json.load(f)
+    #    print("size of low_priority_line_list_doms:", len(low_priority_line_list_doms))
+    #    config["90_low_priority_line_list"] = low_priority_line_list_doms
+    #    output = PATH+"/config_cover_doms.json"
+    #else:
+    #    config["90_low_priority_line_list"] = []
+    #    output = PATH+"/config_cover.json"
+    with open(PATH + "/line_blacklist_doms.json", "r") as f:
+        low_priority_line_list_doms = json.load(f)
+    config["90_low_priority_line_list"] = low_priority_line_list_doms
+    output = PATH+"/config_cover_doms.json"
+
     if parameterlist:
         output = output.replace(".json", "_concolic.json")
         all_index_value = concolic.get_concolicmap(parameterlist)
@@ -858,7 +910,7 @@ def generate_kleeconfig(PATH, option = "", parameterlist = []):
     config["92_indirectcall"] = {}
     config["93_whitelist"] = {}
     config["94_looplimit"] = 10
-    config["95_kernelversion"] = "v5.8-rc6"
+    config["95_kernelversion"] = "v5.5-rc5"
     with open(output, 'w') as f:
         json.dump(config, f, indent=4, sort_keys=True)
 
@@ -867,6 +919,7 @@ def get_BB_lineinfo(PATH):
     bbfile = PATH+"/built-in_tag.ll"
     bb_lines ={}
     line_bb = {}
+    line_bb_without_loopBr = {}
     with open(bbfile,"r") as f:
         s_buf =f.readlines()
     
@@ -874,6 +927,7 @@ def get_BB_lineinfo(PATH):
         dbginfo = json.load(f)
 
     for line in s_buf:
+        loopBr = False
         if line.startswith("built-in.bc-"):
             bb = line.split(":")[0]
             bb_lines[bb] = []
@@ -885,6 +939,9 @@ def get_BB_lineinfo(PATH):
                 dbgnum = dbgnum.split(", !srcloc ")[0]
             if "!llvm.loop" in dbgnum:
                 dbgnum = dbgnum.split(", !llvm.loop ")[0]
+                loopBr = True
+            if "br " in line:
+                loopBr = True
             if dbgnum in dbginfo:
                 if "lineinfo" in dbginfo[dbgnum] and dbginfo[dbgnum]["lineinfo"] not in bb_lines[bb]:
                     lineinfo = dbginfo[dbgnum]["lineinfo"]
@@ -893,6 +950,11 @@ def get_BB_lineinfo(PATH):
                         line_bb[lineinfo] = [bb]
                     else:
                         line_bb[lineinfo] += [bb]
+                    if not loopBr:
+                        if lineinfo not in line_bb_without_loopBr:
+                            line_bb_without_loopBr[lineinfo] = [bb]
+                        else:
+                            line_bb_without_loopBr[lineinfo] += [bb]
             else:
                 print("no dbginfo for",dbgnum)
     output = PATH+"/BB_lineinfo.json"
@@ -902,6 +964,10 @@ def get_BB_lineinfo(PATH):
     output = PATH+"/line_BBinfo.json"
     with open(output, 'w') as f:
         json.dump(line_bb, f, indent=4, sort_keys=True)
+
+    output = PATH+"/line_BBinfo_without_loopBr.json"
+    with open(output, 'w') as f:
+        json.dump(line_bb_without_loopBr, f, indent=4, sort_keys=True)
 
 def get_line_dbginfo(line):
     infodic = {}
@@ -1002,79 +1068,86 @@ def get_completewhitelist(PATH):
     whitelist = refine_lineinfolist(whitelist)
     return whitelist
 
+# Step10: From line_whitelist to get the BB_whitelist
+# Note that a line is in whitelist, doesn't guarantee all corresponding BBs are in the whitelist. For example: inlined lines/ lines corresponding loopBr Inst
+def get_BB_whitelist(PATH):
+    #if not os.path.exists(PATH +"/func_line_completewhitelist.json"):
+    #    whitelist = get_completewhitelist(PATH)
+    with open(PATH+"/func_line_whitelist_v1.json", 'r') as f:
+        func_line_whitelist = json.load(f)
+    with open(PATH+"/line_BBinfo_without_loopBr.json") as f:
+        line_BBinfo = json.load(f)
+
+    func_BB_whitelist = {}
+    BB_whitelist = []
+    for func in func_line_whitelist:
+        func_BB_whitelist[func] = []
+        
+        linelist = func_line_whitelist[func]
+        for line in linelist:
+            if line not in line_BBinfo:
+                continue
+            for BB in line_BBinfo[line]:
+                if BB in BB_whitelist:
+                    continue
+                # line exists in func, but BB exists in another function, it means line is inlined in BB, thus it doesn't guarantee that BB is executed
+                funcname = BB.split(".bc-")[1].split("-")[0]
+                if funcname == func:
+                    func_BB_whitelist[func] += [BB]
+                    BB_whitelist += [BB]
+                    #print(BB,'is added to whitelist due to', line)
+        func_BB_whitelist[func].sort()
+    BB_whitelist.sort()
+
+    with open(PATH+"/func_BB_whitelist.json", 'w') as f:
+        json.dump(func_BB_whitelist, f, indent=4, sort_keys=True)
+    with open(PATH+"/BB_whitelist.json", 'w') as f:
+        json.dump(BB_whitelist, f, indent=4, sort_keys=True)
+
 def get_line_blacklist_filterwithBB(PATH):
     dbg = False
+    #only used for debug
+    with open(PATH+"/func_line_completewhitelist.json", 'r') as f:
+        func_line_completewhitelist = json.load(f)
+    with open(PATH+"/BB_lineinfo.json") as f:
+        BB_lineinfo = json.load(f)
+
     with open(PATH +"/line_blacklist.json") as f:
         Blacklist = json.load(f)
     with open(PATH +"/func_line_blacklist.json") as f:
         func_blacklist = json.load(f)
-    #with open(PATH +"/line_whitelist.json") as f:
-    #    line_whitelist = json.load(f)
+    #if not os.path.exists(PATH +"/BB_whitelist.json"):
+    get_BB_whitelist(PATH)
+    with open(PATH +"/BB_whitelist.json", "r") as f:
+        BB_whitelist = json.load(f)
 
-
-    #with open(PATH +"/line_entryBBlist.json") as f:
-    #    line_entryBBlist = json.load(f)
-   
-    #whitelist = line_whitelist+line_entryBBlist
-    #whitelist = refine_lineinfolist(whitelist)
-    if not os.path.exists(PATH +"/func_line_completewhitelist.json"):
-        whitelist = get_completewhitelist(PATH)
-    with open(PATH +"/func_line_completewhitelist.json") as f:
-        func_line_completewhitelist = json.load(f)
-    total_filterlist = []
-
-    with open(PATH+"/BB_lineinfo.json") as f:
-        BB_lineinfo = json.load(f)
     with open(PATH+"/line_BBinfo.json") as f:
         line_BBinfo = json.load(f)
     
+    total_filterlist = []
     for func in func_blacklist:
         #print("\n",func)
         filterlist = []
         blacklist = func_blacklist[func]
-        if func not in func_line_completewhitelist:
-            continue
         for blackline in blacklist:
-            #print(blackline)
-            #if blackline in whitelist:
-            #    print("filter line:", func, blackline, "due to it's in whitelist")
-            #    filterlist += [blackline]
-            #    continue
             if blackline not in line_BBinfo:
-                print("not in line_BBinfo")
+                print(blackline, "not in line_BBinfo")
                 continue
-            Filter = False
             BBlist = line_BBinfo[blackline]
-            preBBlist = copy.copy(BBlist)
-            if dbg:
-                print(blackline, func, len(BBlist), BBlist)
-            # all lines that are in the same BB of given line
-            linelist = []
             for BB in BBlist:
-                linelist = BB_lineinfo[BB]
-                #linelist += BB_lineinfo[BB]
-                #print blackline,BB,linelist
-                #if any(line in whitelist for line in linelist):
-                for line in linelist:
-                    # don't consider the inlined lines. Thus we check if line is in the func_line_completewhitelist[func] instead of the whole completewhitelist
-                    if line in func_line_completewhitelist[func]:
-                        filterlist += [blackline]
-                        total_filterlist += [blackline]
-                        print("filter line:", func, blackline, "due to:",BB, line)
-                        Filter = True
-                        break
-                if Filter:
+                if BB in BB_whitelist:
+                    print("filter line:", func, blackline, "due to:", BB, [line for line in BB_lineinfo[BB] if line in func_line_completewhitelist[BB.split(".bc-")[1].split("-")[0]]])
+                    filterlist += [blackline]
+                    total_filterlist += [blackline]
                     break
         for filterline in filterlist:
-            #print("remove",filterline, "from", func)
             func_blacklist[func].remove(filterline)
+    
     total_filterlist = list(set(total_filterlist))
-
     for line in total_filterlist:
         Blacklist.remove(line)
     with open(PATH+"/func_line_blacklist_filterwithBB.json","w") as f:
         json.dump(func_blacklist, f, indent=4, sort_keys=True)
-
     with open(PATH+"/line_blacklist_filterwithBB.json","w") as f:
         json.dump(Blacklist, f, indent=4, sort_keys=True)
 
@@ -1196,21 +1269,26 @@ def get_whiteBBlist(PATH):
             whiteBBlist += line_BBinfo[line]
     return whiteBBlist
 
-# get the BBs which dominate anyline in whitelist, and union them with previous whiteBBlist
+# step11 get the BBs which dominate anyline in whitelist, and union them with previous whiteBBlist
 def get_BB_whitelist_predoms(PATH):
-    whiteBBlist = get_whiteBBlist(PATH)
-    funclist = [BB.split(".bc-")[1].split("-")[0] for BB in whiteBBlist]
-    funclist = list(set(funclist))
+    #whiteBBlist = get_whiteBBlist(PATH)
+    #funclist = [BB.split(".bc-")[1].split("-")[0] for BB in whiteBBlist]
+    #funclist = list(set(funclist))
+    with open(PATH+"/func_BB_whitelist.json", "r") as f:
+        func_BB_whitelist = json.load(f)
+    funclist = [func for func in func_BB_whitelist]
 
     BB_mustBBs = dot_analysis.get_func_BB_premustBBs(PATH, funclist)
-    total_mustBBs = copy.deepcopy(whiteBBlist)
-    for whiteBB in whiteBBlist:
-        if whiteBB not in BB_mustBBs:
-            continue
-        total_mustBBs += BB_mustBBs[whiteBB]
-    total_mustBBs = list(set(total_mustBBs))
-    total_mustBBs.sort()
-    return total_mustBBs
+    for func in func_BB_whitelist:
+        addBBlist = []
+        for BB in func_BB_whitelist[func]:
+            if BB not in BB_mustBBs:
+                continue
+            addBBlist += BB_mustBBs[BB]
+        func_BB_whitelist[func] += list(set(addBBlist))
+        func_BB_whitelist[func].sort()
+    with open(PATH+"/func_BB_whitelist_predoms.json", "w") as f:
+        json.dump(func_BB_whitelist, f, indent=4, sort_keys=True)
 
 # get the lines which dominate anyline in whitelist, and union them with previous whitelist
 def get_line_whitelist_predoms(PATH):
@@ -1230,78 +1308,79 @@ def get_line_whitelist_predoms(PATH):
         json.dump(line_whitelist_doms, f, indent=4, sort_keys=True)
     return line_whitelist_doms
 
-# get the BBs which post dominate anyline in whitelist, and union them with previous whiteBBlist
+# step11 get the BBs which post dominate anyline in whitelist, and union them with previous whiteBBlist
 # We don't need to generate the post dominate BBs for function in call trace (they are terminated due to bug in refkernel)
-def get_BB_whitelist_postdoms(PATH, calltracefunclist):
-    whiteBBlist = get_whiteBBlist(PATH)
-    funclist = [BB.split(".bc-")[1].split("-")[0] for BB in whiteBBlist]
-    funclist = list(set(funclist))
+def get_BB_whitelist_doms(PATH, calltracefunclist):
+    with open(PATH+"/func_BB_whitelist_predoms.json", "r") as f:
+        func_BB_whitelist = json.load(f)
+    funclist = [func for func in func_BB_whitelist]
  
     if calltracefunclist:
         print("don't get_BB_whitelist_postdoms for calltrac function :", [func for func in calltracefunclist if func in funclist])
         funclist = [func for func in funclist if func not in calltracefunclist]
 
     BB_mustBBs = dot_analysis.get_func_BB_postmustBBs(PATH, funclist)
-    total_mustBBs = whiteBBlist
-    for whiteBB in whiteBBlist:
-        if whiteBB not in BB_mustBBs:
-            continue
-        total_mustBBs += BB_mustBBs[whiteBB]
+    for func in func_BB_whitelist:
+        addBBlist = []
+        for BB in func_BB_whitelist[func]:
+            if BB not in BB_mustBBs:
+                continue
+            addBBlist += BB_mustBBs[BB]
+        func_BB_whitelist[func] += list(set(addBBlist))
+        func_BB_whitelist[func].sort()
+    
+    with open(PATH+"/func_BB_whitelist_doms.json", "w") as f:
+        json.dump(func_BB_whitelist, f, indent=4, sort_keys=True)
 
-    total_mustBBs = list(set(total_mustBBs))
-    total_mustBBs.sort()
-    return total_mustBBs
-
-# get the lines which post dominate anyline in whitelist, and union them with previous whitelist
-def get_line_whitelist_postdoms(PATH, calltracefunclist = []):
+# step12 get the lines which post dominate anyline in whitelist, and union them with previous whitelist
+def get_line_whitelist_doms_postdoms_calltrace(PATH, calltracefunclist = []):
     with open(PATH+"/BB_lineinfo.json") as f:
         BB_lineinfo = json.load(f)
+    with open(PATH+"/func_BB_whitelist_doms.json", "r") as f:
+        func_BB_whitelist = json.load(f)
     
-    BB_whitelist_doms = get_BB_whitelist_postdoms(PATH, calltracefunclist)
+    func_line_whitelist_doms = {}
     line_whitelist_doms = []
-    for BB in BB_whitelist_doms:
-        if BB not in BB_lineinfo:
-            continue
-        line_whitelist_doms += BB_lineinfo[BB]
+    for func in func_BB_whitelist:
+        func_line_whitelist_doms[func] = []
+        for BB in func_BB_whitelist[func]:
+            func_line_whitelist_doms[func] += BB_lineinfo[BB]
+        func_line_whitelist_doms[func] = sorted(list(set(func_line_whitelist_doms[func])))
+        line_whitelist_doms += func_line_whitelist_doms[func]
 
-    line_whitelist_doms = list(set(line_whitelist_doms))
     line_whitelist_doms.sort()
-    with open(PATH+"/line_whitelist_postdoms.json", 'w') as f:
+    with open(PATH+"/func_line_whitelist_doms.json", 'w') as f:
+        json.dump(func_line_whitelist_doms, f, indent=4, sort_keys=True)
+    with open(PATH+"/line_whitelist_doms.json", 'w') as f:
         json.dump(line_whitelist_doms, f, indent=4, sort_keys=True)
-    return line_whitelist_doms
 
+# step12 filter the previous blacklist with line_whitelist_doms
 def get_line_blacklist_doms_postdoms_calltrace(PATH):
     with open(PATH +"/func_line_blacklist.json") as f:
         func_line_blacklist = json.load(f)
-    line_func = {}
-    for func in func_line_blacklist:
-        for line in func_line_blacklist[func]:
-            line_func[line] = func
-
-    with open(PATH +"/line_blacklist_filterwithBB.json") as f:
+    with open(PATH +"/line_blacklist.json") as f:
         blacklist = json.load(f)
+    with open(PATH+"/line_whitelist_doms.json", 'r') as f:
+        line_whitelist_BBdoms = json.load(f)
+
     
-    if os.path.exists(PATH+"/calltracefunclist"):
-        with open(PATH+"/calltracefunclist", "r") as f:
-            calltracefunclist = f.readlines()
-            calltracefunclist = [line[:-1] for line in calltracefunclist]
-    else:
-        print("no", PATH+" calltracefunclist")
-    line_whitelist_predoms = get_line_whitelist_predoms(PATH)
-    line_whitelist_postdoms = get_line_whitelist_postdoms(PATH, calltracefunclist)
-    
-    line_blacklist_doms_postdoms_calltrace = []
-    for line in blacklist:
-        func = line_func[line]
-        if line in line_whitelist_predoms:
-            print("filter ", func, line, " Predominate")
-            continue
-        if line in line_whitelist_postdoms:
-            print("filter ", func, line, " Postdominate")
-            continue
-        line_blacklist_doms_postdoms_calltrace += [line]
-    with open(PATH+"/line_blacklist_doms_postdoms_calltrace.json","w") as f:
-        json.dump(line_blacklist_doms_postdoms_calltrace, f, indent=4, sort_keys=True)
+    for func in func_line_blacklist:
+        deletelines = []
+        for line in func_line_blacklist[func]:
+            if line in line_whitelist_BBdoms:
+                print("filter blackline with doms", func, line)
+                deletelines += [line]
+        for line in deletelines:
+            func_line_blacklist[func].remove(line)
+
+    line_blacklist = []
+    for func in func_line_blacklist:
+        line_blacklist += func_line_blacklist[func]
+    line_blacklist.sort()
+    with open(PATH+"/func_line_blacklist_doms.json","w") as f:
+        json.dump(func_line_blacklist, f, indent=4, sort_keys=True)
+    with open(PATH+"/line_blacklist_doms.json","w") as f:
+        json.dump(line_blacklist, f, indent=4, sort_keys=True)
 
 
 def get_line_blacklist_filterwithfunctioncall_predoms(PATH):
@@ -1336,6 +1415,36 @@ def check_duplicate_func_linelist(PATH):
         for line in line_func:
             if len(line_func[line]) > 1:
                 print(line, line_func[line])
+
+def compile_gcc(PATH):
+    if PATH[-1] == "/":
+        PATH = PATH[:-1]
+    commit = PATH.split("/")[-1]
+    string1 = "cd /home/zzhan173/repos/linux; git checkout -f "+commit+";make mrproper"
+    print(string1)
+    result = command(string1)
+    print("compilebc.format_linux()")
+    compilebc.format_linux()
+    string1 = "cd /home/zzhan173/repos/linux;cp "+PATH+"/config .config;make -j32"
+    print(string1)
+    result = command(string1)
+    srcpath = "/home/zzhan173/repos/linux"
+    dstpath = PATH
+    shutil.copy(srcpath+"/vmlinux" , dstpath+"/vmlinux")
+    shutil.copy(srcpath+"/System.map" , dstpath+"/System.map")
+    shutil.copy(srcpath+"/arch/x86/boot/bzImage" , dstpath+"/bzImage")
+    shutil.copy(srcpath+"/.config" , dstpath+"/.config")
+
+def copyfiles(srcpath, dstpath, filelist):
+    for filename in filelist:
+        print("copy", srcpath+"/"+filename, "to", dstpath+"/"+filename)
+        shutil.copy(srcpath+"/"+filename , dstpath+"/"+filename)
+
+def read_calltracefunclist(PATH):
+    with open(PATH+"/calltracefunclist", "r") as f:
+        s_buf = f.readlines()
+    return [line[:-1] for line in s_buf]
+#prerequirement: bzImage, cover, config_withoutkasan, calltracefunclist
 if __name__ == "__main__":
     #link_bclist(filelist)
     
@@ -1343,91 +1452,106 @@ if __name__ == "__main__":
     #PATH = sys.argv[2]
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/O0result"
     PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7"
+    #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/gcov"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/433f4ba1/63de3747"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/eb73190f/dd52cb879063"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/813961de/e195ca6cb6f2"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/3619dec5/7daf201d7fe8"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0"
-    #1) get and store debuginfo from vmlinux (get dumpresult of vmlinux by the way)
+    calltracefunclist = read_calltracefunclist(PATH)
+    print("calltracefunclist:", calltracefunclist)
+    #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with laterBC files
+    if option == "compile_refkernel":
+        compile_gcc(PATH)
+    #0.1) get and store debuginfo from vmlinux, stored as tmp_o (get dumpresult of vmlinux by the way)
     if option == "get_vmlinux_dbginfo":
-        PATH = sys.argv[2]
+        #PATH = sys.argv[2]
         get_vmlinux_dbginfo(PATH)
-    #2) get coverline info vmlinux
+    #1) get cover file from syzkaller reproducer
+    #1.1) get coverline info from cover with vmlinux
     elif option == "get_cover_lineinfo":
         cover = PATH+"/cover"
         output = PATH+"/coverlineinfo"
         get_cover_lineinfo(PATH, cover, output)
-    #2.5) compile kernels to bcfiles in repos/linux
-    #3) link the files included in coverlineinfo
+    #1.2) compile kernels to bcfiles in repos/linux
+    #requirement: config_withoutkasan (used for compilation) in PATH
+    elif option == "compile_bcfiles":
+        compilebc.compile_gcc(PATH)
+        compilebc.get_dryruncommands()
+        compilebc.format_linux()
+        compilebc.compile_bc_extra("compile")
+        compilebc.compile_bc_extra("copy", PATH)
+        compilebc.compile_bc_extra("check", PATH)
+    #1.3) link the files included in coverlineinfo and get built-in_tag.ll from built-in.ll
     elif option == "link_bclist_fromcover":
         link_bclist_fromcover(PATH)
-    #elif option == "link_allbc":
-    #    link_allbc(PATH)
-    #elif option == "get_allfunc_file":
-    #    get_allfunc_file(PATH)
-    ##get callees for each function in all bc files seprately
-    #elif option == "get_func_callee_all":
-    #    get_func_callee_all(PATH)
-    ##get recursive callees and link them together
-    #elif option == "get_recursivecallees":
-    #    funcname = sys.argv[2]
-    #    get_recursivecallees(PATH, funcname)
-    #4) get the complete instruction addresses in coverage with the help of dumpresult
+        get_tagbcfile(PATH)
+    #2) get the complete instruction addresses in coverage with the help of dumpresult
     elif option == "get_complete_coverage":
         get_complete_coverage(PATH)
         cover = PATH+"/completecover"
         output = PATH+"/completecoverlineinfo"
         get_cover_lineinfo(PATH, cover, output)
-    #5) get list of source code lines from complete coverage instruction addresses
+    #3, 4) get list of source code lines from complete coverage instruction addresses
+    # get_line_entryBBlist() is included in get_line_whitelist().
+    # output: func_line_whitelist_v0.json (without entry BB lines), func_line_whitelist_v1.json (with entry BB lines)
     elif option == "get_line_whitelist":
         get_line_whitelist(PATH)
-    #6) get  list of all source code lines in the kernel from debug information
+    #5) Todo: source code CFG BB (dom) analysis
+    #6) get  list of all source code lines in the refkernel from debug information
     elif option == "get_line_completelist":
         get_line_completelist(PATH)
-    #7) get list of source code lines of entry BB of each function
-    elif option == "get_line_entryBBlist":
-        get_line_entryBBlist(PATH)
-    #8) blacklist = completelist - whitelist - entryBBlist
+    #7) blacklist = completelist - whitelist(v1)
     elif option == "get_line_blacklist":
         get_line_blacklist(PATH)
-    elif option == "filter_complete_white_blacklist_funcrange":
-        filter_complete_white_blacklist_funcrange(PATH)
-    #elif option == "get_dbginfo":
-    #    get_dbginfo(sys.argv[2],sys.argv[3])
-    #8.5) get built-in_tag.ll from built-in.ll
-    #9) if any line in a llvm BB is in whitelist, then all lines in BB shouldn't be in blacklist
-    elif option == "get_line_blacklist_filterwithBB":
+    #8) source code match to get func_line_whitelist(target kernel)
+    #9) source code match to get func_line_blacklist(target kernel)
+    #10) with the func_line_whitelist, we should get the BB_whitelist
+    elif option ==  "get_BB_whitelist":
         #get debug symbol information from .ll file. Mapping between !num and file,lineNo
         get_dbginfo(PATH)
         #Mapping between BB name and line
         get_BB_lineinfo(PATH)
-        #if a BB contains line in whitelist(from cover file), then all instructions in the BB shouldn't be in blacklist
-        get_line_blacklist_filterwithBB(PATH)
-    #10) only include the lines which calls a function in the blacklist
-    elif option == "get_line_blacklist_filterwithfunctioncall":
-        get_line_blacklist_filterwithfunctioncall(PATH)
-        #PATH += "/O0result"
-    #11) if any line in a BB is in whitelist, all BBs that dom/postdom the BB should not be in blacklist
-    #(cd ~/repos/Linux_kernel_UC_KLEE;source environment.sh);cd PATH;mkdir doms;mkdir postdoms;cd doms;opt -dot-dom-only ../built-in_tag.bc;cd ../postdoms;opt -dot-postdom-only ../built-in_tag.bc
+        get_BB_whitelist(PATH)
+    #11) get the BBs which forward/post dominate anyBB in whitelist
+    elif option == "get_BB_whitelist_withdoms":
+        #get doms/postdoms dot file from built-in_tag.bc
+        dot_analysis.get_dom_files(PATH)
+        get_BB_whitelist_predoms(PATH)
+        get_BB_whitelist_doms(PATH, calltracefunclist)
+    #12) Make use of BB_whitelist(after dominator analysis) to filter func_line_blacklist
     elif option == "get_line_blacklist_filterwithdoms":
-        get_line_blacklist_filterwithdoms(PATH)
-    elif option == "get_line_blacklist_filterwithfunctioncall_predoms":
-        get_line_blacklist_filterwithfunctioncall_predoms(PATH)
-    elif option == "get_line_blacklist_doms_postdoms_calltrace":
+        #get_line_blacklist_filterwithdoms(PATH)
+        get_line_whitelist_doms_postdoms_calltrace(PATH, calltracefunclist)
         get_line_blacklist_doms_postdoms_calltrace(PATH)
-    #12) get config file
-    elif option == "generate_kleeconfig_filterwithfunctioncall":
-        generate_kleeconfig(PATH, "functioncall")
+    #elif option == "get_line_blacklist_filterwithBB":
+    #    #get debug symbol information from .ll file. Mapping between !num and file,lineNo
+    #    get_dbginfo(PATH)
+    #    #Mapping between BB name and line
+    #    get_BB_lineinfo(PATH)
+    #    #if a BB contains line in whitelist(from cover file), then all instructions in the BB shouldn't be in blacklist
+    #    get_line_blacklist_filterwithBB(PATH)
+    ##10) only include the lines which calls a function in the blacklist
+    #elif option == "get_line_blacklist_filterwithfunctioncall":
+    #    get_line_blacklist_filterwithfunctioncall(PATH)
+    #    #PATH += "/O0result"
+    #13) get config file
+    elif option == "generate_kleeconfig":
+        generate_kleeconfig(PATH)
+    #elif option == "generate_kleeconfig_filterwithfunctioncall":
+    #    generate_kleeconfig(PATH, "functioncall")
     elif option == "generate_kleeconfig_filterwithfunctioncallordoms_concolic":
         parameterlist = ["", ("p","./file0\000"),("p","tmpfs\000"), "", ("p", "\x6d\x70\x6f\x6c\x3d\x3d\x93\x74\x61\x74\x69\x63\x3a\x36\x2d\x36\x3a")]
-        generate_kleeconfig(PATH, "functioncall", parameterlist)
         generate_kleeconfig(PATH, "doms", parameterlist)
+    #    generate_kleeconfig(PATH, "functioncall", parameterlist)
+    #    generate_kleeconfig(PATH, "doms", parameterlist)
         #use the union blacklist of functioncall and doms
-        generate_kleeconfig(PATH, "functioncall_doms", parameterlist)
-    elif option == "generate_kleeconfig_filterwithBB":
-        generate_kleeconfig(PATH, "BB")
-    elif option == "generate_kleeconfig_filterwithdoms":
-        generate_kleeconfig(PATH, "doms")
+    #    generate_kleeconfig(PATH, "functioncall_doms", parameterlist)
+    #elif option == "generate_kleeconfig_filterwithBB":
+    #    generate_kleeconfig(PATH, "BB")
+    #elif option == "generate_kleeconfig_filterwithdoms":
+    #    generate_kleeconfig(PATH, "doms")
     elif option == "check_duplicate_func_linelist":
         check_duplicate_func_linelist(PATH)
+

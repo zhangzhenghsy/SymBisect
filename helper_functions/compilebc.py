@@ -16,17 +16,19 @@ def command(string1):
     p=subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     result=p.stdout.readlines()
     return result
-def compile_bc_extra(option, targetdir, filename = None):
+
+repopath = "/home/zzhan173/repos/linux/"
+clang_path = '/data2/zheng/clangs/clang11/clang11.0.1/bin/clang'
+def compile_bc_extra(option, targetdir = None, filename = None):
     #option = "compile" or "check"
     sourcecoverage = False
-    #option = sys.argv[1]
     regx = r'echo \'[ \t]*CC[ \t]*(([A-Za-z0-9_\-.]+\/)+([A-Za-z0-9_.\-]+))\';'
     #base = os.path.join(self.case_path, 'linux')
     #base = "/home/zzhan173/repos/linux"
     #path = os.path.join(base, 'llvmclang_log')
     #path = os.path.join(base, 'clang_log')
     path = '/home/zzhan173/repos/linux/clang_log'
-    clang_path = '/data2/zheng/clangs/clang11/clang11.0.1/bin/clang'
+    #clang_path = '/data2/zheng/clangs/clang11/clang11.0.1/bin/clang'
     #clang_path = "/home/zzhan173/repos/Linux_kernel_UC_KLEE/build/llvm-project/build/bin/clang"
     #clang_path = "/data2/zheng/clangs/clang10/clang10/bin/clang"
     #newclang_path = "/home/zzhan173/repos/Linux_kernel_UC_KLEE/build/llvm-project/build/bin/clang"
@@ -74,6 +76,8 @@ def compile_bc_extra(option, targetdir, filename = None):
 
             except ValueError:
                 print("'No \'wllvm\' or \';\' found in \'{}\''.format(line)")
+                print(line)
+                continue
                 #self.case_logger.error('No \'wllvm\' or \';\' found in \'{}\''.format(line))
                 #raise CompilingError
             idx_obj = len(new_cmd)-2
@@ -91,27 +95,32 @@ def compile_bc_extra(option, targetdir, filename = None):
             newcmd = newcmd.replace("-fshort-wchar ","")
             #newcmd = newcmd.replace(clang_path, newclang_path)
             #print(newcmd)
+            newcmd = "cd "+repopath+";"+newcmd
             newcmds += [newcmd]
     if option == "check":
         print("\n not compile file:")
         notcompiledbc = []
         for bcfile in bcfiles:
-            if not os.path.exists(bcfile):
-                notcompiledbc += [bcfile]
-                print(bcfile)
+            if not os.path.exists(repopath+"/"+bcfile):
+                notcompiledbc += [repopath+"/"+bcfile]
+                print(repopath+"/"+bcfile)
         #for cmd in newcmds:
         #    if any(bcfile in cmd for bcfile in notcompiledbc):
         #        print(cmd)
     if option == "compile":
-        for newcmd in newcmds:
-            print(newcmd)
-        print("number of bc files:",len(newcmd))
+        with open("compile_bc_commands", "w") as f:
+            for newcmd in newcmds:
+                f.write(newcmd+"\n")
+            #print(newcmd)
+        print("number of bc files:",len(newcmds))
         with Pool(32) as p:
             p.map(command, newcmds)
         #targetdir = "/home/zzhan173/Qemu/OOBW/pocs/433f4ba1/63de3747/source"
         #targetdir = "/home/zzhan173/Qemu/OOBW/pocs/eb73190f/dd52cb879063/source"
         #targetdir = "/home/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a/source"
         #targetdir = sys.argv[2]+"/source"
+    if option == "copy":
+        targetdir = targetdir+"/source"
         if not os.path.exists(targetdir):
             os.mkdir(targetdir)
         copy_bcfiles(targetdir, bcfiles)
@@ -119,12 +128,12 @@ def compile_bc_extra(option, targetdir, filename = None):
 
 def copy_bcfiles(targetdir, bcfiles):
     for bcfile in bcfiles:
-        if not os.path.exists(bcfile):
+        if not os.path.exists(repopath+"/"+bcfile):
             continue
-        src = bcfile
+        src = repopath+"/"+bcfile
         dst = targetdir+"/" + bcfile
-        cfile = bcfile.replace(".bc", ".c")
-        dstcfile = targetdir+"/" + cfile
+        cfile = repopath+"/"+bcfile.replace(".bc", ".c")
+        dstcfile = targetdir+"/" + bcfile.replace(".bc", ".c")
 
         dstfolder = os.path.dirname(dst)
         if not os.path.exists(dstfolder):
@@ -132,12 +141,47 @@ def copy_bcfiles(targetdir, bcfiles):
         shutil.copy(src,dst)
         shutil.copy(cfile, dstcfile)
 
+#def format_file_command(PATH):
+#    if dbg:
+#        print("clang format File:",PATH)
+#    string = "/data4/zheng/Linux_kernel_UC_KLEE/install/bin/clang-format -style=\"{BreakBeforeBraces: Stroustrup}\" -i "+PATH
+#    #result = command(string)
+#    return string
+
+def get_indent(line):
+    indent = ""
+    for i in range(len(line)):
+        if line[i] not in [" ", "\t"]:
+            break
+        indent += line[i]
+    return indent
+
 def format_file_command(PATH):
-    if dbg:
-        print("clang format File:",PATH)
-    string = "/data4/zheng/Linux_kernel_UC_KLEE/install/bin/clang-format -style=\"{BreakBeforeBraces: Stroustrup, IndentWidth: 4, SpaceBeforeParens: Never}\" -i "+PATH
-    #result = command(string)
-    return string
+    new_buf = []
+    with open(PATH, "r") as f:
+        s_buf = f.readlines()
+    for line in s_buf:
+        if "} else if (" in line and "\\" not in line:
+            linelist = line.split("} else if (")
+            if len(linelist) >2:
+                print(line)
+                new_buf += [line]
+                continue
+            line1 = linelist[0]+"}\n"
+            indent = get_indent(line)
+            line2 = indent+"else if ("+linelist[1]
+            new_buf += [line1, line2]
+        elif "} else {" in line and "\\" not in line:
+            linelist = line.split("} else {")
+            line1 = linelist[0]+"}\n"
+            indent = get_indent(line)
+            line2 = indent+"else {"+linelist[1]
+            new_buf += [line1, line2]
+        else:
+            new_buf += [line]
+    with open(PATH, "w") as f:
+        for line in new_buf:
+            f.write(line)
 
 def format_dir_commands(PATH):
     commandlist = []
@@ -149,17 +193,42 @@ def format_dir_commands(PATH):
         if os.path.isdir(path):
             commandlist += format_dir_commands(path)
         elif os.path.isfile(path):
-            if path.endswith(".h") or path.endswith(".c"):
-                commandlist += [format_file_command(path)]
+            #if path.endswith(".h") or path.endswith(".c"):
+            if path.endswith(".c"):
+                #commandlist += [format_file_command(path)]
+                commandlist += [path]
     return commandlist
 
-def format_linux():
-    commands = format_dir_commands("/home/zzhan173/repos/linux")
+def format_linux(PATH = "/home/zzhan173/repos/linux"):
+    commands = format_dir_commands(PATH)
     print("size of files to be formatted:", len(commands))
     with Pool(32) as p:
-        p.map(command, commands)
+        #p.map(command, commands)
+        p.map(format_file_command, commands)
 
-# [compile/check] [targetdir] [specific filepath]
+def compile_gcc(PATH, commit = None):
+    if PATH[-1] == "/":
+        PATH = PATH[:-1]
+    if not commit:
+        commit = PATH.split("/")[-1]
+    string1 = "cd /home/zzhan173/repos/linux;find . -name '*.bc' | xargs rm; git checkout -f "+commit+";make mrproper"
+    print(string1)
+    result = command(string1)
+    format_linux()
+    string1 = "cd /home/zzhan173/repos/linux;cp "+PATH+"/config_withoutkasan .config;make olddefconfig;make -j32"
+    print(string1)
+    result = command(string1)
+
+def get_dryruncommands():
+    #clang_path = "/data2/zheng/clangs/clang11/clang11.0.1/bin/clang"
+    string1 = "cd /home/zzhan173/repos/linux;make olddefconfig CC="+clang_path
+    print(string1)
+    result = command(string1)
+    string1 = "cd /home/zzhan173/repos/linux; make -n CC="+clang_path+" > clang_log"
+    print(string1)
+    result = command(string1)
+
+# [compile/check/format] [targetdir] [specific filepath]
 if __name__ == "__main__":
     print(sys.argv)
     if(len(sys.argv) > 3):
@@ -168,5 +237,15 @@ if __name__ == "__main__":
     targetdir = sys.argv[2]
     #compile_bc_extra(funcname)
     #compile_bc_extra()
-    format_linux()
-    compile_bc_extra(option, targetdir)
+    if option == "dryrun":
+        compile_gcc(targetdir)
+        get_dryruncommands()
+    elif option == "format":
+        format_linux()
+    elif option == "compile":
+        #option == "compile" or "check"
+        compile_bc_extra("compile")
+    elif option == "copy":
+        compile_bc_extra("copy", targetdir)
+    elif option == "check":
+        compile_bc_extra("check", targetdir)

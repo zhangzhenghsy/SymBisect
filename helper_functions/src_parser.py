@@ -48,7 +48,7 @@ def build_func_map(s_buf):
     prev_pos = (0,0)
     in_str = False  
     in_comment = 0
-    ifelse=False
+    ifelse= False
     numberif=0
     #TODO: Maybe we should utilize lexer to avoid all the mess below.
     for i in range(len(s_buf)):
