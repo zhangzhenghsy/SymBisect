@@ -326,7 +326,11 @@ def generate_target_list(PATH1, PATH2):
     with open(PATH2+"/line_whitelist_refdoms.json", 'w') as f:
         json.dump(line_whitelist2, f, indent=4, sort_keys=True)
 
-def compile_targetbc(PATH2):
+def compile_targetbc(PATH1, PATH2):
+    if not os.path.exists(PATH2+"/config"):
+        shutil.copy(PATH1+"/config", PATH2+"/config")
+    if not os.path.exists(PATH2+"/config_withoutkasan"):
+        shutil.copy(PATH1+"/config_withoutkasan", PATH2+"/config_withoutkasan")
     compilebc.compile_gcc(PATH2)
     compilebc.get_dryruncommands()
     compilebc.format_linux()
@@ -357,26 +361,3 @@ def generate_target_config(PATH, MustBBs):
     if not os.path.exists(PATH+"/line_blacklist_doms.json"):
         shutil.copy(PATH+"/line_blacklist_refdoms.json", PATH+"/line_blacklist_doms.json")
     prioritylist.generate_kleeconfig(PATH, [], MustBBs)
-
-    
-if __name__ == "__main__":
-    refkernel = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7"
-    targetkernel = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/v5.0"
-    MustBBs = ["built-in.bc-shmem_parse_options-69"]
-    #get_all_matchedlines_git(refkernel, targetkernel)
-    option = sys.argv[1]
-    if option == "generate_target_list":
-        generate_target_list(refkernel, targetkernel)
-    elif option == "compile_targetbc":
-        compile_targetbc(targetkernel)
-    elif option == "link_bcfile":
-        link_bclist_from_refcover(refkernel, targetkernel)
-    elif option == "generate_target_config":
-        generate_target_config(targetkernel, MustBBs)
-    #just for testing
-    elif option == "get_matchfiles":
-        get_matchfiles(refkernel, targetkernel)
-    #filename = sys.argv[1]
-    #line_target_context = get_matchedlines(refkernel+"/"+filename, targetkernel+"/"+filename)
-    #line_targetline_git = get_matchedlines_git(refkernel+"/source/"+filename, targetkernel+"/source/"+filename)
-    #compare_twomatches(line_target_context, line_targetline_git)

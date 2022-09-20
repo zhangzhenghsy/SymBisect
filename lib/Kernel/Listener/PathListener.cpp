@@ -86,6 +86,19 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
         line_info = line_info.substr(pos+1);
         state.completecoveredLines.insert(line_info);
         klee::klee_message("insert new line in completecoveredLines: %s", line_info.c_str());
+
+        std::set<std::string> coveredlines = state.completecoveredLines;
+        if (this->whitelist_map.find(line_info) != this->whitelist_map.end())
+        {
+                std::set<std::string> whitelist = this->whitelist_map[line_info];
+                for (auto whiteline:whitelist){
+                    klee::klee_message("whiteline: %s", whiteline.c_str());
+                    if (coveredlines.find(whiteline) == coveredlines.end()){
+                        klee::klee_message("%s not in coveredlines, terminate the state", whiteline.c_str());
+                        this->executor->terminateState(state);
+                    }
+                }
+        }
     }
 
     int endIndex = state.stack.size() - 1;
