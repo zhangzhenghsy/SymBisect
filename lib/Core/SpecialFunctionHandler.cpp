@@ -155,7 +155,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("vzalloc", handleVzalloc, true),
   add("_copy_from_user", handleMemcpyRZ, true),
   add("_copy_to_user", handleMemcpyRZ, true),
-
+  add("strcmp", handleStrcmp, true),
+  add("strchr", handleStrchr, true),
 #undef addDNR
 #undef add
 };
@@ -1174,4 +1175,220 @@ void SpecialFunctionHandler::handleUser_path_at(ExecutionState &state,
 
     ref<Expr> ret = ConstantExpr::alloc(0, Expr::Int32);
     executor.bindLocal(target, state, ret);
+}
+
+// int strcmp(const char *cs, const char *ct)
+// Assumption: ct points to a constant string , cs points to a symbolic string
+// todo: for the case that ct points to a symbolic string, return symbolic value
+void SpecialFunctionHandler::handleStrcmp(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments) {
+  klee_message("\nfunction Model handleStrcmp");
+  ObjectPair op, op2;
+  bool success1, success2;
+
+  ref<Expr> srcaddr = arguments[0];
+  if (ConstantExpr* CE1 = dyn_cast<ConstantExpr>(srcaddr)) {
+    success1 = state.addressSpace.resolveOne(CE1, op);
+  }  else {
+    return;
+  }
+  ref<Expr> targetaddr = arguments[1];
+  if (ConstantExpr* CE2 = dyn_cast<ConstantExpr>(targetaddr)) {
+    success2 = state.addressSpace.resolveOne(CE2, op2);
+  }  else {
+    return;
+  }
+  
+  const MemoryObject * sobject = op.first;
+  const MemoryObject * tobject = op2.first;
+  klee_message("source obj addr: %lu obj size: %u", sobject->address, sobject->size);
+  klee_message("target obj addr: %lu obj size: %u", tobject->address, tobject->size);
+
+  uint64_t sbaseoffset = dyn_cast<ConstantExpr>(srcaddr)->getZExtValue() - sobject->address;
+  uint64_t tbaseoffset = dyn_cast<ConstantExpr>(targetaddr)->getZExtValue() - tobject->address;
+  const ObjectState *os = op.second;
+  const ObjectState *os2 = op2.second;
+  uint64_t length = tobject->size-tbaseoffset;
+
+  ref<Expr> constraint = ConstantExpr::create(1, Expr::Bool);
+  for(uint64_t i = 0; i < length; i++){
+      ref<Expr> soffset = ConstantExpr::create((sbaseoffset + i), Context::get().getPointerWidth());
+      ref<Expr> toffset = ConstantExpr::create((tbaseoffset + i), Context::get().getPointerWidth());
+      ref<Expr> svalue = os->read(soffset, 8);
+      // tvalue should be concrete
+      ref<Expr> tvalue = os2->read(toffset, 8);
+      klee_message("i:%lu svalue: %s tvalue: %s", i, svalue.get_ptr()->dump2().c_str(),tvalue.get_ptr()->dump2().c_str());
+      // The logic here is a little different from the original fuction
+      // when there is a unequal constant char, we cannot gurantee the return value is 1 or -1
+      if (ConstantExpr* CE3 = dyn_cast<ConstantExpr>(svalue)){
+        if (CE3->getZExtValue() < dyn_cast<ConstantExpr>(tvalue)->getZExtValue()){
+          executor.bindLocal(target, state, ConstantExpr::alloc(-1, Expr::Int32));
+          return;
+        } 
+        else if (CE3->getZExtValue() > dyn_cast<ConstantExpr>(tvalue)->getZExtValue())
+        {
+          executor.bindLocal(target, state, ConstantExpr::alloc(1, Expr::Int32));
+          return;
+        }
+        continue;
+      }
+      constraint= AndExpr::create(EqExpr::create(svalue, tvalue), constraint);
+      //ref<Expr> base = AddExpr::create(srcaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
+      //executor.executeMemoryOperation(state, true, base, value, 0);
+  }
+  klee_message("constraint: %s", constraint.get_ptr()->dump2().c_str());
+  Executor::StatePair equalstr = executor.fork(state, constraint, true);
+  klee::klee_message("branches.first: %p branches.second: %p", equalstr.first, equalstr.second);
+  if (equalstr.first) { // symbolic str cs == ct
+    executor.bindLocal(target, *(equalstr.first), ConstantExpr::alloc(0, Expr::Int32));
+  }
+  if (equalstr.second) { // symbolic str cs != ct
+    executor.bindLocal(target, *(equalstr.second), ConstantExpr::alloc(1, Expr::Int32));
+  }
+}
+
+// char *strchr(const char *s, int c)
+void SpecialFunctionHandler::handleStrchr(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments) {
+  
+  // step 1: get the string s object
+  ObjectPair op;
+  bool success;
+
+  ref<Expr> srcaddr = arguments[0];
+  klee_message("straddr: %s", srcaddr.get_ptr()->dump2().c_str());
+  if (ConstantExpr* CE1 = dyn_cast<ConstantExpr>(srcaddr)) {
+    success = state.addressSpace.resolveOne(CE1, op);
+  }  else {
+    klee_message("handleStrchr: srcaddr is symbolic");
+    return;
+  }
+  const MemoryObject *sobject = op.first;
+  const ObjectState *os = op.second;
+  
+  //step2: iterate on the bytes of string s and compare them with c
+  //todo: change the length of strc. extract the value and create ConstantExpr again?
+  ref<Expr> strc = ConstantExpr::create(dyn_cast<ConstantExpr>(arguments[1])->getZExtValue(), 8);
+  klee_message("strc: %s", strc.get_ptr()->dump2().c_str());
+  //klee_message("strc: %u", strc.get_ptr()->dump2().c_str());
+  //ConstantExpr::create(dyn_cast<ConstantExpr>(arguments[1])->getZExtValue(), 8);
+
+  uint64_t sbaseoffset = dyn_cast<ConstantExpr>(srcaddr)->getZExtValue() - sobject->address;
+  uint64_t length = sobject->size-sbaseoffset;
+  std::vector<uint64_t> indexs;
+  //std::vector<ref<Expr> > constraints;
+  // used for store current constraint
+  ref<Expr> constraint = ConstantExpr::create(1, Expr::Bool);
+  for(uint64_t i = 0; i < length; i++){
+    ref<Expr> soffset = ConstantExpr::create((sbaseoffset + i), Context::get().getPointerWidth());
+    ref<Expr> svalue = os->read(soffset, 8);
+    // If reach the end of the str, just break and return the NULL. 
+    // Note that current state contains the constraints that previous bytes cannot be the given char
+    if (ConstantExpr* CE3 = dyn_cast<ConstantExpr>(svalue)){
+        if (CE3->getZExtValue() == 0){
+          klee_message("reach the end of string");
+          break;
+          //executor.bindLocal(target, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
+          //return;
+        } 
+    }
+    ref<Expr> returnaddr = ConstantExpr::create((dyn_cast<ConstantExpr>(srcaddr)->getZExtValue() + i), Context::get().getPointerWidth());
+    constraint = NeExpr::create(svalue, strc);
+    if (i%10 != 0){
+      executor.addConstraint(state, constraint);
+      continue;
+    }
+    Executor::StatePair branches = executor.fork(state, constraint, false);
+    // this byte must equal the given char. should stop the iteration since the latter addresses cannot be returned;
+    if (!branches.first){
+      executor.bindLocal(target, *(branches.second),  returnaddr);
+      klee_message("state: %p  return value: %s", branches.second, returnaddr.get_ptr()->dump2().c_str());
+      return;
+    }
+    else {
+      // This byte cannot equal the given byte; Since we have added this constraint, thus just continue the loop 
+      if (!branches.second){
+        continue;
+      } 
+      // This byte can equal the given byte or not
+      // branches.first (state): not equal the given byte
+      // branches.second: equal the given byte and return current address
+      executor.bindLocal(target, *(branches.second),  returnaddr);
+      klee_message("state: %p  return value: %s", branches.second, returnaddr.get_ptr()->dump2().c_str());
+      indexs.push_back(i);
+      // Already fork enough cases that the symbolic byte equals the given byte
+      if (indexs.size() >= 2){
+        // we need a case that returns 0 to be executed first
+        soffset = ConstantExpr::create((sbaseoffset + i+1), Context::get().getPointerWidth());
+        svalue = os->read(soffset, 8);
+        constraint = EqExpr::create(svalue, strc);
+        Executor::StatePair branches = executor.fork(state, constraint, false);
+        executor.bindLocal(target, *(branches.second),  ConstantExpr::alloc(0, Context::get().getPointerWidth()));
+        klee_message("state: %p  return value: 0",branches.second);
+        //executor.bindLocal(target, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
+        //return;
+        break;
+      }
+    }
+   
+    //bool res;
+    //bool mustnotEqual = executor.solver->mustBeFalse(
+    //  state.constraints, EqExpr::create(svalue, strc), res, state.queryMetaData);
+    //if (!res){
+      //constraint = AndExpr::create(EqExpr::create(svalue, strc), constraint);
+    //  constraint = NeExpr::create(svalue, strc);
+    //  Executor::StatePair branches = executor.fork(state, constraint, false);
+    //  indexs.push_back(i);
+      //constraints.push_back(constraint);
+    //  if (indexs.size() >= 10){
+    //    break;
+    //  }
+    //} else{
+      //constraint= AndExpr::create(NeExpr::create(svalue, strc), constraint);
+    //}  
+  }
+  klee_message("state: %p  return value: 0", &state);
+  executor.bindLocal(target, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
+  return;
+  //klee_message("L1311");
+  //size_t size = indexs.size();
+  //klee_message("size: %lu", size);
+  //// not solvable
+  //if(size ==0){
+  //  klee_message("handleStrchr: no byte in string can equal to given byte");
+  //  executor.bindLocal(target, state, ConstantExpr::alloc(0, Context::get().getPointerWidth()));
+  //  return;
+  //}
+  
+  /*
+  Executor::StatePair branches = executor.fork(state, constraints.at(0), false);
+  if(branches.first){
+      ref<Expr> returnaddr = ConstantExpr::create((dyn_cast<ConstantExpr>(srcaddr)->getZExtValue() + indexs.at(0)), Context::get().getPointerWidth());
+      executor.bindLocal(target, *(branches.first),  returnaddr);
+  }
+  klee_message("L1323");
+  for (size_t i = 1; i < size; i++)
+  {
+    klee_message("branches.second: %lu", branches.second);
+    if(!branches.second){ 
+      return;
+    }
+    uint64_t index = indexs.at(i);
+    constraint = constraints.at(i);
+    klee_message("index:%lu  constraint:%s", index, constraint.get_ptr()->dump2().c_str());
+    Executor::StatePair branches = executor.fork(*branches.second, constraint, false);
+    klee_message("L1330");
+    ref<Expr> returnaddr = ConstantExpr::create((dyn_cast<ConstantExpr>(srcaddr)->getZExtValue() + index), Context::get().getPointerWidth());
+    if(branches.first){
+      executor.bindLocal(target, *(branches.first),  returnaddr);
+    }
+    klee_message("L1335");
+  }
+  if(branches.second){
+    executor.bindLocal(target, *(branches.second), ConstantExpr::alloc(0, Context::get().getPointerWidth()));
+  }
+  */
+
 }

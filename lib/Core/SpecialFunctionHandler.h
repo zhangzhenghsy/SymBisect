@@ -154,6 +154,8 @@ namespace klee {
     HANDLER(handleStrncpy_from_user);
     HANDLER(handleUser_path_at);
     HANDLER(handleVzalloc);
+    HANDLER(handleStrcmp);
+    HANDLER(handleStrchr);
 #undef HANDLER
   };
 } // End klee namespace
