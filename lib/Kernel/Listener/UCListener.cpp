@@ -179,7 +179,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     }
     }
     
-
+    //print_constraints(state);
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
             break;

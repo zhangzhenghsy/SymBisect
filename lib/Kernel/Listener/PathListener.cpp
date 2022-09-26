@@ -121,35 +121,11 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
         case llvm::Instruction::Call: {
             //klee::klee_message("print state.completecoveredLines");
             std::set<std::string> coveredlines = state.completecoveredLines;
-            //std::string coveredline;
-            //std::map<const std::string*, std::set<unsigned> > cov = state.completecoveredLines;
-            //klee::klee_message("print all current coveredlines:");
-            //for (const auto &entry : cov) {
-            //    for (const auto &line : entry.second) {
-            //        coveredline = *(entry.first);
-            //        coveredline.append(":");
-            //        coveredline.append(std::to_string(line));
-            //        klee::klee_message("%s", coveredline.c_str());
-            //        coveredlines.insert(coveredline);
-            //    }
-            //}
 
             auto line_info = dump_inst_sourceinfo(ki->inst);
             std::size_t pos = line_info.find("source/");
             line_info = line_info.substr(pos+1);
             klee::klee_message("key line_info: %s", line_info.c_str());
-
-            if (this->whitelist_map.find(line_info) != this->whitelist_map.end())
-            {
-                std::set<std::string> whitelist = this->whitelist_map[line_info];
-                for (auto whiteline:whitelist){
-                    klee::klee_message("whiteline: %s", whiteline.c_str());
-                    if (coveredlines.find(whiteline) == coveredlines.end()){
-                        klee::klee_message("%s not in coveredlines, terminate the state", whiteline.c_str());
-                        this->executor->terminateState(state);
-                    }
-                }
-            }
 
             if (isa<DbgInfoIntrinsic>(ki->inst))
                 break;

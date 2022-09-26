@@ -2263,14 +2263,18 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       int randvalue = std::rand()%2;
       if (randvalue==1){
         cond = Expr::createIsZero(cond);
+        klee::klee_message("randvalue==1, pick the opposite Cond: %s", cond.get_ptr()->dump2().c_str());
       }
       Executor::StatePair branches = fork(state, cond, false);
       ExecutionState * state2 = branches.second;
 
-      if (randvalue==1){
-        branches = StatePair(branches.second, branches.first);
-      }
       klee::klee_message("branches.first: %p branches.second: %p", branches.first, branches.second);
+      if (randvalue==1){
+        klee::klee_message("randvalue==1, exchange the StatePair the keep the branches corresponds the original Cond (but it will be executed first)");
+        branches = StatePair(branches.second, branches.first);
+        klee::klee_message("branches.first: %p branches.second: %p", branches.first, branches.second);
+      }
+      
       //klee::klee_message("branches.second: %p", branches.second);
 
       // NOTE: There is a hidden dependency here, markBranchVisited
@@ -2288,8 +2292,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // only when both paths are feasible, we only to check loop limit and add the missing listener_service->afterExecuteInstruction
       if (branches.first && branches.second) {
         ExecutionState& newstate = *state2;
-        klee_message("logNewConstraint for state : %p and newstate : %p", &state, &newstate);
+        klee_message("logNewConstraint for state : %p", &state);
         logNewConstraint(state, ki);
+        klee_message("logNewConstraint for state : %p",  &newstate);
         logNewConstraint(newstate, ki);
         // should we log the BB execution number when there is only one path feasible?
         checkLoopLimit(state, ki);

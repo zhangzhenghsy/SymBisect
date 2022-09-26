@@ -282,6 +282,7 @@ def compare_twomatches(line_target_context, line_targetline_git):
             print(line, "no match in line_target_context line_targetline_git[line]:" , line_targetline_git[line])
 
 def generate_target_list(PATH1, PATH2):
+    print("\n\ngenerate_target_list\n")
     # question: should we use the original blacklist or blacklist filter with refkernel bc dom tree?
     # question： should we check if the function is renamed?
     with open(PATH1+"/func_line_blacklist_doms.json") as f:
@@ -327,6 +328,7 @@ def generate_target_list(PATH1, PATH2):
         json.dump(line_whitelist2, f, indent=4, sort_keys=True)
 
 def compile_targetbc(PATH1, PATH2):
+    print("\n\ncompile_targetbc\n")
     if not os.path.exists(PATH2+"/config"):
         shutil.copy(PATH1+"/config", PATH2+"/config")
     if not os.path.exists(PATH2+"/config_withoutkasan"):
@@ -339,6 +341,7 @@ def compile_targetbc(PATH1, PATH2):
     compilebc.compile_bc_extra("check", PATH2)
 
 def link_bclist_from_refcover(PATH1, PATH2):
+    print("\n\nlink_bclist_from_refcover\n")
     coverlineinfo = PATH1+"/coverlineinfo"
     with open (coverlineinfo,"r") as f:
         s_buf =f.readlines()
@@ -357,6 +360,7 @@ def link_bclist_from_refcover(PATH1, PATH2):
     prioritylist.get_tagbcfile(PATH2)
 
 def generate_target_config(PATH, MustBBs):
+    print("\n\ngenerate_target_config\n")
     # todo: do dom analysis for target kernel again (consider that we need to do source analysis to correct the func name in func_line_blacklist_refdoms.json/func_line_whitelist_refdoms.json)
     if not os.path.exists(PATH+"/line_blacklist_doms.json"):
         shutil.copy(PATH+"/line_blacklist_refdoms.json", PATH+"/line_blacklist_doms.json")
