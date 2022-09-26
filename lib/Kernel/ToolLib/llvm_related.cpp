@@ -134,7 +134,7 @@ std::string dump_inst_booltin(llvm::Instruction *inst, std::string version) {
         }
     }
 
-    res += "https://elixir.bootlin.com/linux/"+version+"/source/"+ Path + "#L" + std::to_string(line);
+    res += "/home/zzhan173/Qemu/OOBW/pocs/"+version+"/source/"+ Path + "#L" + std::to_string(line);
     //res += "https://elixir.bootlin.com/linux/v5.8-rc6/source/" + Path + "#L" + std::to_string(line);
     //res += "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/" + Path + "?id=63de37476ebd1e9bab6a9e17186dc5aa1da9ea99#n" + std::to_string(line);
     //res += Path + "#L" + std::to_string(line);
