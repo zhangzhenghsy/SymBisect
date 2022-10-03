@@ -59,14 +59,17 @@ def get_files(p_buf):
             filenames.add(result)
     return filenames
 
-ref_kernel = "/data4/zheng/repos/linux"
-target_kernel = "/data4/zheng/repos/target_linux"
+ref_kernel = "/data/zzhan173/repos/linux"
+target_kernel = "/data/zzhan173/repos/target_linux"
 
 #for example, ~/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/
 def get_commit_frompath(PATH):
     if PATH[-1] == "/":
         PATH = PATH[:-1]
-    return PATH.split("/")[-1]
+    if PATH.split("/")[-1] in ["alloc","crash"]:
+        return PATH.split("/")[-2]
+    else:
+        return PATH.split("/")[-1]
 
 def get_diff_buf(PATH1, PATH2):
     commit1 = get_commit_frompath(PATH1)
@@ -329,8 +332,8 @@ def generate_target_list(PATH1, PATH2):
 
 def compile_targetbc(PATH1, PATH2):
     print("\n\ncompile_targetbc\n")
-    if not os.path.exists(PATH2+"/config"):
-        shutil.copy(PATH1+"/config", PATH2+"/config")
+    #if not os.path.exists(PATH2+"/config"):
+    #    shutil.copy(PATH1+"/config", PATH2+"/config")
     if not os.path.exists(PATH2+"/config_withoutkasan"):
         shutil.copy(PATH1+"/config_withoutkasan", PATH2+"/config_withoutkasan")
     compilebc.compile_gcc(PATH2)

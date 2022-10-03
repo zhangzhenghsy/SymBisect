@@ -158,7 +158,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     klee::klee_message("target->dest: %d", ki->dest);
     int inst_type[] = {llvm::Instruction::GetElementPtr, llvm::Instruction::Load, llvm::Instruction::Store, llvm::Instruction::Ret,
     llvm::Instruction::ICmp, llvm::Instruction::Call, llvm::Instruction::Or, llvm::Instruction::Add,
-    llvm::Instruction::Xor};
+    llvm::Instruction::Xor, llvm::Instruction::Mul};
     int *find = std::find(std::begin(inst_type), std::end(inst_type), ki->inst->getOpcode());
     if (find != std::end(inst_type)){
     size_t i = 0;
@@ -319,11 +319,21 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
 
     unsigned index = ki->dest;
     klee::klee_message("ki->dest: %u", ki->dest);
-
+    int inst_type[] = {llvm::Instruction::GetElementPtr, llvm::Instruction::Load, 
+    llvm::Instruction::ICmp, llvm::Instruction::Or, llvm::Instruction::Add, 
+    llvm::Instruction::Xor, llvm::Instruction::Mul, llvm::Instruction::ZExt};
+    int *find = std::find(std::begin(inst_type), std::end(inst_type), ki->inst->getOpcode());
+    if (find != std::end(inst_type)){
+        if(executor->getDestCell(state, ki).value.get_ptr()){
+            klee::klee_message("Inst value: %s", executor->getDestCell(state, ki).value.get_ptr()->dump2().c_str());
+        } else {
+            klee::klee_message("Inst value: Null");
+        }
+    }
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
             yhao_print(executor->getDestCell(state, ki).value->print, str);
-            klee::klee_message("GetElementPtr Inst value: %s", str.c_str());
+            //klee::klee_message("GetElementPtr Inst value: %s", str.c_str());
             break;
         }
         case llvm::Instruction::Load: {
@@ -334,7 +344,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
                 symbolize_Inst_return(state, ki);
             }
             yhao_print(executor->getDestCell(state, ki).value->print, str);
-            klee::klee_message("Load Inst value: %s", str.c_str());
+            //klee::klee_message("Load Inst value: %s", str.c_str());
             symbolic_after_load(state, ki);
             break;
         }
@@ -351,7 +361,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
         }
         case llvm::Instruction::ICmp: {
             yhao_print(executor->getDestCell(state, ki).value->print, str);
-            klee::klee_message("ICMP Inst value: %s", str.c_str());
+            //klee::klee_message("ICMP Inst value: %s", str.c_str());
             break;
         }
         case llvm::Instruction::Br: {

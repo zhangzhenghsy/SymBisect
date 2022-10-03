@@ -4,6 +4,7 @@ import re
 import subprocess
 from multiprocessing import Pool
 import shutil
+import json
 
 dbg = False
 def regx_get(regx, line, index):
@@ -18,7 +19,7 @@ def command(string1):
     return result
 
 repopath = "/home/zzhan173/repos/linux/"
-clang_path = '/data2/zheng/clangs/clang11/clang11.0.1/bin/clang'
+clang_path =  "/home/zzhan173/Linux_kernel_UC_KLEE/install/bin/clang"
 def compile_bc_extra(option, targetdir = None, filename = None):
     #option = "compile" or "check"
     sourcecoverage = False
@@ -65,7 +66,7 @@ def compile_bc_extra(option, targetdir = None, filename = None):
                 cmd = line[idx1:idx1+idx2].split(' ')
                 if cmd[0] == clang_path:
                     new_cmd.append(cmd[0])
-                    new_cmd.append('-emit-llvm -g -O0 -fno-short-wchar -fno-discard-value-names')
+                    new_cmd.append('-emit-llvm -g -O0 -fno-short-wchar -fno-discard-value-names -fno-inline')
                     if sourcecoverage:
                         new_cmd.append(' -fprofile-instr-generate -fcoverage-mapping')
                     #new_cmd.append('-emit-llvm -g -fno-short-wchar')
@@ -206,14 +207,42 @@ def format_linux(PATH = "/home/zzhan173/repos/linux"):
         #p.map(command, commands)
         p.map(format_file_command, commands)
 
+# currently it can insert some lines according to codeadaptation json file
+# note: it should not be done when compile bc
+# todo: then there is a line matching issue, unless the added lines are added only before the crash line
+def adapt_code(repo, codeadaptation):
+    with open(codeadaptation) as f:
+        # it will contain the added lines 
+        file_index_lines = json.load(f)
+    for filename in file_index_lines:
+        index_lines = file_index_lines[filename]
+        s_buf2 = []
+        with open(repo+"/"+filename, "r") as f:
+            s_buf = f.readlines()
+        for i in range(len(s_buf)):
+            index = str(i)
+            if index in index_lines:
+                s_buf2 += index_lines[index]
+            s_buf2 += [s_buf[i]]
+        with open(repo+"/"+filename, "w") as f:
+            for line in s_buf2:
+                f.write(line)
+
 def compile_gcc(PATH, commit = None):
     if PATH[-1] == "/":
         PATH = PATH[:-1]
     if not commit:
-        commit = PATH.split("/")[-1]
+        if PATH.split("/")[-1] in ["alloc", "crash"]:
+            commit = PATH.split("/")[-2]
+        else:
+            commit = PATH.split("/")[-1]
     string1 = "cd /home/zzhan173/repos/linux;find . -name '*.bc' | xargs rm; git checkout -f "+commit+";make mrproper"
     print(string1)
     result = command(string1)
+    #print("adapt_code()")
+    #if os.path.exists(PATH+"/codeadaptation.json"):
+    #    adapt_code("/home/zzhan173/repos/linux", PATH+"/codeadaptation.json")
+    print("format_linux()")
     format_linux()
     string1 = "cd /home/zzhan173/repos/linux;cp "+PATH+"/config_withoutkasan .config;make olddefconfig;make -j32"
     print(string1)
@@ -249,3 +278,5 @@ if __name__ == "__main__":
         compile_bc_extra("copy", targetdir)
     elif option == "check":
         compile_bc_extra("check", targetdir)
+    elif option == "compilefile":
+        compile_bc_extra("compile", None, sys.argv[2])

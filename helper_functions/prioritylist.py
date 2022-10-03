@@ -11,6 +11,8 @@ import compilebc
 import shutil
 import cfg_analysis
 
+ref_linux = "/home/zzhan173/repos/linux"
+
 def command(string1):
     p=subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     result=p.stdout.readlines()
@@ -21,7 +23,8 @@ def command_err(string1):
     result=p.stderr.readlines()
     return result
 
-home_path = "/data4/zheng/Linux_kernel_UC_KLEE/build/llvm-project/build/"
+UCKLEE = "/home/zzhan173/Linux_kernel_UC_KLEE/"
+home_path = UCKLEE+"build/llvm-project/build/"
 def link_bclist(filelist, PATH, output="built-in.bc"):
     previouskernel = "/home/zzhan173/repos/linux/"
     newkernel = PATH+"/source/"
@@ -330,12 +333,12 @@ def link_bclist_fromcover(PATH):
 
 # step1.3 
 def get_tagbcfile(PATH):
-    shutil.copy(PATH+"/built-in.bc", "/data4/zheng/Linux_kernel_UC_KLEE/built-in.bc")
-    string1 = "cd /data4/zheng/Linux_kernel_UC_KLEE;build/llvm-project/build/bin/opt -load build/llvm-project/build/lib/libbbTag.so -bbtag built-in.bc > built-in_tag.bc"
+    shutil.copy(PATH+"/built-in.bc", UCKLEE+"/built-in.bc")
+    string1 = "cd "+UCKLEE+";build/llvm-project/build/bin/opt -load build/llvm-project/build/lib/libbbTag.so -bbtag built-in.bc > built-in_tag.bc"
     print(string1)
     command(string1)
-    shutil.copy("/data4/zheng/Linux_kernel_UC_KLEE/built-in_tag.bc", PATH+"/built-in_tag.bc")
-    string1 = "cd "+PATH+";/data4/zheng/Linux_kernel_UC_KLEE/install/bin/llvm-dis built-in.bc;/data4/zheng/Linux_kernel_UC_KLEE/install/bin/llvm-dis built-in_tag.bc"
+    shutil.copy(UCKLEE+"/built-in_tag.bc", PATH+"/built-in_tag.bc")
+    string1 = "cd "+PATH+";"+UCKLEE+"install/bin/llvm-dis built-in.bc;"+UCKLEE+"/install/bin/llvm-dis built-in_tag.bc"
     print(string1)
     command(string1)
 
@@ -616,6 +619,7 @@ def get_line_completelist(PATH):
         if line.startswith("0xff"):
             addr = line.split(":")[0][2:]
         if addr not in complete_func_addrs:
+            #print(addr,"not in complete_func_addrs")
             continue
         if addr in complete_nop_addrs:
             continue
@@ -625,8 +629,8 @@ def get_line_completelist(PATH):
         else:
             func = line.split("inlined by) ")[1].split(" ")[0]
             info = line.split("inlined by) ")[1].split(" ")[2]
-        #if func == "irq_work_queue":
-        #    print(line)
+        #if func == "__check_object_size":
+        #    print(addr, line)
         if func not in func_completelist:
             func_completelist[func] = []
         if info not in func_completelist[func]:
@@ -910,7 +914,7 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
     config["92_indirectcall"] = {}
     config["93_whitelist"] = {}
     config["94_looplimit"] = 10
-    config["95_kernelversion"] = "v5.5-rc5"
+    config["95_kernelversion"] = PATH.split("/pocs/")[1]
     with open(output, 'w') as f:
         json.dump(config, f, indent=4, sort_keys=True)
 
@@ -970,6 +974,8 @@ def get_BB_lineinfo(PATH):
         json.dump(line_bb_without_loopBr, f, indent=4, sort_keys=True)
 
 def get_line_dbginfo(line):
+    if "clang version" in line:
+        return {}
     infodic = {}
     infolist = line.split("(")[1].split(")")[0].split(", ")
     for info in infolist:
@@ -1316,7 +1322,7 @@ def get_BB_whitelist_doms(PATH, calltracefunclist):
     funclist = [func for func in func_BB_whitelist]
  
     if calltracefunclist:
-        print("don't get_BB_whitelist_postdoms for calltrac function :", [func for func in calltracefunclist if func in funclist])
+        print("shouldn't get_BB_whitelist_postdoms for calltrac function :", [func for func in calltracefunclist if func in funclist])
         funclist = [func for func in funclist if func not in calltracefunclist]
 
     BB_mustBBs = dot_analysis.get_func_BB_postmustBBs(PATH, funclist)
@@ -1420,15 +1426,17 @@ def compile_gcc(PATH):
     if PATH[-1] == "/":
         PATH = PATH[:-1]
     commit = PATH.split("/")[-1]
-    string1 = "cd /home/zzhan173/repos/linux; git checkout -f "+commit+";make mrproper"
+    string1 = "cd "+ref_linux+"; git checkout -f "+commit+";make mrproper"
     print(string1)
     result = command(string1)
+    if os.path.exists(PATH+"/codeadaptation.json"):
+        compilebc.adapt_code(ref_linux, PATH+"/codeadaptation.json")
     print("compilebc.format_linux()")
     compilebc.format_linux()
-    string1 = "cd /home/zzhan173/repos/linux;cp "+PATH+"/config .config;make -j32"
+    string1 = "cd "+ref_linux+";cp "+PATH+"/config .config;make -j32"
     print(string1)
     result = command(string1)
-    srcpath = "/home/zzhan173/repos/linux"
+    srcpath = ref_linux
     dstpath = PATH
     shutil.copy(srcpath+"/vmlinux" , dstpath+"/vmlinux")
     shutil.copy(srcpath+"/System.map" , dstpath+"/System.map")
@@ -1451,7 +1459,7 @@ if __name__ == "__main__":
     option = sys.argv[1]
     #PATH = sys.argv[2]
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/O0result"
-    PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7"
+    #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/gcov"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/433f4ba1/63de3747"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/eb73190f/dd52cb879063"
@@ -1459,8 +1467,7 @@ if __name__ == "__main__":
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/813961de/e195ca6cb6f2"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/3619dec5/7daf201d7fe8"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0"
-    calltracefunclist = read_calltracefunclist(PATH)
-    print("calltracefunclist:", calltracefunclist)
+    PATH = "/data/zzhan173/OOBW/pocs/813961de/e195ca6cb6f2/alloc"
     #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with laterBC files
     if option == "compile_refkernel":
         compile_gcc(PATH)
@@ -1516,12 +1523,15 @@ if __name__ == "__main__":
         get_BB_whitelist(PATH)
     #11) get the BBs which forward/post dominate anyBB in whitelist
     elif option == "get_BB_whitelist_withdoms":
+        calltracefunclist = read_calltracefunclist(PATH)
+        print("calltracefunclist:", calltracefunclist)
         #get doms/postdoms dot file from built-in_tag.bc
         dot_analysis.get_dom_files(PATH)
         get_BB_whitelist_predoms(PATH)
         get_BB_whitelist_doms(PATH, calltracefunclist)
     #12) Make use of BB_whitelist(after dominator analysis) to filter func_line_blacklist
     elif option == "get_line_blacklist_filterwithdoms":
+        calltracefunclist = read_calltracefunclist(PATH)
         #get_line_blacklist_filterwithdoms(PATH)
         get_line_whitelist_doms_postdoms_calltrace(PATH, calltracefunclist)
         get_line_blacklist_doms_postdoms_calltrace(PATH)
@@ -1554,4 +1564,6 @@ if __name__ == "__main__":
     #    generate_kleeconfig(PATH, "doms")
     elif option == "check_duplicate_func_linelist":
         check_duplicate_func_linelist(PATH)
+    elif option == "adapt_code":
+        compilebc.adapt_code(ref_linux, PATH+"/codeadaptation.json")
 

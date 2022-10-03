@@ -5,9 +5,12 @@ import time
 import copy
 import os,sys
 import subprocess
+import matplotlib
+matplotlib.use('Agg')
 
 testPATH = "/home/zzhan173/repos/Linux_kernel_UC_KLEE/configs/033724d6/04300d66f0a0/domfiles/domonly.fbcon_modechanged.dot"
 
+UCKLEE = "/home/zzhan173/Linux_kernel_UC_KLEE/"
 def command(string1):
     p=subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     result=p.stdout.readlines()
@@ -191,10 +194,10 @@ def get_func_BB_postmustBBs(PATH, funclist):
     return BB_mustBBs
 
 def get_dom_files(PATH):
-    string1 = "cd "+PATH+";mkdir doms;cd doms;/data4/zheng/Linux_kernel_UC_KLEE/install/bin/opt  -dot-dom-only ../built-in_tag.bc"
+    string1 = "cd "+PATH+";mkdir doms;cd doms;"+UCKLEE+"/install/bin/opt  -dot-dom-only ../built-in_tag.bc"
     print(string1)
     result = command(string1)
-    string1 = "cd "+PATH+";mkdir postdoms;cd postdoms;/data4/zheng/Linux_kernel_UC_KLEE/install/bin/opt -dot-postdom-only ../built-in_tag.bc"
+    string1 = "cd "+PATH+";mkdir postdoms;cd postdoms;"+UCKLEE+"/install/bin/opt -dot-postdom-only ../built-in_tag.bc"
     print(string1)
     result = command(string1)
 
