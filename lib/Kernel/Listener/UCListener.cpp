@@ -469,7 +469,8 @@ void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KI
             // create new mo and symbolic_address = mo->getBaseExpr();
             // do not consider address calculation
             // mainly for the case concrete address + symbolic offset
-            auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
+            //auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
+            auto name = base.get_ptr()->dump2();
             klee::MemoryObject *mo = executor->create_mo(state, ty, ki->inst, name);
             executor->un_eval(ki, 0, state).value = mo->getBaseExpr();
             this->map_symbolic_address[base] = mo->getBaseExpr();
@@ -502,8 +503,8 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
             // create new mo and symbolic_address = mo->getBaseExpr();
             // do not consider address calculation
             // mainly for the case concrete address + symbolic offset
-            auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
-            //std::string name = base.get_ptr()->dump2();
+            //auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
+            std::string name = base.get_ptr()->dump2();
             klee::MemoryObject *mo = executor->create_mo(state, ty, ki->inst, name);
             executor->un_eval(ki, 1, state).value = mo->getBaseExpr();
             this->map_symbolic_address[base] = mo->getBaseExpr();
@@ -544,11 +545,12 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
             std::string name;
             std::string retstr = ret.get_ptr()->dump2();
             //klee::klee_message("retstr: %s  retstr.length():%u", retstr.c_str(), retstr.length());
-            if(retstr.substr(0,21) == "(ReadLSB w64 0 input_" && (retstr.length() == 23)) {
-                name = "input_"+retstr.substr(21,1)+"(pointer)";
-            } else {
-                name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
-            }
+            //if(retstr.substr(0,21) == "(ReadLSB w64 0 input_" && (retstr.length() == 23)) {
+            //    name = "input_"+retstr.substr(21,1)+"(pointer)";
+            //} else {
+            //    name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
+            //}
+            name = ret.get_ptr()->dump2();
             //std::string name = retstr;
             klee::klee_message("name: %s", name.c_str());
             yhao_print(ty->getPointerElementType()->print, str);
