@@ -1,12 +1,13 @@
 export PATH_PROJECT=$PWD
 
 # build llvm & clang
+mkdir build
 cd $PATH_PROJECT/build
 #rm -rf llvm-project
-#git clone https://github.com/llvm/llvm-project.git
+git clone https://github.com/llvm/llvm-project.git
 cd llvm-project
-#git checkout tags/llvmorg-11.0.1
-#mkdir build && cd build
+git checkout tags/llvmorg-11.0.1
+mkdir build && cd build
 cd build
 cmake -G "Unix Makefiles" \
   -DCMAKE_BUILD_TYPE=Release \
