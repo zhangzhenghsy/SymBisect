@@ -10,6 +10,7 @@ import src_parser
 import compilebc
 import shutil
 import cfg_analysis
+import helper
 
 ref_linux = "/home/zzhan173/repos/linux"
 
@@ -430,6 +431,8 @@ def get_bb_addrs(s_buf, addr):
         addr = '0x'+s_buf[index][:16]
         if addr not in addrs:
             addrs += [addr]
+        if "retq" in s_buf[index]:
+            break
         index +=1
     return addrs
 
@@ -1433,6 +1436,7 @@ def compile_gcc(PATH):
         compilebc.adapt_code(ref_linux, PATH+"/codeadaptation.json")
     print("compilebc.format_linux()")
     compilebc.format_linux()
+    helper.add_fnoinline_Makefile(ref_linux+"/Makefile")
     string1 = "cd "+ref_linux+";cp "+PATH+"/config .config;make -j32"
     print(string1)
     result = command(string1)
@@ -1461,13 +1465,13 @@ if __name__ == "__main__":
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/O0result"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/gcov"
-    #PATH = "/home/zzhan173/Qemu/OOBW/pocs/433f4ba1/63de3747"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/eb73190f/dd52cb879063"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/813961de/e195ca6cb6f2"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/3619dec5/7daf201d7fe8"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0"
-    PATH = "/data/zzhan173/OOBW/pocs/813961de/e195ca6cb6f2/alloc"
+    #PATH = "/data/zzhan173/OOBW/pocs/813961de/e195ca6cb6f2/alloc"
+    PATH = "/data/zzhan173/OOBW/pocs/433f4ba1/63de3747"
     #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with laterBC files
     if option == "compile_refkernel":
         compile_gcc(PATH)
