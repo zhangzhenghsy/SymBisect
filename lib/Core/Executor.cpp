@@ -3703,6 +3703,7 @@ void Executor::run(ExecutionState &initialState) {
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
   // main interpreter loop
+  auto start_time = std::time(NULL);
   while (!states.empty() && !haltExecution) {
     ExecutionState &state = searcher->selectState();
     //klee::klee_message("searcher->selectState() &state: %p", &state);
@@ -3723,6 +3724,13 @@ void Executor::run(ExecutionState &initialState) {
     if (!checkMemoryUsage()) {
       // update searchers when states were terminated early due to memory pressure
       updateStates(nullptr);
+    }
+
+    auto execute_time = std::time(NULL)-start_time;
+    if (execute_time > 1200) {
+      // todo: check if target line has been reached?
+      klee::klee_message("execution time out (60) we think there is no OOB triggerred");
+      haltExecution = true;
     }
   }
 
