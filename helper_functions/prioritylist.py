@@ -241,11 +241,11 @@ def get_func_file_fromll(llfile):
 ADDR2LINE = 'addr2line'
 def get_vmlinux_dbginfo(PATH):
     dumpresult = PATH+"/dumpresult"
-    if not os.path.exists(dumpresult):
-        print("generate dumpresult")
-        string = "cd "+PATH+";objdump -d vmlinux > dumpresult"
-        command(string)
-        print("done!")
+    #if not os.path.exists(dumpresult):
+    print("generate dumpresult")
+    string = "cd "+PATH+";objdump -d vmlinux > dumpresult"
+    command(string)
+    print("done!")
     
     t0=time.time()
     addrlist = []
@@ -300,11 +300,15 @@ def get_cover_lineinfo(PATH, cover, output):
         lineinfos = get_lineinfo(debug_buf, st, ed, number)
         for lineinfo in lineinfos:
             lineinfolist += [str(hex(number))+" "+lineinfo[0]+" "+lineinfo[1]]
+            #sourceinfo = helper.simplify_path(lineinfo[1])
+            #lineinfolist += [str(hex(number))+" "+lineinfo[0]+" "+sourceinfo]
             #print str(hex(number))[:-1],lineinfo[0],lineinfo[1]
             if lineinfo[0] not in funclist:
                 funclist += [lineinfo[0]]
             if lineinfo[1].split(":")[0] not in filelist and ".c" in lineinfo[1]:
                 filelist += [lineinfo[1].split(":")[0]]
+            #if sourceinfo.split(":")[0] not in filelist and ".c" in sourceinfo:
+            #   filelist += [sourceinfo.split(":")[0]]
         #numberlist += [str(hex(number))[:-1]]
         #print str(hex(number))[:-1]
     with open(output,"w") as f:
@@ -446,10 +450,10 @@ def get_complete_coverage(PATH):
         return
 
     dumpresult = PATH+"/dumpresult"
-    if not os.path.exists(dumpresult):
-        print("generate dumpresult")
-        string = "cd "+PATH+";objdump vmlinux > dumpresult"
-        command(string)
+    #if not os.path.exists(dumpresult):
+    #    print("generate dumpresult")
+    #    string = "cd "+PATH+";objdump vmlinux > dumpresult"
+    #    command(string)
     with open(dumpresult,'r') as f:
         dumpresult = f.readlines()
 
@@ -485,6 +489,17 @@ def refine_lineinfolist(lineinfolist):
 # it requires completecoverlineinfo
 # it will be used in get_line_blacklist()
 def get_line_whitelist(PATH):
+    if PATH[-1] == "/":
+        PATH = PATH[:-1]
+    commit = PATH.split("/")[-1]
+    string1 = "cd "+ref_linux+"; git checkout -f "+commit+";make mrproper"
+    print(string1)
+    result = command(string1)
+    if os.path.exists(PATH+"/codeadaptation.json"):
+        compilebc.adapt_code(ref_linux, PATH+"/codeadaptation.json")
+    print("compilebc.format_linux()")
+    compilebc.format_linux()
+
     lineinfo = PATH+"/completecoverlineinfo"
     func_whitelist = {}
     whitelist = []
@@ -913,7 +928,7 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
         all_index_value = concolic.get_concolicmap(parameterlist)
         config["96_concolic_map"] = all_index_value
         
-    config["91_print_inst"] = False
+    config["91_print_inst"] = True
     config["92_indirectcall"] = {}
     config["93_whitelist"] = {}
     config["94_looplimit"] = 10

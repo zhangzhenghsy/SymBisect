@@ -6,6 +6,7 @@ import time
 import compilebc,prioritylist
 import ast
 import shutil
+import helper
 
 def trim_lines(buf):
     for i in range(len(buf)):
@@ -102,7 +103,8 @@ def get_matchfiles(PATH1, PATH2):
     filter_matchedfiles = []
     filter_matchedfiles_dic = {}
     for (fn,fp) in matchfiles:
-        if fn == None or fp == None:
+        #if fn == None or fp == None:
+        if fn == None:
             continue
         if ".bc" in fn:
             continue
@@ -230,12 +232,16 @@ def get_all_matchedlines_git(PATH1, PATH2):
     matchedfiles = get_matchfiles(PATH1, PATH2)
 
     ref_files = get_ref_files(PATH1)
+    ref_files = [helper.simplify_path(line) for line in ref_files]
     filter_matchedfiles = []
     for (fn, fp) in matchedfiles:
         #fnpath = fn.split("source/")[1]
         #get the relative path of file
         fnpath = fn.split("repos/linux/")[1]
         if fnpath in ref_files:
+            if fp == None:
+                print(fnpath,"is deleted")
+                continue
             filter_matchedfiles += [(fn, fp)]
     print("size of matchedfiles:", len(matchedfiles), "size of filter_matchedfiles:", len(filter_matchedfiles))
     #for ele in matchedfiles:
@@ -297,12 +303,25 @@ def generate_target_list(PATH1, PATH2):
     get_all_matchedlines_git(PATH1, PATH2)
     with open(PATH2+"/all_matchedlines.json") as f:
         all_matchedlines = json.load(f)
+    with open(PATH2+"/filter_matchedfiles.json", "r") as f:
+        filter_matchedfiles = json.load(f)
 
     func_line_blacklist2 = {}
     line_blacklist2 = []
+    notchangedfiles = []
     for func in func_line_blacklist:
         func_line_blacklist2[func] = []
         for line in func_line_blacklist[func]:
+            #print(line)
+            line = helper.simplify_path(line)
+            #print(line)
+            filename = line.split(":")[0]
+            if "/data/zzhan173/repos/linux/"+filename not in filter_matchedfiles:
+                if filename not in notchangedfiles:
+                    notchangedfiles += [filename]
+                    print(filename, "is not changed in target kernel")
+                func_line_blacklist2[func]  += [line]
+                line_blacklist2 += [line]
             if line in all_matchedlines:
                 func_line_blacklist2[func]  += [all_matchedlines[line]]
                 line_blacklist2 += [all_matchedlines[line]]
@@ -314,6 +333,11 @@ def generate_target_list(PATH1, PATH2):
     for func in func_line_whitelist:
         func_line_whitelist2[func] = []
         for line in func_line_whitelist[func]:
+            line = helper.simplify_path(line)
+            filename = line.split(":")[0]
+            if "/data/zzhan173/repos/linux/"+filename not in filter_matchedfiles:
+                func_line_whitelist2[func]   += [line]
+                line_whitelist2 += [line]
             if line in all_matchedlines:
                 func_line_whitelist2[func]  += [all_matchedlines[line]]
                 line_whitelist2 += [all_matchedlines[line]]
@@ -352,11 +376,20 @@ def link_bclist_from_refcover(PATH1, PATH2):
         filelist =  ast.literal_eval(s_buf[-3][:-1])
         print("num of reffiles:", len(filelist))
     filelist = [line.replace("/home/zzhan173/repos/linux", ref_kernel) for line in filelist]
-
+    target_filelist = []
     with open(PATH2+"/filter_matchedfiles.json", "r") as f:
         filter_matchedfiles = json.load(f)
-    target_filelist = [filter_matchedfiles[line] for line in filelist if line in filter_matchedfiles]
-    target_filelist = [line.replace(target_kernel+"/", "") for line in target_filelist]
+    for line in filelist:
+        if line not in filter_matchedfiles:
+            #print(line,"not in filter_matchedfiles")
+            target_filelist += [line.replace(ref_kernel+"/", "")]
+        elif filter_matchedfiles[line] == None:
+            print(line,"is deleted in target kernel")
+            continue
+        else:
+            target_filelist += [filter_matchedfiles[line].replace(target_kernel+"/", "")]
+    #target_filelist = [filter_matchedfiles[line] for line in filelist if line in filter_matchedfiles]
+    #target_filelist = [line.replace(target_kernel+"/", "") for line in target_filelist]
     print("num of targetfiles:", len(target_filelist))
     print(target_filelist)
     prioritylist.link_bclist(target_filelist, PATH2, "built-in.bc")
@@ -365,6 +398,8 @@ def link_bclist_from_refcover(PATH1, PATH2):
 def generate_target_config(PATH, MustBBs):
     print("\n\ngenerate_target_config\n")
     # todo: do dom analysis for target kernel again (consider that we need to do source analysis to correct the func name in func_line_blacklist_refdoms.json/func_line_whitelist_refdoms.json)
-    if not os.path.exists(PATH+"/line_blacklist_doms.json"):
-        shutil.copy(PATH+"/line_blacklist_refdoms.json", PATH+"/line_blacklist_doms.json")
+    #if not os.path.exists(PATH+"/line_blacklist_doms.json"):
+    shutil.copy(PATH+"/line_blacklist_refdoms.json", PATH+"/line_blacklist_doms.json")
     prioritylist.generate_kleeconfig(PATH, [], MustBBs)
+    os.mkdirs(PATH+"/configs")
+    shutil.copy(PATH+"/config_cover_doms.json", PATH+"/configs/config_cover_doms.json")

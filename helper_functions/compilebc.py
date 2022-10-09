@@ -66,7 +66,7 @@ def compile_bc_extra(option, targetdir = None, filename = None):
                 cmd = line[idx1:idx1+idx2].split(' ')
                 if cmd[0] == clang_path:
                     new_cmd.append(cmd[0])
-                    new_cmd.append('-emit-llvm -g -O0 -fno-short-wchar -fno-discard-value-names -fno-inline')
+                    new_cmd.append('-emit-llvm -g -O0 -fno-short-wchar -fno-discard-value-names -fno-inline -fno-inline-functions')
                     if sourcecoverage:
                         new_cmd.append(' -fprofile-instr-generate -fcoverage-mapping')
                     #new_cmd.append('-emit-llvm -g -fno-short-wchar')
