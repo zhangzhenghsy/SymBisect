@@ -11,7 +11,12 @@
 #include "../MLTA/CallGraph.hh"
 
 #include "klee/Support/ErrorHandling.h"
-
+#include <iostream>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <algorithm>
+using namespace std;
 
 kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
@@ -235,6 +240,35 @@ bool OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki) {
     return OOBW;
 }
 
+std::string simplifylineinfo(string lineinfo) {
+    stringstream test(lineinfo);
+    string segment;
+    vector<std::string> seglist;
+
+    while(std::getline(test, segment, '/'))
+    {
+        seglist.push_back(segment);
+    }
+
+    vector<string> vector1, vector2;
+    vector<string>::iterator pos;
+    while (find(seglist.begin(), seglist.end(), "..") != seglist.end()) {
+        pos  = std::find(seglist.begin(), seglist.end(), "..");
+        vector1 = std::vector<string>(seglist.begin(), pos-1);
+        vector2 = std::vector<string>(pos+1, seglist.end());
+        vector1.insert(vector1.end(), vector2.begin(), vector2.end());
+        seglist = vector1;
+    }
+
+    string simplifylineinfo ;
+    for (pos = seglist.begin(); pos < seglist.end(); pos++) {
+        if(*pos == ".") continue;
+        simplifylineinfo += *pos;
+        simplifylineinfo += "/";
+    }
+    simplifylineinfo = simplifylineinfo.substr(0, simplifylineinfo.length()-1);
+    return simplifylineinfo;
+}
 void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
 
     auto bb = ki->inst->getParent();
@@ -253,10 +287,16 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
     }
     auto name_l = dump_inst_sourceinfo(ki->inst);
     if (low_priority_lines.find(name_l) != low_priority_lines.end()) {
-        klee::klee_message("reach low priority line list terminate the state");
+        klee::klee_message("reach low priority line list terminate the state %s", name_l.c_str());
         this->executor->terminateState(state);
     }
-
+    string simple_name_l = simplifylineinfo(name_l);
+    if (simple_name_l != name_l) {
+        if (low_priority_lines.find(simple_name_l) != low_priority_lines.end()) {
+            klee::klee_message("reach low priority line list(after simplify) terminate the state %s", simple_name_l.c_str());
+            this->executor->terminateState(state);
+        }
+    }
     if (target_lines.find(name_l) != target_lines.end()) {
         klee::klee_message("reach target line, do vulnerability check");
         bool result = OOBWcheck(state, ki);
