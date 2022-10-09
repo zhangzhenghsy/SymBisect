@@ -35,6 +35,8 @@ namespace kuc {
         std::set<std::string> low_priority_functions;
         //added by zheng
         std::set<std::string> low_priority_lines;
+        //once reach, do OOBW check, once positive, halt the execution. In most cases there is only one target line
+        std::set<std::string> target_lines;
 
         std::string temp_call_cond_name = "temp_call_cond";
         uint64_t temp_call_cond_count = 0;

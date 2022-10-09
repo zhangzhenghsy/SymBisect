@@ -15,6 +15,11 @@
 
 kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
     config = executor->config;
+    if (config.contains("4_target_line_list") && config["4_target_line_list"].is_array()) {
+        for (const auto &temp: config["4_target_line_list"]) {
+            target_lines.insert(temp.get<std::string>());
+        }
+    }
 
     if (config.contains("10_target_bb_list") && config["10_target_bb_list"].is_array()) {
         for (const auto &temp: config["10_target_bb_list"]) {
@@ -225,6 +230,11 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
     }
 }
 
+bool OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki) {
+    bool OOBW = state.OOBW;
+    return OOBW;
+}
+
 void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
 
     auto bb = ki->inst->getParent();
@@ -246,7 +256,18 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
         klee::klee_message("reach low priority line list terminate the state");
         this->executor->terminateState(state);
     }
+
+    if (target_lines.find(name_l) != target_lines.end()) {
+        klee::klee_message("reach target line, do vulnerability check");
+        bool result = OOBWcheck(state, ki);
+        if (result) {
+            klee::klee_message("OOB detected in target line");
+            this->executor->haltExecution = true;
+        }
+    }
+    state.OOBW = false;
 }
+
 
 void kuc::PathListener::afterRun(klee::ExecutionState &state) {
 

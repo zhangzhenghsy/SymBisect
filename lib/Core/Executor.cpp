@@ -1199,6 +1199,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
         std::swap(trueState->completecoveredLines, falseState->completecoveredLines);
         std::swap(trueState->BBcount, falseState->BBcount);
         std::swap(trueState->constraint_lines, falseState->constraint_lines);
+        std::swap(trueState->OOBW, falseState->OOBW);
       }
     }
 
@@ -4128,9 +4129,9 @@ void Executor::executeAlloc(ExecutionState &state,
 
   //std::cout <<"\nFunction Executor::executeAlloc\n";
   //std::cout << "&State: " << &state << "\n";
-  //std::cout<<"size before toUnique(state, size):\n"<<size.get_ptr()->dump2()<<"\n";
+  klee_message("size before toUnique(state, size):\n %s", size.get_ptr()->dump2().c_str());
   size = toUnique(state, size);
-  //std::cout<<"size after toUnique(state, size):\n"<<size.get_ptr()->dump2()<<"\n";
+  klee_message("size after toUnique(state, size):\n %s", size.get_ptr()->dump2().c_str());
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(size)) {
     const llvm::Value *allocSite = state.prevPC->inst;
     if (allocationAlignment == 0) {
@@ -4152,6 +4153,7 @@ void Executor::executeAlloc(ExecutionState &state,
                 ConstantExpr::alloc(0, Context::get().getPointerWidth()));
     } else {
       //std::cout << "mo->address: " << mo->address << "  mo->size: " << mo->size << "\n";
+      klee_message("mo->address: %lu  mo->size: %u", mo->address, mo->size);
       ObjectState *os = bindObjectInState(state, mo, isLocal);
       if (zeroMemory) {
         os->initializeToZero();
@@ -4185,7 +4187,8 @@ void Executor::executeAlloc(ExecutionState &state,
     bool success =
         solver->getValue(state.constraints, size, example, state.queryMetaData);
     assert(success && "FIXME: Unhandled solver failure");
-    (void) success;
+    klee_message("solve to get a concrete size: %s", size.get_ptr()->dump2().c_str());
+    //(void) success;
     //std::cout << "concretize the symbolic size; size = optimizer.optimizeExpr(size, true);\n";
     //std::cout << "size: " << size.get_ptr()->dump2()<<"\n";
     //std::cout << "example: " << example.get_ptr()->dump2()<<"\n";
@@ -4492,6 +4495,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     } else {
       klee::klee_message("memory error: out of bound pointer");
       klee::klee_message("ignore it now");
+      state.OOBW = true;
       //terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
       //                      NULL, getAddressInfo(*unbound, address));
       //klee_warning("memory error: out of bound pointer");

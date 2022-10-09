@@ -105,6 +105,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     completecoveredLines(state.completecoveredLines),
     BBcount(state.BBcount),
     constraint_lines(state.constraint_lines),
+    OOBW(state.OOBW),
     symbolics(state.symbolics),
     arrayNames(state.arrayNames),
     openMergeStack(state.openMergeStack),

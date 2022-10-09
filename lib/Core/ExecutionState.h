@@ -208,6 +208,9 @@ public:
   /// @brief zheng: Set containing which lines in which files the constraint is added;
   std::map<const std::string, std::set<std::string>> constraint_lines;
 
+  /// @brief zheng: Log whether OOBW is detected in current Inst;
+  bool OOBW;
+
   /// @brief Pointer to the process tree of the current state
   /// Copies of ExecutionState should not copy ptreeNode
   PTreeNode *ptreeNode = nullptr;
