@@ -1185,17 +1185,17 @@ void SpecialFunctionHandler::handleStrcmp(ExecutionState &state,
                                           std::vector<ref<Expr> > &arguments) {
   klee_message("\nfunction Model handleStrcmp");
   ObjectPair op, op2;
-  bool success1, success2;
+  //bool success1, success2;
 
   ref<Expr> srcaddr = arguments[0];
   if (ConstantExpr* CE1 = dyn_cast<ConstantExpr>(srcaddr)) {
-    success1 = state.addressSpace.resolveOne(CE1, op);
+    bool success1 = state.addressSpace.resolveOne(CE1, op);
   }  else {
     return;
   }
   ref<Expr> targetaddr = arguments[1];
   if (ConstantExpr* CE2 = dyn_cast<ConstantExpr>(targetaddr)) {
-    success2 = state.addressSpace.resolveOne(CE2, op2);
+    bool success2 = state.addressSpace.resolveOne(CE2, op2);
   }  else {
     return;
   }
