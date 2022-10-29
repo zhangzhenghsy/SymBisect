@@ -211,6 +211,9 @@ public:
   /// @brief zheng: Log whether OOBW is detected in current Inst;
   bool OOBW;
 
+  /// @brief zheng: log the mapping between base address and symbolic address (concretebase: concretebase+symbolic offset)
+  std::map<ref<Expr>, ref<Expr>> symaddr_base;
+
   /// @brief Pointer to the process tree of the current state
   /// Copies of ExecutionState should not copy ptreeNode
   PTreeNode *ptreeNode = nullptr;
