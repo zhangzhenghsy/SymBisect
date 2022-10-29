@@ -156,6 +156,7 @@ namespace klee {
     HANDLER(handleVzalloc);
     HANDLER(handleStrcmp);
     HANDLER(handleStrchr);
+    HANDLER(handleMemset);
 #undef HANDLER
   };
 } // End klee namespace

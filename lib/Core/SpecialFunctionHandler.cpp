@@ -157,6 +157,9 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("_copy_to_user", handleMemcpyRZ, true),
   add("strcmp", handleStrcmp, true),
   add("strchr", handleStrchr, true),
+  add("memset", handleMemset, true),
+  // should we consider the page padding for vmalloc?
+  add("vmalloc", handleMalloc, true),
 #undef addDNR
 #undef add
 };
@@ -1391,4 +1394,49 @@ void SpecialFunctionHandler::handleStrchr(ExecutionState &state,
   }
   */
 
+}
+
+void SpecialFunctionHandler::handleMemset(ExecutionState &state,
+                                          KInstruction *target,
+                                          std::vector<ref<Expr> > &arguments){
+    assert(arguments.size()==3 && "invalid number of arguments to memset");
+    ObjectPair op;
+
+    ref<Expr> targetaddr = arguments[0];
+    klee::klee_message("targetaddr: %s",targetaddr.get_ptr()->dump2().c_str());
+    bool success;
+    
+    if (ConstantExpr* CE1 = dyn_cast<ConstantExpr>(targetaddr)) {
+      success = state.addressSpace.resolveOne(CE1, op);
+    } else{
+      klee::klee_message("memset not constant target address. Return directly");
+      return;
+    }
+
+    if (!success) {
+      klee::klee_message("memset dont find object for the given address, is it OOB?");
+      executor.bindLocal(target, state, targetaddr);
+      return;
+    }
+    ref<Expr> value = arguments[1];
+    ref<Expr> len = arguments[2];
+    const MemoryObject * object = op.first;
+    //klee_message("target obj addr: %lu obj size: %u", object->address, object->size);
+    klee_message("target obj addr: %lu", object->address);
+
+    uint64_t length;
+    if(ConstantExpr* CE = dyn_cast<ConstantExpr>(len)){
+      length = CE->getZExtValue();
+    } else{
+      // we should check whether the length can be larger than object size? is it?
+      klee::klee_message("memset not constant size; use object size.");
+      length = object->size;
+      //return;
+    }
+
+    for(uint64_t i =0; i<length; i++){
+      ref<Expr> base = AddExpr::create(targetaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
+      executor.executeMemoryOperation(state, true, base, value, 0);
+    }
+    executor.bindLocal(target, state, targetaddr);
 }
