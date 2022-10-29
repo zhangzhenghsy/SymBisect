@@ -1200,6 +1200,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
         std::swap(trueState->BBcount, falseState->BBcount);
         std::swap(trueState->constraint_lines, falseState->constraint_lines);
         std::swap(trueState->OOBW, falseState->OOBW);
+        std::swap(trueState->symaddr_base, falseState->symaddr_base);
       }
     }
 
@@ -3729,7 +3730,7 @@ void Executor::run(ExecutionState &initialState) {
     auto execute_time = std::time(NULL)-start_time;
     if (execute_time > 1200) {
       // todo: check if target line has been reached?
-      klee::klee_message("execution time out (60) we think there is no OOB triggerred");
+      klee::klee_message("execution time out (1200) we think there is no OOB triggerred");
       haltExecution = true;
     }
   }
@@ -5062,9 +5063,18 @@ MemoryObject *Executor::create_mo(ExecutionState &state, llvm::Type *ty, llvm::I
     auto size = kmodule->targetData->getTypeStoreSize(ty);
     // if char pointer (likley to be a char array buffer), then allocate 8192 bytes
     if (ty->isIntegerTy(8)) {
-        klee_message("ty->isIntegerTy(8)");
+        klee_message("ty->isIntegerTy(8), allocate an array of 8192 chars");
         size = kmodule->targetData->getTypeStoreSize(ty) * 8192;
     }
+    else if (ty->isPointerTy()) {
+      // may be array of pointer
+      klee_message("ty->isPointerTy(), allocate an array of 128 pointers");
+      size = kmodule->targetData->getTypeStoreSize(ty) * 128;
+    }
+    //if (size == 0){
+    //  klee_message("struct size is 0. Resize it to be 4096");
+    //  size = kmodule->targetData->getTypeStoreSize(ty) * 4096;
+    //}
     // yu hao: add more space for zero length array
     auto new_size = (uint64_t)size;
     if (auto *st = dyn_cast<StructType>(ty)) {

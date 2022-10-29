@@ -97,6 +97,8 @@ class Executor : public Interpreter {
   friend class MergeHandler;
   friend klee::Searcher *klee::constructUserSearcher(Executor &executor);
   friend class kuc::ListenerService;
+  //friend class kuc::UCListener::UCListener;
+  //friend class kuc::PathListener;
 
 public:
   typedef std::pair<ExecutionState*,ExecutionState*> StatePair;
@@ -176,6 +178,16 @@ public:
     /// pointers. We use the actual Function* address as the function address.
     /// zheng: moved to public to enable use in UCpathListener
     std::set<uint64_t> legalFunctions;
+    /// zheng: moved to public to enable use in UCpathListener
+    TimingSolver *solver;
+
+    /// Add the given (boolean) condition as a constraint on state. This
+    /// function is a wrapper around the state's addConstraint function
+    /// which also manages propagation of implied values,
+    /// validity checks, and seed patching.
+    /// zheng: moved to public
+    void addConstraint(ExecutionState &state, ref<Expr> condition);
+
 
 private:
   static const char *TerminateReasonNames[];
@@ -184,7 +196,6 @@ private:
   Searcher *searcher;
 
   ExternalDispatcher *externalDispatcher;
-  TimingSolver *solver;
   MemoryManager *memory;
   std::set<ExecutionState*, ExecutionStateIDCompare> states;
   StatsTracker *statsTracker;
@@ -405,12 +416,7 @@ private:
   // current state, and one of the states may be null.
   StatePair fork(ExecutionState &current, ref<Expr> condition, bool isInternal);
 
-  /// Add the given (boolean) condition as a constraint on state. This
-  /// function is a wrapper around the state's addConstraint function
-  /// which also manages propagation of implied values,
-  /// validity checks, and seed patching.
-  void addConstraint(ExecutionState &state, ref<Expr> condition);
-
+  
   // Called on [for now] concrete reads, replaces constant with a symbolic
   // Used for testing.
   ref<Expr> replaceReadWithSymbolic(ExecutionState &state, ref<Expr> e);

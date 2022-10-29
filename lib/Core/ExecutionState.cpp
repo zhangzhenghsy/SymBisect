@@ -106,6 +106,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     BBcount(state.BBcount),
     constraint_lines(state.constraint_lines),
     OOBW(state.OOBW),
+    symaddr_base(state.symaddr_base),
     symbolics(state.symbolics),
     arrayNames(state.arrayNames),
     openMergeStack(state.openMergeStack),

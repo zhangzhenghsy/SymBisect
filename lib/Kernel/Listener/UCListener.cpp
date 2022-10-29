@@ -332,8 +332,79 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
     }
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
-            yhao_print(executor->getDestCell(state, ki).value->print, str);
+            //yhao_print(executor->getDestCell(state, ki).value->print, str);
             //klee::klee_message("GetElementPtr Inst value: %s", str.c_str());
+            ObjectPair op;
+            bool success;
+            klee::ref<klee::Expr> baseaddr = executor->eval(ki, 0, state).value;
+            klee::ref<klee::Expr> index = executor->eval(ki, 1, state).value;
+            // if the index is concrete, we don't need to log the mapping between symbolic addr and base object
+            if (klee::ConstantExpr* CE1 = dyn_cast<klee::ConstantExpr>(index)) {
+                break;
+            }
+            if (klee::ConstantExpr* CE2 = dyn_cast<klee::ConstantExpr>(baseaddr)) {
+                success = state.addressSpace.resolveOne(CE2, op);
+            } else{
+                break;
+            }
+            if(success) {
+                state.symaddr_base[executor->getDestCell(state, ki).value] = baseaddr;
+                klee_message("symaddr_base symaddr %s base addr %s\n", executor->getDestCell(state, ki).value.get_ptr()->dump2().c_str(), baseaddr.get_ptr()->dump2().c_str());
+                const klee::MemoryObject * object = op.first;
+                klee_message("Base corresponding obj addr: %lu obj size: %u", object->address, object->size);
+            }
+            break;
+        }
+        case llvm::Instruction::Store: {
+            ObjectPair op;
+            bool success;
+            klee::ref<klee::Expr> value = executor->eval(ki, 0, state).value;
+            klee::ref<klee::Expr> address = executor->eval(ki, 1, state).value;
+            // if the address is really concrete (no mapped symbolic address), we don't need to check the mapping between symbolic addr and base object
+            if (this->map_address_symbolic.find(address) == this->map_address_symbolic.end()){
+                break;
+            }
+            address = this->map_address_symbolic[address];
+            klee_message("sym address: %s", address.get_ptr()->dump2().c_str());
+            //if (klee::ConstantExpr* CE1 = dyn_cast<klee::ConstantExpr>(address)) {
+            //    break;
+            //}
+            if (state.symaddr_base.find(address) != state.symaddr_base.end()){                
+                klee::ref<klee::Expr> baseaddr = state.symaddr_base[address];
+                klee_message("find address in symaddr_base mapping, the base addr: %s", baseaddr.get_ptr()->dump2().c_str());
+                success = state.addressSpace.resolveOne(dyn_cast<klee::ConstantExpr>(baseaddr), op);
+                if (!success) {break;}
+                const klee::MemoryObject * object = op.first;
+                const ObjectState *os = op.second;
+                klee_message("Base corresponding obj addr: %lu obj size: %u", object->address, object->size);
+                auto ty = ki->inst->getOperand(0)->getType();
+                uint64_t size = executor->kmodule->targetData->getTypeStoreSize(ty).getKnownMinSize();
+                klee_message("size of operand0 : %lu", size);
+                uint64_t offset;
+                // our starting address
+                klee::ref<klee::Expr> objectbase = klee::ConstantExpr::create(object->address, klee::Context::get().getPointerWidth());
+                klee::ref<klee::Expr> currentaddr;
+                for (offset = 0 ; offset < (uint64_t)object->size; offset += size) {
+                    ref<Expr> Offset = klee::ConstantExpr::create(offset, klee::Context::get().getPointerWidth());
+                    ref<Expr> currentaddr = AddExpr::create(objectbase, Offset);
+                    ref<Expr> oldvalue = os->read(offset, size*8);
+
+                    bool res;
+                    ref<Expr> condition = EqExpr::create(currentaddr, address);
+                    bool success = executor->solver->mayBeTrue(state.constraints, condition, res,
+                                  state.queryMetaData);
+                    if (!res) { 
+                        klee_message("address cannot equal current address, skip. currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());
+                        continue; 
+                    }
+                    auto name = "["+currentaddr.get_ptr()->dump2()+"]" + "(symvar)";
+                    ref<Expr> currentvalue = executor->manual_make_symbolic(name, size, size*8);
+                    ref<Expr> newconstraint = OrExpr::create(EqExpr::create(currentvalue, oldvalue), EqExpr::create(currentvalue, value));
+                    klee_message("newconstraint: %s", newconstraint.get_ptr()->dump2().c_str());
+                    executor->executeMemoryOperation(state, true, currentaddr, currentvalue, 0);
+                    executor->addConstraint(state, newconstraint);
+                }
+            }
             break;
         }
         case llvm::Instruction::Load: {
@@ -522,6 +593,13 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
     // check value of load, if it is pointer, create mo and symbolic os
     auto ty = ki->inst->getType();
     if (ty->isPointerTy() && ty->getPointerElementType()->isSized()) {
+        // ignore the 0-sized type
+        auto size = executor->kmodule->targetData->getTypeStoreSize(ty->getPointerElementType());
+        klee_message("size : %lu", size);
+        if (size == 0) {
+            klee_message("struct size is 0. don't create object for it");
+            return;
+        }
         // the return value (a pointer) of load instruction
         auto ret = executor->getDestCell(state, ki).value;
         if (ret->getKind() == klee::Expr::Constant) {
@@ -543,7 +621,7 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
             // create new mo and symbolic pointer = mo->getBaseExpr();
             klee::klee_message("make symbolic load ret concolic with creating a concolic object");
             std::string name;
-            std::string retstr = ret.get_ptr()->dump2();
+            //std::string retstr = ret.get_ptr()->dump2();
             //klee::klee_message("retstr: %s  retstr.length():%u", retstr.c_str(), retstr.length());
             //if(retstr.substr(0,21) == "(ReadLSB w64 0 input_" && (retstr.length() == 23)) {
             //    name = "input_"+retstr.substr(21,1)+"(pointer)";
