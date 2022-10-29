@@ -82,6 +82,9 @@ def get_diff_buf(PATH1, PATH2):
     print(string1)
     command(string1)
 
+    if os.path.exists(PATH1+"/codeadaptation.json"):
+        print("adapt code according to codeadaptation.json")
+        compilebc.adapt_code(ref_kernel, PATH1+"/codeadaptation.json")
     compilebc.format_linux(ref_kernel)
     compilebc.format_linux(target_kernel)
     string1 = "git diff --no-index "+ref_kernel+" "+target_kernel+" >"+PATH2+"/diffbuf"
@@ -401,5 +404,5 @@ def generate_target_config(PATH, MustBBs):
     #if not os.path.exists(PATH+"/line_blacklist_doms.json"):
     shutil.copy(PATH+"/line_blacklist_refdoms.json", PATH+"/line_blacklist_doms.json")
     prioritylist.generate_kleeconfig(PATH, [], MustBBs)
-    os.mkdirs(PATH+"/configs")
+    os.makedirs(PATH+"/configs")
     shutil.copy(PATH+"/config_cover_doms.json", PATH+"/configs/config_cover_doms.json")

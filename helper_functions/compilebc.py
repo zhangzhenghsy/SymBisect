@@ -139,7 +139,10 @@ def copy_bcfiles(targetdir, bcfiles):
         dstfolder = os.path.dirname(dst)
         if not os.path.exists(dstfolder):
             os.makedirs(dstfolder)
-        shutil.copy(src,dst)
+        shutil.copy(src, dst)
+        if not os.path.exists(cfile):
+            print(cfile, "not exists")
+            continue
         shutil.copy(cfile, dstcfile)
 
 #def format_file_command(PATH):
@@ -159,8 +162,13 @@ def get_indent(line):
 
 def format_file_command(PATH):
     new_buf = []
+    #print(PATH)
     with open(PATH, "r") as f:
-        s_buf = f.readlines()
+        try:
+            s_buf = f.readlines()
+        except:
+            print("format_file_command readlines except", PATH)
+            return
     for line in s_buf:
         if "} else if (" in line and "\\" not in line:
             linelist = line.split("} else if (")
@@ -246,6 +254,9 @@ def compile_gcc(PATH, commit = None):
     format_linux()
     string1 = "cd /home/zzhan173/repos/linux;cp "+PATH+"/config_withoutkasan .config;make olddefconfig;make -j32"
     print(string1)
+    if not os.path.exists(PATH+"/config_withoutkasan"):
+        print("config_withoutkasan doesn't exist")
+        exit()
     result = command(string1)
 
 def get_dryruncommands():

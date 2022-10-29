@@ -16,9 +16,15 @@ def add_fnoinline_Makefile(PATH):
     for i in range(len(s_buf)):
         line = s_buf[i]
         s_buf2 += [line]
-        if "endif" in line and "KBUILD_CFLAGS += -Os" in s_buf[i-1]:
-            insert = True
-            s_buf2 += ["KBUILD_CFLAGS   += -fno-inline-small-functions\n"]
+        if not insert:
+            if "endif" in line and "KBUILD_CFLAGS += -Os" in s_buf[i-1]:
+                insert = True
+                s_buf2 += ["KBUILD_CFLAGS   += -fno-inline-small-functions\n"]
+                continue
+            if line == "\n" and "ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE" in s_buf[i+1]:
+                insert = True
+                s_buf2 += ["KBUILD_CFLAGS   += -fno-inline-small-functions\n"]
+                continue
 
     if not insert:
         print("Don't find location to insert -fno-inline-small-functions in", PATH)
