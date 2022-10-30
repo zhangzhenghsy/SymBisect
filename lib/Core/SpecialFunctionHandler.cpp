@@ -1182,27 +1182,35 @@ void SpecialFunctionHandler::handleUser_path_at(ExecutionState &state,
 
 // int strcmp(const char *cs, const char *ct)
 // Assumption: ct points to a constant string , cs points to a symbolic string
+// return 1/-1/0
 // todo: for the case that ct points to a symbolic string, return symbolic value
 void SpecialFunctionHandler::handleStrcmp(ExecutionState &state,
                                           KInstruction *target,
                                           std::vector<ref<Expr> > &arguments) {
   klee_message("\nfunction Model handleStrcmp");
   ObjectPair op, op2;
-  //bool success1, success2;
+  bool success1, success2;
 
   ref<Expr> srcaddr = arguments[0];
   if (ConstantExpr* CE1 = dyn_cast<ConstantExpr>(srcaddr)) {
-    bool success1 = state.addressSpace.resolveOne(CE1, op);
+    success1 = state.addressSpace.resolveOne(CE1, op);
   }  else {
     return;
   }
   ref<Expr> targetaddr = arguments[1];
   if (ConstantExpr* CE2 = dyn_cast<ConstantExpr>(targetaddr)) {
-    bool success2 = state.addressSpace.resolveOne(CE2, op2);
+    success2 = state.addressSpace.resolveOne(CE2, op2);
   }  else {
     return;
   }
   
+  if (!success2) {
+    klee_message("dont find target object, return symbolic value");
+    auto name = "[strcmp symreturn "+targetaddr.get_ptr()->dump2()+"]" + "(symvar)";
+    ref<Expr> symreturn = executor.manual_make_symbolic(name, 4, 32);
+    executor.bindLocal(target, state, symreturn);
+    return;
+  }
   const MemoryObject * sobject = op.first;
   const MemoryObject * tobject = op2.first;
   klee_message("source obj addr: %lu obj size: %u", sobject->address, sobject->size);
@@ -1268,6 +1276,15 @@ void SpecialFunctionHandler::handleStrchr(ExecutionState &state,
     klee_message("handleStrchr: srcaddr is symbolic");
     return;
   }
+
+  if (!success) {
+    klee_message("dont find src object, return symbolic value");
+    auto name = "[strchr symreturn "+srcaddr.get_ptr()->dump2()+"]" + "(symvar)";
+    ref<Expr> symreturn = executor.manual_make_symbolic(name, 1, 8);
+    executor.bindLocal(target, state, symreturn);
+    return;
+  }
+
   const MemoryObject *sobject = op.first;
   const ObjectState *os = op.second;
   
