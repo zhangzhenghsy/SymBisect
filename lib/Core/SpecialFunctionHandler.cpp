@@ -1223,13 +1223,17 @@ void SpecialFunctionHandler::handleStrcmp(ExecutionState &state,
   uint64_t length = tobject->size-tbaseoffset;
 
   ref<Expr> constraint = ConstantExpr::create(1, Expr::Bool);
+  // dont want to compare too many bytes (can by 8192 bytes due to our previous design). It's a simplify.
+  if(length > 32) {
+    length = 32;
+  }
   for(uint64_t i = 0; i < length; i++){
       ref<Expr> soffset = ConstantExpr::create((sbaseoffset + i), Context::get().getPointerWidth());
       ref<Expr> toffset = ConstantExpr::create((tbaseoffset + i), Context::get().getPointerWidth());
       ref<Expr> svalue = os->read(soffset, 8);
       // tvalue should be concrete
       ref<Expr> tvalue = os2->read(toffset, 8);
-      klee_message("i:%lu svalue: %s tvalue: %s", i, svalue.get_ptr()->dump2().c_str(),tvalue.get_ptr()->dump2().c_str());
+      //klee_message("i:%lu svalue: %s tvalue: %s", i, svalue.get_ptr()->dump2().c_str(),tvalue.get_ptr()->dump2().c_str());
       // The logic here is a little different from the original fuction
       // when there is a unequal constant char, we cannot gurantee the return value is 1 or -1
       if (ConstantExpr* CE3 = dyn_cast<ConstantExpr>(svalue)){
@@ -1248,7 +1252,7 @@ void SpecialFunctionHandler::handleStrcmp(ExecutionState &state,
       //ref<Expr> base = AddExpr::create(srcaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
       //executor.executeMemoryOperation(state, true, base, value, 0);
   }
-  klee_message("constraint: %s", constraint.get_ptr()->dump2().c_str());
+  //klee_message("constraint: %s", constraint.get_ptr()->dump2().c_str());
   Executor::StatePair equalstr = executor.fork(state, constraint, true);
   klee::klee_message("branches.first: %p branches.second: %p", equalstr.first, equalstr.second);
   if (equalstr.first) { // symbolic str cs == ct
