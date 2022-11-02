@@ -4386,7 +4386,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
   if (success) {
     //klee::klee_message("Executor::executeMemoryOperation find the object");
     const MemoryObject *mo = op.first;
-    //klee::klee_message("success find object according to address: %s mo->addr: %lu mo->size: %d", address.get_ptr()->dump2().c_str(), mo->address, mo->size);
+    //klee::klee_message("executeMemoryOperation find object according to address: %s mo->addr: %lu mo->size: %d", address.get_ptr()->dump2().c_str(), mo->address, mo->size);
 
     if (MaxSymArraySize && mo->size >= MaxSymArraySize) {
       address = toConstant(state, address, "max-sym-array-size");
@@ -4404,9 +4404,11 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     //std::cout << "mo->issymsize: " << mo->issymsize << "\n";
     if (!mo->issymsize.compare("True")){
       ref<Expr> symsize = mo->symsize;
+      //klee::klee_message("mo->issymsize True    symsize: %s", symsize.get_ptr()->dump2().c_str());
       //std::cout << "mo->issymsize True    symsize of object:\n";
       //std::cout << (symsize.ptr)->dump2() << "\n";
 	    check = UltExpr::create(offset, symsize);
+      klee::klee_message("mo->issymsize True new check: %s", check.get_ptr()->dump2().c_str());
 	    //std::cout << "new check:\n"  << (check.ptr)->dump2() <<"\n";
     }
 
@@ -4447,7 +4449,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     } else {
 	 /// zheng: it's possible that the (symbolic offset) is larger than the size
 	 /// question, when concretize the address and get the object, is it possible that we don't get the corret object? 
-        klee_message("\n\nOOBW detection!!\n");
+        klee_message("possible OOBW detection");
 	  //std::cout << "It's possible that offset is larger than size!!! \n\n";
     ///return;
     }
