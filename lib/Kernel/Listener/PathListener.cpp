@@ -297,7 +297,8 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
             this->executor->terminateState(state);
         }
     }
-    if (target_lines.find(name_l) != target_lines.end()) {
+    //klee::klee_message("simple_name_l: %s", simple_name_l.c_str());
+    if (target_lines.find(simple_name_l) != target_lines.end()) {
         klee::klee_message("reach target line, do vulnerability check");
         bool result = OOBWcheck(state, ki);
         if (result) {
