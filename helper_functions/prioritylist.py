@@ -434,6 +434,8 @@ def get_bb_addrs(s_buf, addr):
     ed = len(s_buf) - 1
     index = get_dump_line(s_buf,st,ed, addr)
     addrs = ['0x'+addr]
+    if '__sanitizer_cov_trace_pc' in s_buf[index-1]:
+        addrs = ['0x'+s_buf[index-1][:16]] + addrs
     index +=1
     while '__sanitizer_cov_trace_pc' not in s_buf[index] and s_buf[index] != "\n":
         addr = '0x'+s_buf[index][:16]
@@ -579,6 +581,9 @@ def get_func_addrs(PATH, addr, s_buf, addr_buf):
         index += 1
     addrlist = s_buf[previndex+1:index]
     nopaddrlist = [line for line in addrlist if "nop" in line]
+    ## we don't want the cov_trace_pc Insts corresponding source code lines in our completelinelist, to aviod FP in corner cases
+    #covtraceaddrlist = [line for line in addrlist if "sanitizer_cov_trace_pc" in line]
+    #nopaddrlist += covtraceaddrlist
     addrlist = [line.split(":")[0] for line in addrlist if ":" in line]
     nopaddrlist = [line.split(":")[0] for line in nopaddrlist if ":" in line]
     #print(addr, "get_func_addrs() ", funcname, s_buf[previndex+1][:16], s_buf[index-1][:16], "addrlist:", len(addrlist))
@@ -1595,8 +1600,8 @@ if __name__ == "__main__":
     #2) get the complete instruction addresses in coverage with the help of dumpresult
     elif option == "get_complete_coverage":
         get_complete_coverage(PATH)
-        cover = PATH+"/completecover"
-        output = PATH+"/completecoverlineinfo"
+        cover = "/completecover"
+        output = "/completecoverlineinfo"
         get_cover_lineinfo(PATH, cover, output)
     #3, 4) get list of source code lines from complete coverage instruction addresses
     # get_line_entryBBlist() is included in get_line_whitelist().
