@@ -1448,15 +1448,29 @@ void SpecialFunctionHandler::handleMemset(ExecutionState &state,
     uint64_t length;
     if(ConstantExpr* CE = dyn_cast<ConstantExpr>(len)){
       length = CE->getZExtValue();
+      if (length > object->size){
+        klee_message("argument len %lu < object size %u", length, object->size);
+        length = object->size;
+      }
     } else{
-      // we should check whether the length can be larger than object size? is it?
+      // we should check whether the length can be larger than object size? 
       klee::klee_message("memset not constant size; use object size.");
+      klee_message("object size %u", object->size);
       length = object->size;
+      bool res;
+      ref<Expr> condition = EqExpr::create(len, klee::ConstantExpr::create(length, klee::Context::get().getPointerWidth()));
+      bool success = executor.solver->mayBeTrue(state.constraints, condition, res,
+                                  state.queryMetaData);
+      if(res){
+        klee_message("add constraint symsize == object concrete size %s", condition.get_ptr()->dump2().c_str());
+        executor.addConstraint(state, condition);
+      }
       //return;
     }
 
     for(uint64_t i =0; i<length; i++){
       ref<Expr> base = AddExpr::create(targetaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
+      klee_message("write address %s", base.get_ptr()->dump2().c_str());
       executor.executeMemoryOperation(state, true, base, value, 0);
     }
     executor.bindLocal(target, state, targetaddr);
