@@ -144,18 +144,23 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     std::string str;
     //yhao_log(1, inst_to_strID(ki->inst));
     //yhao_log(1, dump_inst_booltin(ki->inst));
+    klee::klee_message("ExecutionState &state: %p", &state);
+    klee::klee_message("bb name i->getParent()->getName().str() %s",ki->inst->getParent()->getName().str().c_str());
+    klee::klee_message("sourcecodeLine: %s %u:%u", ki->info->file.c_str(), ki->info->line, ki->info->column);
+    klee::klee_message("ki->inst->getOpcodeName(): %s", ki->inst->getOpcodeName());
     if (print_inst){
         yhao_print(ki->inst->print, str)
         klee::klee_message("inst: %s", str.c_str());
+        //size_t i = 0;
+        //while (i < ki->inst->getNumOperands()) {
+        //    yhao_print(ki->inst->getOperand(i)->print, str);
+        //    klee::klee_message("Operand%u: %s", i, str.c_str());
+        //    i +=1;
+            //klee::klee_message("%s", ki->inst->getOperand(i)->dump().c_str());
+        //}
+        
     }
-    
-    klee::klee_message("ExecutionState &state: %p", &state);
-    klee::klee_message("bb name i->getParent()->getName().str() %s",ki->inst->getParent()->getName().str().c_str());
-    std::string sourceinfo = dump_inst_booltin(ki->inst, kernelversion);
-    if (sourceinfo!= ""){
-    klee::klee_message("line sourceinfo %s",sourceinfo.c_str());
-    }
-    klee::klee_message("target->dest: %d", ki->dest);
+    //klee::klee_message("target->dest: %d", ki->dest);
     int inst_type[] = {llvm::Instruction::GetElementPtr, llvm::Instruction::Load, llvm::Instruction::Store, llvm::Instruction::Ret,
     llvm::Instruction::ICmp, llvm::Instruction::Call, llvm::Instruction::Or, llvm::Instruction::Add,
     llvm::Instruction::Xor, llvm::Instruction::Mul};
@@ -293,7 +298,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             break;
     	}
         case llvm::Instruction::Call: {
-            print_constraints(state);
+            //print_constraints(state);
     	}
         default: {
 
@@ -318,7 +323,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
     klee::klee_message("UCListener::afterExecuteInstruction()");
 
     unsigned index = ki->dest;
-    klee::klee_message("ki->dest: %u", ki->dest);
+    //klee::klee_message("ki->dest: %u", ki->dest);
     int inst_type[] = {llvm::Instruction::GetElementPtr, llvm::Instruction::Load, 
     llvm::Instruction::ICmp, llvm::Instruction::Or, llvm::Instruction::Add, 
     llvm::Instruction::Xor, llvm::Instruction::Mul, llvm::Instruction::ZExt};
@@ -384,12 +389,17 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
                 // our starting address
                 klee::ref<klee::Expr> objectbase = klee::ConstantExpr::create(object->address, klee::Context::get().getPointerWidth());
                 klee::ref<klee::Expr> currentaddr;
+                int loop = 0;
                 for (offset = 0 ; offset < (uint64_t)object->size; offset += size) {
+                    loop ++;
+                    if (loop > 32) break;
                     ref<Expr> Offset = klee::ConstantExpr::create(offset, klee::Context::get().getPointerWidth());
                     ref<Expr> currentaddr = AddExpr::create(objectbase, Offset);
                     ref<Expr> oldvalue = os->read(offset, size*8);
 
                     bool res;
+                    klee_message("currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());
+                    klee_message("address: %s", address.get_ptr()->dump2().c_str());
                     ref<Expr> condition = EqExpr::create(currentaddr, address);
                     bool success = executor->solver->mayBeTrue(state.constraints, condition, res,
                                   state.queryMetaData);
@@ -464,6 +474,15 @@ void kuc::UCListener::afterRun(klee::ExecutionState &state) {
 
 }
 
+std::string simplifyfuncname(std::string funcname) {
+    size_t found = funcname.find(".");
+    if (found != std::string::npos) {
+        funcname = funcname.substr(0, found);
+        klee_message("simplifyfuncname: %s", funcname.c_str());
+    }
+    return funcname;
+}
+
 bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     auto cs = llvm::cast<llvm::CallBase>(ki->inst);
     llvm::Value *fp = cs->getCalledOperand();
@@ -476,10 +495,20 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
         return false;
     }
     std::string name = f->getName().str();
+    std::string simplifyname = simplifyfuncname(name);
+    skip_functions.insert("llvm.read_register.i64");
+    skip_functions.insert("llvm.write_register.i64");
+    skip_functions.insert("nla_data");
     if (skip_functions.find(name) != skip_functions.end()) {
         klee::klee_message("skip function: %s",name.c_str());
         return true;
     }
+    if (simplifyname == "")
+     if (skip_functions.find(simplifyname) != skip_functions.end()) {
+        klee::klee_message("skip function: %s",name.c_str());
+        return true;
+    }
+
     if (f && f->isDeclaration()) {
         switch (f->getIntrinsicID()) {
             case llvm::Intrinsic::not_intrinsic: {
