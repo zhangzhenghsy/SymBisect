@@ -40,6 +40,12 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     if (config.contains("96_concolic_map")){
         concolic_map = config["96_concolic_map"];
     }
+    // example: "97_calltrace": ["ethnl_set_features", "ethnl_parse_bitset", "bitmap_from_arr32"]
+    if (config.contains("97_calltrace")){
+        for (const auto &temp: config["97_calltrace"]) {
+            Calltrace.push_back(temp.get<std::string>());
+        }
+    }
 }
 
 kuc::UCListener::~UCListener() = default;
@@ -147,7 +153,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     klee::klee_message("ExecutionState &state: %p", &state);
     klee::klee_message("bb name i->getParent()->getName().str() %s",ki->inst->getParent()->getName().str().c_str());
     klee::klee_message("sourcecodeLine: %s %u:%u", ki->info->file.c_str(), ki->info->line, ki->info->column);
-    klee::klee_message("ki->inst->getOpcodeName(): %s", ki->inst->getOpcodeName());
+    //klee::klee_message("ki->inst->getOpcodeName(): %s", ki->inst->getOpcodeName());
     if (print_inst){
         yhao_print(ki->inst->print, str)
         klee::klee_message("inst: %s", str.c_str());
@@ -508,6 +514,11 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
         klee::klee_message("skip function: %s",name.c_str());
         return true;
     }
+    if(skip_calltrace_distance(state, ki)){
+        skip_calltrace = true;
+        return true;
+    }
+    skip_calltrace = false;
 
     if (f && f->isDeclaration()) {
         switch (f->getIntrinsicID()) {
@@ -525,6 +536,55 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
     return false;
 }
 
+// used to calculate the distance between current function and target vulnerable function.
+// If it's over the threshold (return true), then we wan't do deeper function call
+bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee::KInstruction *ki) {
+    // if there is no "97_calltrace" in config, we don't want to skip any functions.
+    if (Calltrace.size() == 0){
+        return false;
+    }
+    int threshold_distance = Calltrace.size() + 1;
+    if(threshold_distance < 6) {
+        threshold_distance = 6;
+    }
+    //klee::klee_message("threshold_distance: %d", threshold_distance);
+    bool Insametrace = true;
+    int currentdistance = Calltrace.size();
+
+    int endIndex = state.stack.size() - 1;
+    std::string calltracefuncname;
+    for (int i = 0; i <= endIndex; i++) {
+      auto const &sf = state.stack.at(i);
+      klee::KFunction* kf = sf.kf;
+      llvm::Function* f = kf ? kf->function : 0;
+      if (Insametrace) {
+        calltracefuncname = Calltrace[i];
+      }
+      if (f)
+      {
+          std::string funcname = f->getName().str();
+            if (funcname != calltracefuncname) {
+                Insametrace = false;
+            }
+            if (Insametrace) {
+                currentdistance -= 1;
+            } else {
+                int count = 0;
+                for(auto &BB: *f) {count++;}
+                if (count > 1) {
+                    currentdistance += 1;
+                }
+            }
+      }
+    }
+    
+    if (currentdistance > threshold_distance)
+    {
+        klee::klee_message("currentdistance :%d threshold_distance: %d skip the function due calltrace_distance", currentdistance, threshold_distance);
+        return true;
+    }
+    return false;
+}
 void kuc::UCListener::executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) {
 
 }
@@ -624,7 +684,7 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
     if (ty->isPointerTy() && ty->getPointerElementType()->isSized()) {
         // ignore the 0-sized type
         auto size = executor->kmodule->targetData->getTypeStoreSize(ty->getPointerElementType());
-        klee_message("size : %lu", size);
+        klee_message("size : %lu", size.getKnownMinSize());
         if (size == 0) {
             klee_message("struct size is 0. don't create object for it");
             return;
@@ -696,6 +756,9 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
         if (skip_functions.find(name) != skip_functions.end()) {
             goto create_return;
         }
+        if(skip_calltrace){
+            goto create_return;
+        }
         switch (f->getIntrinsicID()) {
             case llvm::Intrinsic::not_intrinsic: {
                 if (executor->special_function(f)) {
@@ -710,6 +773,9 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
         }
     } else if (f && !f->isDeclaration()) {
         std::string name = f->getName().str();
+        if(skip_calltrace){
+            goto create_return;
+        }
         if (skip_functions.find(name) != skip_functions.end()) {
             klee::klee_message("in skip_functions");
             goto create_return;

@@ -27,6 +27,8 @@ namespace kuc {
 
         void executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) override;
 
+        bool skip_calltrace_distance(klee::ExecutionState &state, klee::KInstruction *ki);
+
         // count for global var name
         std::map<std::string, int64_t> count;
         // symbolic address <-> mo->getBaseExpr()
@@ -40,6 +42,8 @@ namespace kuc {
         std::map<std::string, std::string> indirectcall_map;
         std::string kernelversion;
         std::map<std::string,std::map<std::string, uint64_t>> concolic_map;
+        std::vector<std::string> Calltrace;
+        bool skip_calltrace;
 
     private:
         std::string create_global_var_name(llvm::Instruction *i, int64_t index, const std::string &kind);

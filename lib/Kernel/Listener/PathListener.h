@@ -47,6 +47,7 @@ namespace kuc {
         std::map<std::string, std::set<std::string>> whitelist_map;
         std::uint32_t looplimit;
         std::string kernelversion;
+        std::vector<std::string> Calltrace;
         GlobalContext GlobalCtx;
     };
 }
