@@ -316,7 +316,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
 // if skip OOB error, we need to symbolize the dest value
 void kuc::UCListener::symbolize_Inst_return(klee::ExecutionState &state, klee::KInstruction *ki){
     llvm::Type *ty = ki->inst->getType();
-    auto sym_name = this->create_global_var_name(ki->inst, 0, "symbolic_Inst_return");
+    auto sym_name = this->create_global_var_name(ki, 0, "symbolic_Inst_return");
     klee_message("create symbolic return for Load Inst: %s", sym_name.c_str());
     unsigned int size =  executor->kmodule->targetData->getTypeStoreSize(ty);
     Expr::Width width = executor->getWidthForLLVMType(ty);
@@ -589,16 +589,15 @@ void kuc::UCListener::executionFailed(klee::ExecutionState &state, klee::KInstru
 
 }
 
-std::string kuc::UCListener::create_global_var_name(llvm::Instruction *i, int64_t index, const std::string &kind) {
+std::string kuc::UCListener::create_global_var_name(klee::KInstruction *ki, int64_t index, std::string kind) {
     std::string name;
-    name += inst_to_strID(i);
+    //name += inst_to_strID(i);
     //add by zheng
-    std::string sourceinfo = dump_inst_booltin(i, kernelversion);
-    std::size_t pos = sourceinfo.find("#");
-    std::string linenum = sourceinfo.substr(pos);
-    name += linenum;
+    std::string filename = ki->info->file.c_str();
+    std::string linenum = std::to_string(ki->info->line);
+    name = filename+":"+ linenum;
 
-    name += "-" + std::to_string(index);
+    //name += "-" + std::to_string(index);
     name += "-" + kind;
     if (this->count.find(name) == this->count.end()) {
         this->count[name] = 0;
@@ -810,8 +809,12 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
     llvm::Type *resultType = cs->getType();
     if (!resultType->isVoidTy()) {
         klee::klee_message("make call return symbolic");
-
-        auto name = create_global_var_name(ki->inst, -1, "call_return");
+        std::string funcname;
+        if (llvm::isa<llvm::InlineAsm>(fp)) {
+            funcname = "asmcall";
+        } else {
+            funcname = f->getName().str();}
+        auto name = create_global_var_name(ki, -1, funcname+"-call_return");
         auto ty = ki->inst->getType();
         unsigned int size = executor->kmodule->targetData->getTypeStoreSize(ty);
         klee::Expr::Width width = executor->getWidthForLLVMType(ty);

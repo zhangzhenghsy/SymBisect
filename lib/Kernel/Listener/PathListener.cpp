@@ -135,7 +135,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             auto line_info = dump_inst_sourceinfo(ki->inst);
             std::size_t pos = line_info.find("source/");
             line_info = line_info.substr(pos+1);
-            klee::klee_message("key line_info: %s", line_info.c_str());
+            //klee::klee_message("key line_info: %s", line_info.c_str());
 
             if (isa<DbgInfoIntrinsic>(ki->inst))
                 break;

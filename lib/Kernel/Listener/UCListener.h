@@ -46,7 +46,7 @@ namespace kuc {
         bool skip_calltrace;
 
     private:
-        std::string create_global_var_name(llvm::Instruction *i, int64_t index, const std::string &kind);
+        std::string create_global_var_name(klee::KInstruction *ki, int64_t index, std::string kind);
 
         void symbolic_before_load(klee::ExecutionState &state, klee::KInstruction *ki);
 
