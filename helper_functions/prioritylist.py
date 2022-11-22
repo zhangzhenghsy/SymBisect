@@ -944,6 +944,8 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
     config["93_whitelist"] = {}
     config["94_looplimit"] = 10
     config["95_kernelversion"] = PATH.split("/pocs/")[1]
+
+    config["97_calltrace"] = []
     with open(output, 'w') as f:
         json.dump(config, f, indent=4, sort_keys=True)
 
@@ -1557,7 +1559,8 @@ if __name__ == "__main__":
     
     option = sys.argv[1]
     PATH = ""
-    targetline = "/home/zzhan173/repos/linux/lib/bitmap.c:1278"
+    #targetline = "/home/zzhan173/repos/linux/lib/bitmap.c:1278"
+    targetline = "/home/zzhan173/repos/linux/mm/percpu.c:1746"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/O0result"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/gcov"
@@ -1570,10 +1573,12 @@ if __name__ == "__main__":
     #PATH = "/data/zzhan173/OOBW/pocs/433f4ba1/63de3747"
     #PATH = "/data/zzhan173/OOBW/pocs/ad598a48/9b15f7fa"
     #PATH = "/data/zzhan173/OOBW/pocs/19d6c375/d19c64b3d097"
-    PATH = "/data/zzhan173/Qemu/OOBW/pocs/a770bf51/cbf3d60329c4"
+    #PATH = "/data/zzhan173/Qemu/OOBW/pocs/a770bf51/cbf3d60329c4"
+    PATH = "/data/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a"
     if not PATH:
         PATH = sys.argv[2]
-    #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with laterBC files
+    #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with later BC files
+    # requirement config file; optional: codeadaptation.json
     if option == "compile_refkernel":
         compile_gcc(PATH)
     #0.1) get and store debuginfo from vmlinux, stored as tmp_o (get dumpresult of vmlinux by the way)
@@ -1581,9 +1586,11 @@ if __name__ == "__main__":
         #PATH = sys.argv[2]
         get_vmlinux_dbginfo(PATH)
     #1) get cover file from syzkaller reproducer
-    #1.1) get coverline info from cover with vmlinux
+    # note that we need to compile corresponding syzkaller, sometimes we need to adapt the source code
+    # requirement repro.syz, compiled kernel from 0), compiled corresponding syzkaller tool
     elif option == "get_all":
         get_all(PATH, targetline)
+    #1.1) get coverline info from cover with vmlinux
     elif option == "get_cover_lineinfo":
         get_cover_lineinfo(PATH)
         if targetline:
@@ -1625,6 +1632,7 @@ if __name__ == "__main__":
         get_BB_lineinfo(PATH)
         get_BB_whitelist(PATH)
     #11) get the BBs which forward/post dominate anyBB in whitelist
+    # requirement: calltracefunclist
     elif option == "get_BB_whitelist_withdoms":
         calltracefunclist = read_calltracefunclist(PATH)
         print("calltracefunclist:", calltracefunclist)

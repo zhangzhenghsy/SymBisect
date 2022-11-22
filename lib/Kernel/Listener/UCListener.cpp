@@ -813,7 +813,13 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
         if (llvm::isa<llvm::InlineAsm>(fp)) {
             funcname = "asmcall";
         } else {
-            funcname = f->getName().str();}
+            if (f)
+            {
+                funcname = f->getName().str();
+            } else {
+                funcname = "indirectcall";
+            }
+        }
         auto name = create_global_var_name(ki, -1, funcname+"-call_return");
         auto ty = ki->inst->getType();
         unsigned int size = executor->kmodule->targetData->getTypeStoreSize(ty);
