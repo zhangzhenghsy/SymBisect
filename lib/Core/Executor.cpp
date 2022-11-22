@@ -1055,9 +1055,11 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   if (isSeeding)
     timeout *= static_cast<unsigned>(it->second.size());
   solver->setTimeout(timeout);
+  klee_message("dbg Executor::fork L1058");
   bool success = solver->evaluate(current.constraints, condition, res,
                                   current.queryMetaData);
   solver->setTimeout(time::Span());
+  klee_message("dbg Executor::fork L1061");
   if (!success) {
     current.pc = current.prevPC;
     terminateStateEarly(current, "Query timed out (fork).");
@@ -1139,6 +1141,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   // the value it has been fixed at, we should take this as a nice
   // hint to just use the single constraint instead of all the binary
   // search ones. If that makes sense.
+  klee_message("dbg Executor::fork L1143");
   if (res==Solver::True) {
     if (!isInternal) {
       if (pathWriter) {
@@ -1156,6 +1159,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 
     return StatePair(0, &current);
   } else {
+    klee_message("dbg Executor::fork L1161");
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;
 
@@ -1232,7 +1236,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       terminateStateEarly(*falseState, "max-depth exceeded.");
       return StatePair(0, 0);
     }
-
+    klee_message("dbg Executor::fork L1238");
     return StatePair(trueState, falseState);
   }
 }
@@ -1718,10 +1722,18 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
   Instruction *i = ki->inst;
   if (isa_and_nonnull<DbgInfoIntrinsic>(i))
     return;
+  klee_message("Executor::executeCall()");
+  // whether the function is declaration or not, we should check if we have a special handler
+  if(f) {
+    if (specialFunctionHandler->handle(state, f, ki, arguments))
+      return;
+  }
   if (f && f->isDeclaration()) {
+    klee_message("Executor::executeCall f && f->isDeclaration()");
     switch (f->getIntrinsicID()) {
     case Intrinsic::not_intrinsic:
       // state may be destroyed by this call, cannot touch
+      klee_message("Executor::executeCall Intrinsic::not_intrinsic");
       callExternalFunction(state, ki, f, arguments);
       break;
     case Intrinsic::fabs: {
@@ -1840,6 +1852,7 @@ void Executor::executeCall(ExecutionState &state, KInstruction *ki, Function *f,
       }
     }
   } else {
+    klee_message("Executor::executeCall not f && f->isDeclaration()");
     // Check if maximum stack size was reached.
     // We currently only count the number of stack frames
     if (RuntimeMaxStackFrames && state.stack.size() > RuntimeMaxStackFrames) {
@@ -2260,6 +2273,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       std::string conditionstr = cond.get_ptr()->dump2();
       klee::klee_message("Cond: %s",conditionstr.c_str());
       cond = optimizer.optimizeExpr(cond, false);
+      klee::klee_message("optimizer Cond: %s",conditionstr.c_str());
 
       srand(std::time(0));
       int randvalue = std::rand()%2;
@@ -3955,6 +3969,7 @@ void Executor::callExternalFunction(ExecutionState &state,
                                     KInstruction *target,
                                     Function *function,
                                     std::vector< ref<Expr> > &arguments) {
+  klee_message("Executor::callExternalFunction");
   // check if specialFunctionHandler wants it
   if (specialFunctionHandler->handle(state, function, target, arguments))
     return;

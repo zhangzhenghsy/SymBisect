@@ -160,6 +160,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("memset", handleMemset, true),
   // should we consider the page padding for vmalloc?
   add("vmalloc", handleMalloc, true),
+  add("kzalloc", handleKmalloc, true),
+  add("bpf_map_area_alloc", handleKmalloc, true),
 #undef addDNR
 #undef add
 };
@@ -234,6 +236,14 @@ bool SpecialFunctionHandler::handle(ExecutionState &state,
                                     Function *f,
                                     KInstruction *target,
                                     std::vector< ref<Expr> > &arguments) {
+  std::string funcname = f->getName().str();
+  klee_message("SpecialFunctionHandler::handle old funcname: %s", funcname.c_str());
+  if (funcname.find('.') != std::string::npos){
+    funcname = funcname.substr(0, funcname.find('.'));
+    klee_message("SpecialFunctionHandler::handle new funcname: %s", funcname.c_str());
+    auto m = executor.get_module();
+    f = m->getFunction(funcname);
+  }
   handlers_ty::iterator it = handlers.find(f);
   if (it != handlers.end()) {    
     Handler h = it->second.first;
@@ -437,7 +447,7 @@ void SpecialFunctionHandler::handleMalloc(ExecutionState &state,
                                   KInstruction *target,
                                   std::vector<ref<Expr> > &arguments) {
   // XXX should type check args
-  assert(arguments.size()==1 && "invalid number of arguments to malloc");
+  //assert(arguments.size()==1 && "invalid number of arguments to malloc");
   executor.executeAlloc(state, arguments[0], false, target);
 }
 
@@ -447,6 +457,7 @@ void SpecialFunctionHandler::handleVzalloc(ExecutionState &state,
   assert(arguments.size()==1 && "invalid number of arguments to malloc");
   executor.executeAlloc(state, arguments[0], false, target);
 }
+
 
 void SpecialFunctionHandler::handleMemalign(ExecutionState &state,
                                             KInstruction *target,
@@ -946,11 +957,12 @@ void SpecialFunctionHandler::handleDivRemOverflow(ExecutionState &state,
 }
 
 // yu hao: handle kernel function
+// set the memory to zero
 void SpecialFunctionHandler::handleKmalloc(ExecutionState &state,
                                            KInstruction *target,
                                            std::vector<ref<Expr> > &arguments) {
     // XXX should type check args
-    assert(arguments.size()==2 && "invalid number of arguments to kmalloc");
+    //assert(arguments.size()==2 && "invalid number of arguments to kmalloc");
     executor.executeAlloc(state, arguments[0], false, target, true);
 }
 
