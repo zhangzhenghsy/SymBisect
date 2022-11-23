@@ -860,12 +860,16 @@ void Executor::initializeGlobalObjects(ExecutionState &state) {
   // calls
   std::vector<ObjectState *> constantObjects;
   for (const GlobalVariable &v : m->globals()) {
+    klee_message("try to initialize global variable: %s", v.getName().str().c_str());
     MemoryObject *mo = globalObjects.find(&v)->second;
     ObjectState *os = bindObjectInState(state, mo, false);
 
     // yu hao: do not handle external global variables
     if(v.isExternallyInitialized()) {
-    } else if (v.isDeclaration() && mo->size) {
+      klee_message("external global variables, do not handle");
+    }
+    /*else if (v.isDeclaration() && mo->size) {
+      klee_message("v.isDeclaration() && mo->size");
       // Program already running -> object already initialized.
       // Read concrete value and write it to our copy.
       void *addr;
@@ -882,7 +886,9 @@ void Executor::initializeGlobalObjects(ExecutionState &state) {
               os->write8(offset, static_cast<unsigned char *>(addr)[offset]);
           }
       }
-    } else if (v.hasInitializer()) {
+    } */
+    else if (v.hasInitializer()) {
+      klee_message("v.hasInitializer()");
       initializeGlobalObject(state, os, v.getInitializer(), 0);
       if (v.isConstant())
         constantObjects.emplace_back(os);
@@ -890,6 +896,7 @@ void Executor::initializeGlobalObjects(ExecutionState &state) {
       else
         goto init_global_with_symbolic;
     } else {
+      klee_message("else os->initializeToZero();");
       os->initializeToZero();
       // yuhao:
       goto init_global_with_symbolic;
@@ -898,6 +905,7 @@ void Executor::initializeGlobalObjects(ExecutionState &state) {
     continue;
     // yuhao: initialize global object with symbolic value
     init_global_with_symbolic:
+      klee_message("init_global_with_symbolic");
       initializeGlobalObject(state, os, v.getType()->getElementType(), 0);
   }
 
@@ -3742,9 +3750,9 @@ void Executor::run(ExecutionState &initialState) {
     }
 
     auto execute_time = std::time(NULL)-start_time;
-    if (execute_time > 1200) {
+    if (execute_time > 12000) {
       // todo: check if target line has been reached?
-      klee::klee_message("execution time out (1200) we think there is no OOB triggerred");
+      klee::klee_message("execution time out (12000) we think there is no OOB triggerred");
       haltExecution = true;
     }
   }
