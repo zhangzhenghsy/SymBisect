@@ -502,9 +502,12 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
     }
     std::string name = f->getName().str();
     std::string simplifyname = simplifyfuncname(name);
-    skip_functions.insert("llvm.read_register.i64");
-    skip_functions.insert("llvm.write_register.i64");
-    skip_functions.insert("nla_data");
+    std::string local_skipfunctions[] = {"llvm.read_register.i64", "llvm.write_register.i64", "nla_data", "console_lock", "console_unlock"};
+    for (std::string local_skipfunction:local_skipfunctions)
+    {
+        skip_functions.insert(local_skipfunction);
+    }
+
     if (skip_functions.find(name) != skip_functions.end()) {
         klee::klee_message("skip function: %s",name.c_str());
         return true;
@@ -543,7 +546,7 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
     if (Calltrace.size() == 0){
         return false;
     }
-    int threshold_distance = Calltrace.size() + 1;
+    int threshold_distance = Calltrace.size();
     if(threshold_distance < 6) {
         threshold_distance = 6;
     }
@@ -578,7 +581,8 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
       }
     }
     
-    if (currentdistance > threshold_distance)
+    klee::klee_message("currentdistance :%d threshold_distance: %d ", currentdistance, threshold_distance);
+    if (currentdistance >= threshold_distance)
     {
         klee::klee_message("currentdistance :%d threshold_distance: %d skip the function due calltrace_distance", currentdistance, threshold_distance);
         return true;
@@ -591,7 +595,8 @@ void kuc::UCListener::executionFailed(klee::ExecutionState &state, klee::KInstru
 
 std::string kuc::UCListener::create_global_var_name(klee::KInstruction *ki, int64_t index, std::string kind) {
     std::string name;
-    //name += inst_to_strID(i);
+    //klee_message("inst_to_strID(ki->inst): %s", inst_to_strID(ki->inst).c_str());
+    //name += inst_to_strID(ki->inst);
     //add by zheng
     std::string filename = ki->info->file.c_str();
     std::string linenum = std::to_string(ki->info->line);
