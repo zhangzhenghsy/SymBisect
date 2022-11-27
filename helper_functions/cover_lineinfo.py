@@ -14,6 +14,7 @@ def cut_cover_line(PATH, targetline):
     
     if lastindex == 0:
         print("dont find the targetline in coverline :", targetline)
+        exit()
     else:
         print(lastindex, s_buf[lastindex])
     
