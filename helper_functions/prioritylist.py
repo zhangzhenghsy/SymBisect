@@ -886,12 +886,12 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
     config["2_bitcode"] = bcfile
     
     # should be different in different cases
-    #entryfunc = "do_mount"
-    entryfunc = ""
+    calltracefunclist = read_calltracefunclist(PATH)
+    calltracefunclist.reverse()
+    entryfunc = calltracefunclist[0]
     config["3_entry_function"] = entryfunc
     config["4_target_line_list"] = []
     
-    #target_bb_list = ["built-in.bc-do_mount-46"]
     target_bb_list = []
     config["10_target_bb_list"] = target_bb_list
     
@@ -944,8 +944,8 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
     config["93_whitelist"] = {}
     config["94_looplimit"] = 10
     config["95_kernelversion"] = PATH.split("/pocs/")[1]
-
-    config["97_calltrace"] = []
+    
+    config["97_calltrace"] = calltracefunclist
     with open(output, 'w') as f:
         json.dump(config, f, indent=4, sort_keys=True)
 
@@ -1560,7 +1560,8 @@ if __name__ == "__main__":
     option = sys.argv[1]
     PATH = ""
     #targetline = "/home/zzhan173/repos/linux/lib/bitmap.c:1278"
-    targetline = "/home/zzhan173/repos/linux/mm/percpu.c:1746"
+    #targetline = "/home/zzhan173/repos/linux/mm/percpu.c:1746"
+    targetline = "/home/zzhan173/repos/linux/drivers/gpu/drm/drm_fb_helper.c:733"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/O0result"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/gcov"
@@ -1574,7 +1575,8 @@ if __name__ == "__main__":
     #PATH = "/data/zzhan173/OOBW/pocs/ad598a48/9b15f7fa"
     #PATH = "/data/zzhan173/OOBW/pocs/19d6c375/d19c64b3d097"
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/a770bf51/cbf3d60329c4"
-    PATH = "/data/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a"
+    #PATH = "/data/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a"
+    PATH = "/data/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0"
     if not PATH:
         PATH = sys.argv[2]
     #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with later BC files
