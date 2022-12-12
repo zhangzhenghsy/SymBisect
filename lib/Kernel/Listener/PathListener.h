@@ -28,6 +28,10 @@ namespace kuc {
 
         void executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) override;
 
+        void BB_reachableBBs(BasicBlock * BB);
+        bool BB1_reach_BB2(BasicBlock * A, BasicBlock * B);
+        bool Isaloop(BasicBlock * A, BasicBlock * B, BasicBlock * C);
+
     public:
         nlohmann::json config;
         std::set<std::string> target_bbs;
@@ -45,6 +49,7 @@ namespace kuc {
         // zheng: indirect call map
         std::map<std::string, std::string> indirectcall_map;
         std::map<std::string, std::set<std::string>> whitelist_map;
+        std::map<std::string, std::set<std::string>> BB_reachBBs;
         std::uint32_t looplimit;
         std::string kernelversion;
         std::vector<std::string> Calltrace;

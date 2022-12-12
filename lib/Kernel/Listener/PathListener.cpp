@@ -16,6 +16,7 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <queue>
 using namespace std;
 
 kuc::PathListener::PathListener(klee::Executor *executor) : Listener(executor) {
@@ -83,6 +84,47 @@ kuc::PathListener::~PathListener() = default;
 void kuc::PathListener::beforeRun(klee::ExecutionState &initialState) {
 
 }
+
+void kuc::PathListener:: BB_reachableBBs(BasicBlock * BB) {
+    std::string keyBBname = BB->getName().str();
+    if(BB_reachBBs.find(keyBBname) != BB_reachBBs.end()){
+        return;
+    }
+    std::unordered_set<BasicBlock *> reachable;
+    std::queue<BasicBlock *> worklist;
+    worklist.push(BB);
+    while (!worklist.empty()) {
+        BasicBlock *front = worklist.front();
+        worklist.pop();
+        for (BasicBlock *succ : successors(front)) {
+            if (reachable.count(succ) == 0) {
+            /// We need the check here to ensure that we don't run infinitely if the CFG has a loop in it
+            /// i.e. the BB reaches itself directly or indirectly
+                worklist.push(succ);
+                reachable.insert(succ);
+            }
+        }
+    }
+    for (BasicBlock * localBB:reachable) {
+        BB_reachBBs[keyBBname].insert(localBB->getName().str());
+    }
+  //return reachable;
+}
+
+bool kuc::PathListener::BB1_reach_BB2(BasicBlock * A, BasicBlock * B){
+    std::string keyBBname = A->getName().str();
+    set<std::string> AreachableBBs = BB_reachBBs[keyBBname];
+    if (AreachableBBs.find(B->getName().str()) != AreachableBBs.end()){
+      return true;
+    }
+    return false;
+}
+
+// Br Inst, A->B, A->C.  if C->A or B->A, then we know it's a loop
+bool kuc::PathListener::Isaloop(BasicBlock * A, BasicBlock * B, BasicBlock * C){
+  return BB1_reach_BB2(B, A) || BB1_reach_BB2(C, A);
+}
+
 
 void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
 
@@ -195,6 +237,20 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
             break;
         }
         case llvm::Instruction::Br:{
+	    // implement BB choice code later (now they are in executor)
+            /*BranchInst *bi = cast<BranchInst>(ki->inst);
+            if (bi->isUnconditional())
+                break;
+            BasicBlock * BB = bi->getParent();
+            BB_reachableBBs(BB);
+
+            std::string keyBBname = BB->getName().str();
+            if (bi->isUnconditional()) break;
+            BasicBlock * BB1 = bi->getSuccessor(0);
+            BB_reachableBBs(BB1);
+            BasicBlock * BB2 = bi->getSuccessor(1);
+            BB_reachableBBs(BB2);*/
+            // generate the BB_reachBBs and store the info in BB_reachBBs
             break;
             // move the loop limit terminate to Executor.cpp
             /*

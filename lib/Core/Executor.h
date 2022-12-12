@@ -312,6 +312,10 @@ private:
   void initializeGlobalObject(ExecutionState &state, ObjectState *os,
                   llvm::Type *ty,
                   unsigned offset);
+  // zheng: initialize stack object with symbolic value. Since in our execution we may skip some initialization by mistake
+  void initializeStackObject(ExecutionState &state, ObjectState *os,
+                                      llvm::Type *ty,
+                                      unsigned offset);
   void initializeGlobals(ExecutionState &state);
   void allocateGlobalObjects(ExecutionState &state);
   void initializeGlobalAliases();
@@ -591,6 +595,8 @@ public:
   std::string global_name = "global";
   uint64_t global_count = 0;
 
+  std::string stack_name = "stack";
+  uint64_t stack_count = 0;
   // yu hao: useful functions
   Cell& un_eval(KInstruction *ki, unsigned index, ExecutionState &state) const;
   // make a mo with one whole symbolic value

@@ -674,6 +674,43 @@ void Executor::initializeGlobalObject(ExecutionState &state, ObjectState *os,
     }
 }
 
+void Executor::initializeStackObject(ExecutionState &state, ObjectState *os,
+                                      llvm::Type *ty,
+                                      unsigned offset) {
+    const auto targetData = kmodule->targetData.get();
+    if (auto *vt = dyn_cast<VectorType>(ty)) {
+        unsigned elementSize =
+                targetData->getTypeStoreSize(vt->getElementType());
+        for (unsigned i=0, e=vt->getNumElements(); i != e; ++i)
+            initializeStackObject(state, os, vt->getElementType(),
+                                   offset + i*elementSize);
+    } else if (auto *at = dyn_cast<ArrayType>(ty)) {
+        unsigned elementSize =
+                targetData->getTypeStoreSize(at->getElementType());
+        for (unsigned i=0, e=at->getNumElements(); i != e; ++i)
+            initializeStackObject(state, os, at->getElementType(),
+                                   offset + i*elementSize);
+    } else if (auto *st = dyn_cast<StructType>(ty)) {
+        const StructLayout *sl =
+                targetData->getStructLayout(cast<StructType>(st));
+        for (unsigned i=0, e=st->getNumElements(); i != e; ++i)
+            initializeStackObject(state, os, st->getElementType(i),
+                                   offset + sl->getElementOffset(i));
+    } else if (auto *pt = dyn_cast<PointerType>(ty)) {
+        std::string name = stack_name + "_" +std::to_string(stack_count++);
+        unsigned int size = kmodule->targetData->getTypeStoreSize(pt);
+        Expr::Width width = getWidthForLLVMType(pt);
+        auto expr = manual_make_symbolic(name, size, width);
+        os->write(offset, expr);
+    } else if (auto *it = dyn_cast<IntegerType>(ty)) {
+        std::string name = stack_name + "_" +std::to_string(stack_count++);
+        unsigned int size = kmodule->targetData->getTypeStoreSize(it);
+        Expr::Width width = getWidthForLLVMType(it);
+        auto expr = manual_make_symbolic(name, size, width);
+        os->write(offset, expr);
+    }
+}
+
 MemoryObject * Executor::addExternalObject(ExecutionState &state, 
                                            void *addr, unsigned size, 
                                            bool isReadOnly) {
@@ -2123,7 +2160,7 @@ void Executor::checkLoopLimit(ExecutionState &state, KInstruction *ki, bool term
   // answer:  just call this function when both branches are possible
   if (terminate){
     if (state.BBcount[BBkey] > looplimit) {
-      klee::klee_message("reach loop limit, terminate the state");
+      klee::klee_message("reach loop limit, terminate the state: %p", &state);
       terminateState(state);
     }
   }
@@ -2147,6 +2184,38 @@ void Executor::logNewConstraint(ExecutionState &state, KInstruction *ki) {
     state.constraint_lines[finalconstraint_str].insert(sourceinfo);
     klee_message("add constraint: %s\n at line: %s", finalconstraint_str.c_str(), sourceinfo.c_str());
   }
+}
+
+std::unordered_set<BasicBlock *> BB_reachableBBs(BasicBlock * BB) {
+  std::unordered_set<BasicBlock *> reachable;
+  std::queue<BasicBlock *> worklist;
+  worklist.push(BB);
+  while (!worklist.empty()) {
+    BasicBlock *front = worklist.front();
+    worklist.pop();
+    for (BasicBlock *succ : successors(front)) {
+      if (reachable.count(succ) == 0) {
+       /// We need the check here to ensure that we don't run infinitely if the CFG has a loop in it
+       /// i.e. the BB reaches itself directly or indirectly
+        worklist.push(succ);
+        reachable.insert(succ);
+      }
+    }
+  }
+  return reachable;
+}
+
+bool BB1_reach_BB2(BasicBlock * A, BasicBlock * B){
+    std::unordered_set<BasicBlock *> AreachableBBs = BB_reachableBBs(A);
+    if (AreachableBBs.find(B) != AreachableBBs.end()){
+      return true;
+    }
+    return false;
+}
+
+// Br Inst, A->B, A->C.  if C->A or B->A, then we know it's a loop
+bool Isaloop(BasicBlock * A, BasicBlock * B, BasicBlock * C){
+  return BB1_reach_BB2(B, A) || BB1_reach_BB2(C, A);
 }
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
@@ -2283,8 +2352,26 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       cond = optimizer.optimizeExpr(cond, false);
       klee::klee_message("optimizer Cond: %s",conditionstr.c_str());
 
+      klee_message("bi->getSuccessor(0)->getName(): %s  bi->getSuccessor(1)->getName(): %s", bi->getSuccessor(0)->getName().str().c_str(), bi->getSuccessor(1)->getName().str().c_str());
       srand(std::time(0));
       int randvalue = std::rand()%2;
+      if (Isaloop(bi->getParent(), bi->getSuccessor(0), bi->getSuccessor(1)))
+      {
+        klee_message("it's in a loop");
+        //srand(std::time(0));
+        //randvalue = std::rand()%2;
+      } else {
+        if(BB1_reach_BB2(bi->getSuccessor(0), bi->getSuccessor(1))) {
+          klee_message("BB1 can reach BB2, try to execute BB1 first");
+          randvalue = 1;
+        }
+	else if(BB1_reach_BB2(bi->getSuccessor(1), bi->getSuccessor(0))) {
+	  klee_message("BB2 can reach BB1, try to execute BB2 first");
+	  randvalue = 0;
+	}
+      }
+
+      klee_message("randvalue: %d", randvalue);
       if (randvalue==1){
         cond = Expr::createIsZero(cond);
         klee::klee_message("randvalue==1, pick the opposite Cond: %s", cond.get_ptr()->dump2().c_str());
@@ -2294,7 +2381,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
       klee::klee_message("branches.first: %p branches.second: %p", branches.first, branches.second);
       if (randvalue==1){
-        klee::klee_message("randvalue==1, exchange the StatePair the keep the branches corresponds the original Cond (but it will be executed first)");
+        klee::klee_message("randvalue==1, exchange the StatePair the keep the branches corresponding the original Cond (but BB1 will be executed first)");
         branches = StatePair(branches.second, branches.first);
         klee::klee_message("branches.first: %p branches.second: %p", branches.first, branches.second);
       }
@@ -2920,6 +3007,26 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       size = MulExpr::create(size, count);
     }
     executeAlloc(state, size, true, ki);
+    // symbolize the stack object;
+    ObjectPair op;
+    ref<Expr> address = getDestCell(state, ki).value;
+    ConstantExpr *realAddress = dyn_cast<ConstantExpr>(address);
+
+    if (realAddress) {
+      AllocaInst *ai = cast<AllocaInst>(ki->inst);
+      llvm::Type *ty = ai->getAllocatedType();
+      bool success = getMemoryObject(op, state, address);
+      if (success) {
+        const MemoryObject *mo = op.first;
+        ref<Expr> offset = mo->getOffsetExpr(address);
+        const ObjectState *os = op.second;
+        if (os->readOnly) {
+        } else {
+            ObjectState *wos = state.addressSpace.getWriteable(mo, os);
+            initializeStackObject(state, wos, ty, 0);
+        }
+      }
+    }
     break;
   }
 
