@@ -942,8 +942,8 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
     config["91_print_inst"] = True
     config["92_indirectcall"] = {}
     config["93_whitelist"] = {}
-    config["94_looplimit"] = 10
-    config["95_kernelversion"] = PATH.split("/pocs/")[1]
+    config["94_looplimit"] = 3
+    config["95_kernelversion"] = PATH
     
     config["97_calltrace"] = calltracefunclist
     with open(output, 'w') as f:
@@ -1559,9 +1559,11 @@ if __name__ == "__main__":
     
     option = sys.argv[1]
     PATH = ""
+    targetline = "/home/zzhan173/repos/linux/fs/squashfs/lzo_wrapper.c:68"
     #targetline = "/home/zzhan173/repos/linux/lib/bitmap.c:1278"
     #targetline = "/home/zzhan173/repos/linux/mm/percpu.c:1746"
-    targetline = "/home/zzhan173/repos/linux/drivers/gpu/drm/drm_fb_helper.c:733"
+    #targetline = "/home/zzhan173/repos/linux/drivers/gpu/drm/drm_fb_helper.c:733"
+    #targetline = "kernel/printk/printk.c:1402"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/O0result"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7"
     #PATH = "/home/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/gcov"
@@ -1576,7 +1578,9 @@ if __name__ == "__main__":
     #PATH = "/data/zzhan173/OOBW/pocs/19d6c375/d19c64b3d097"
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/a770bf51/cbf3d60329c4"
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a"
-    PATH = "/data/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0"
+    #PATH = "/data/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0"
+    #PATH = "/home/zzhan173/OOBW2020-2021/08d60e599954/e68061375f79"
+    PATH = "/home/zzhan173/OOBW2020-2021/e812cbbbbbb1/a0d54b4f5b21"
     if not PATH:
         PATH = sys.argv[2]
     #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with later BC files
@@ -1590,6 +1594,7 @@ if __name__ == "__main__":
     #1) get cover file from syzkaller reproducer
     # note that we need to compile corresponding syzkaller, sometimes we need to adapt the source code
     # requirement repro.syz, compiled kernel from 0), compiled corresponding syzkaller tool
+    #all) requirement config_withoutkasan calltracefunclist
     elif option == "get_all":
         get_all(PATH, targetline)
     #1.1) get coverline info from cover with vmlinux
