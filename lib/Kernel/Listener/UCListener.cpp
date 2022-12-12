@@ -502,7 +502,7 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
     }
     std::string name = f->getName().str();
     std::string simplifyname = simplifyfuncname(name);
-    std::string local_skipfunctions[] = {"llvm.read_register.i64", "llvm.write_register.i64", "nla_data", "console_lock", "console_unlock"};
+    std::string local_skipfunctions[] = {"llvm.read_register.i64", "llvm.write_register.i64", "nla_data", "console_lock", "console_unlock", "klee_div_zero_check", "klee_overshift_check"};
     for (std::string local_skipfunction:local_skipfunctions)
     {
         skip_functions.insert(local_skipfunction);
@@ -517,7 +517,7 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
         klee::klee_message("skip function: %s",name.c_str());
         return true;
     }
-    if(skip_calltrace_distance(state, ki)){
+    if(skip_calltrace_distance(state, ki, name)){
         skip_calltrace = true;
         return true;
     }
@@ -541,7 +541,8 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
 
 // used to calculate the distance between current function and target vulnerable function.
 // If it's over the threshold (return true), then we wan't do deeper function call
-bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee::KInstruction *ki) {
+// add a check:  if there is a cyclic call (A->B->C->A), then just skip
+bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee::KInstruction *ki, std::string targetfuncname) {
     // if there is no "97_calltrace" in config, we don't want to skip any functions.
     if (Calltrace.size() == 0){
         return false;
@@ -556,6 +557,7 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
 
     int endIndex = state.stack.size() - 1;
     std::string calltracefuncname;
+
     for (int i = 0; i <= endIndex; i++) {
       auto const &sf = state.stack.at(i);
       klee::KFunction* kf = sf.kf;
@@ -565,7 +567,12 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
       }
       if (f)
       {
+          // check cyclic callchain
           std::string funcname = f->getName().str();
+          if(targetfuncname == funcname) {
+            klee_message("detected cyclic call chain: %s skipped", targetfuncname.c_str());
+            return true;
+          }
             if (funcname != calltracefuncname) {
                 Insametrace = false;
             }

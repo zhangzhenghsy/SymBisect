@@ -27,7 +27,7 @@ namespace kuc {
 
         void executionFailed(klee::ExecutionState &state, klee::KInstruction *ki) override;
 
-        bool skip_calltrace_distance(klee::ExecutionState &state, klee::KInstruction *ki);
+        bool skip_calltrace_distance(klee::ExecutionState &state, klee::KInstruction *ki, std::string targetfuncname);
 
         // count for global var name
         std::map<std::string, int64_t> count;
