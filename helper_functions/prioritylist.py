@@ -446,6 +446,40 @@ def get_bb_addrs(s_buf, addr):
         index +=1
     return addrs
 
+# some functions are not inserted __sanitizer_cov_trace_pc insts. For such functions, we shouldn't restore the BB addrs with cov insts?
+def func_no_covinst(s_buf, addr):
+    addr = addr[2:]
+    st = 0
+    ed = len(s_buf) - 1
+    index = get_dump_line(s_buf,st,ed, addr)
+    index2 = index
+    index3 = index
+    
+    startfunc = False
+    funcname = None
+    while '__sanitizer_cov_trace_pc' not in s_buf[index]:
+        index -=1
+        if ">:" in s_buf[index]:
+            startfunc = True
+            funcname =  s_buf[index].split("<")[1].split(">")[0]
+            break
+    #if addr == "ffffffff81aea638":
+    #    print("ffffffff81aea638 BBstart",s_buf[index], startfunc)
+    endfunc = False
+    while '__sanitizer_cov_trace_pc' not in s_buf[index2]:
+        index2 +=1
+        if s_buf[index2] == "\n":
+            endfunc = True
+            break
+    #if addr == "ffffffff81aea638":
+    #    print("ffffffff81aea638 BBend",s_buf[index2])
+    if startfunc and endfunc:
+        #print(funcname, "not inserted with cov Inst")
+        #print(s_buf[index3-1][:-1])
+        #print(s_buf[index3][:-1])
+        return True, funcname
+    return False, funcname
+        
 # for the BB addresses, try to generate the corresponding complete instructions addresses
 # it requires dumpresult and coverage file
 # it will be used in get_line_whitelist()
@@ -475,10 +509,38 @@ def get_complete_coverage(PATH):
         addr = line[:-1]
         #print(addr)
         bbaddrs = get_bb_addrs(dumpresult, addr)
+        func_no_covinst(dumpresult, addr);
         #print(bbaddrs)
         completeaddrs += bbaddrs
 
     with open(PATH+"/completecover",'w') as f:
+        for addr in completeaddrs:
+            f.write(addr+"\n")
+
+def get_complete_coverage_filter_func_no_covinst(PATH):
+    vmlinux = PATH + '/vmlinux'
+    dumpresult = PATH+"/dumpresult"
+    with open(dumpresult,'r') as f:
+        dumpresult = f.readlines()
+
+    cover = PATH+"/cover"
+    with open(cover,'r') as f:
+        bbcover = f.readlines()
+
+    completeaddrs = []
+    filterfunclist = []
+    for line in bbcover:
+        addr = line[:-1]
+        result,funcname = func_no_covinst(dumpresult, addr)
+        if result:
+            if funcname not in filterfunclist:
+                print(funcname, "not inserted with cov Inst")
+                filterfunclist += [funcname]
+            continue
+        bbaddrs = get_bb_addrs(dumpresult, addr)
+        completeaddrs += bbaddrs
+
+    with open(PATH+"/completecover_filter_func_no_covinst",'w') as f:
         for addr in completeaddrs:
             f.write(addr+"\n")
 
@@ -1684,4 +1746,9 @@ if __name__ == "__main__":
         check_duplicate_func_linelist(PATH)
     elif option == "adapt_code":
         compilebc.adapt_code(ref_linux, PATH+"/codeadaptation.json")
+    elif option == "get_complete_coverage_filter_func_no_covinst":
+        get_complete_coverage_filter_func_no_covinst(PATH)
+        cover = "/completecover_filter_func_no_covinst"
+        output = "/completecoverlineinfo_filter"
+        get_cover_lineinfo(PATH, cover, output)
 

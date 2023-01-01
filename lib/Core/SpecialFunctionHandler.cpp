@@ -161,6 +161,9 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   // should we consider the page padding for vmalloc?
   add("vmalloc", handleMalloc, true),
   add("kzalloc", handleKmalloc, true),
+  add("__kzalloc", handleKmalloc, true),
+  add("__do_kmalloc", handleKmalloc, true),
+  add("__kmalloc_track_caller", handleKmalloc, true),
   add("bpf_map_area_alloc", handleKmalloc, true),
 #undef addDNR
 #undef add

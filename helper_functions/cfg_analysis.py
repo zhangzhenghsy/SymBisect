@@ -11,7 +11,7 @@ def command(string1):
     return result
 
 def get_cfg_files(PATH):
-    string1 = "cd "+PATH+";mkdir cfgs;cd cfgs;/data4/zheng/Linux_kernel_UC_KLEE/install/bin/opt  -dot-cfg-only ../built-in_tag.bc"
+    string1 = "cd "+PATH+";mkdir cfgs;cd cfgs;/home/zzhan173/Linux_kernel_UC_KLEE/install/bin/opt  -dot-cfg-only ../built-in_tag.bc"
     print(string1)
     result = command(string1)
 
