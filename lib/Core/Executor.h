@@ -295,6 +295,8 @@ private:
   void checkLoopLimit(ExecutionState &state, KInstruction *ki, bool terminate);
   /// add by zheng: log the new added constraint when forking states at the branch 
   void logNewConstraint(ExecutionState &state, KInstruction *ki);
+  /// add by zheng: check if there is a targetBB guidance for current Br branch Inst
+  std::string targetBB(ExecutionState &state, KInstruction *ki);
 
   void run(ExecutionState &initialState);
 

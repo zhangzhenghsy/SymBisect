@@ -2186,6 +2186,21 @@ void Executor::logNewConstraint(ExecutionState &state, KInstruction *ki) {
   }
 }
 
+std::string Executor::targetBB(ExecutionState &state, KInstruction *ki){
+  if (!config.contains("98_BB_targetBB")){
+    return "";
+  }
+  
+  std::map<std::string, std::string> BB_targetBB = config["98_BB_targetBB"];
+  BranchInst *bi = cast<BranchInst>(ki->inst);
+  std::string currentBB = bi->getParent()->getName().str();
+  if (BB_targetBB.find(currentBB) != BB_targetBB.end()){
+    return BB_targetBB[currentBB];
+  }
+
+  return "";
+}
+
 std::unordered_set<BasicBlock *> BB_reachableBBs(BasicBlock * BB) {
   std::unordered_set<BasicBlock *> reachable;
   std::queue<BasicBlock *> worklist;
@@ -2365,10 +2380,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           klee_message("BB1 can reach BB2, try to execute BB1 first");
           randvalue = 1;
         }
-	else if(BB1_reach_BB2(bi->getSuccessor(1), bi->getSuccessor(0))) {
-	  klee_message("BB2 can reach BB1, try to execute BB2 first");
-	  randvalue = 0;
-	}
+	    else if(BB1_reach_BB2(bi->getSuccessor(1), bi->getSuccessor(0))) {
+	      klee_message("BB2 can reach BB1, try to execute BB2 first");
+	      randvalue = 0;
+	    }
       }
 
       klee_message("randvalue: %d", randvalue);
@@ -2400,6 +2415,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       if (branches.second)
         transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), *branches.second);
 
+      
+
       // only when both paths are feasible, we only to check loop limit and add the missing listener_service->afterExecuteInstruction
       if (branches.first && branches.second) {
         ExecutionState& newstate = *state2;
@@ -2413,6 +2430,23 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         klee_message("this->listener_service->afterExecuteInstruction(newstate, ki) newstate: %p", &newstate);
         this->listener_service->afterExecuteInstruction(newstate, ki);
       }
+
+      std::string TargetBB = targetBB(state, ki);
+      if (TargetBB != "") {
+        klee_message("TargetBB: %s", TargetBB.c_str());
+        if (TargetBB == bi->getSuccessor(0)->getName().str()) {
+          if (branches.second)
+          {
+            terminateState(*branches.second);
+            klee_message("terminate the second branch");
+          }
+        } else {
+          if (branches.first) {
+            terminateState(*branches.first);
+            klee_message("terminate the first branch");
+          }
+        }
+      } 
     }
     break;
   }
