@@ -952,7 +952,13 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
     calltracefunclist.reverse()
     entryfunc = calltracefunclist[0]
     config["3_entry_function"] = entryfunc
-    config["4_target_line_list"] = []
+
+    target_line_list = []
+    with open(PATH+"/4_target_line_list", "r") as f:
+        s_buf = f.readlines()
+    for line in s_buf:
+        target_line_list += [line[:-1]]
+    config["4_target_line_list"] = target_line_list
     
     target_bb_list = []
     config["10_target_bb_list"] = target_bb_list
@@ -1002,12 +1008,22 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
         config["96_concolic_map"] = all_index_value
         
     config["91_print_inst"] = True
-    config["92_indirectcall"] = {}
+    if not os.path.exists(PATH + "/92_indirectcall.json"):
+        with open(PATH + "/92_indirectcall.json", 'w') as f:
+            json.dump({}, f, indent=4)
+    with open(PATH + "/92_indirectcall.json", "r") as f:
+        indirectcall = json.load(f)
+    config["92_indirectcall"] = indirectcall
     config["93_whitelist"] = {}
     config["94_looplimit"] = 3
     config["95_kernelversion"] = PATH
     
     config["97_calltrace"] = calltracefunclist
+
+    with open(PATH + "/order_func_whitelines/BB_targetBB/total.json", "r") as f:
+        BB_targetBB = json.load(f)
+    config["98_BB_targetBB"] = BB_targetBB
+
     with open(output, 'w') as f:
         json.dump(config, f, indent=4, sort_keys=True)
 

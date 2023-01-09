@@ -140,6 +140,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
         klee::klee_message("insert new line in completecoveredLines: %s", line_info.c_str());
 
         std::set<std::string> coveredlines = state.completecoveredLines;
+        // Can be used for, given a line, we must execute line2 before. Otherwise terminate the state
         if (this->whitelist_map.find(line_info) != this->whitelist_map.end())
         {
                 std::set<std::string> whitelist = this->whitelist_map[line_info];
