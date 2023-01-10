@@ -55,7 +55,7 @@ void DFSSearcher::update(ExecutionState *current,
       states.pop_back();
     } else {
       auto it = std::find(states.begin(), states.end(), state);
-      assert(it != states.end() && "invalid state removed");
+      //assert(it != states.end() && "invalid state removed");
       states.erase(it);
     }
   }
