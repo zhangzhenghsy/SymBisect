@@ -502,7 +502,9 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
     }
     std::string name = f->getName().str();
     std::string simplifyname = simplifyfuncname(name);
-    std::string local_skipfunctions[] = {"llvm.read_register.i64", "llvm.write_register.i64", "nla_data", "console_lock", "console_unlock", "klee_div_zero_check", "klee_overshift_check"};
+    std::string local_skipfunctions[] = {"llvm.read_register.i64", "llvm.write_register.i64", "nla_data", "console_lock", "console_unlock", "klee_div_zero_check", "klee_overshift_check", "kmem_cache_alloc", "kmem_cache_alloc_node",
+    "syscall_enter_from_user_mode ", "_raw_spin_lock_irqsave", "irqentry_enter", "__schedule", "preempt_schedule_irq", "bad_range", "update_curr", "_raw_spin_lock_irq", "finish_task_switch", "call_rcu",
+    "__free_object", "free_unref_page", "path_init"};
     for (std::string local_skipfunction:local_skipfunctions)
     {
         skip_functions.insert(local_skipfunction);
@@ -611,11 +613,13 @@ std::string kuc::UCListener::create_global_var_name(klee::KInstruction *ki, int6
 
     //name += "-" + std::to_string(index);
     name += "-" + kind;
+    klee_message("create_global_var_name(), name:%s", name.c_str());
     if (this->count.find(name) == this->count.end()) {
         this->count[name] = 0;
     } else {
         this->count[name] = this->count[name] + 1;
     }
+    klee_message("create_global_var_name(), count:%s", std::to_string(this->count[name]).c_str());
     name += "-" + std::to_string(this->count[name]);
     return name;
 }

@@ -165,6 +165,11 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("__do_kmalloc", handleKmalloc, true),
   add("__kmalloc_track_caller", handleKmalloc, true),
   add("bpf_map_area_alloc", handleKmalloc, true),
+  add("kmem_cache_alloc_trace", handlekmem_cache_alloc_trace, true),
+  add("kmem_cache_alloc_node_trace", handlekmem_cache_alloc_trace, true),
+  add("kfree", handleFree, false),
+  add("kmem_cache_free", handlekmem_cache_free, false),
+  
 #undef addDNR
 #undef add
 };
@@ -799,6 +804,15 @@ void SpecialFunctionHandler::handleFree(ExecutionState &state,
   executor.executeFree(state, arguments[0]);
 }
 
+void SpecialFunctionHandler::handlekmem_cache_free(ExecutionState &state,
+                          KInstruction *target,
+                          std::vector<ref<Expr> > &arguments) {
+  // XXX should type check args
+  assert(arguments.size()==2 &&
+         "invalid number of arguments to free");
+  executor.executeFree(state, arguments[1]);
+}
+
 void SpecialFunctionHandler::handleCheckMemoryAccess(ExecutionState &state,
                                                      KInstruction *target,
                                                      std::vector<ref<Expr> > 
@@ -967,6 +981,14 @@ void SpecialFunctionHandler::handleKmalloc(ExecutionState &state,
     // XXX should type check args
     //assert(arguments.size()==2 && "invalid number of arguments to kmalloc");
     executor.executeAlloc(state, arguments[0], false, target, true);
+}
+
+void SpecialFunctionHandler::handlekmem_cache_alloc_trace(ExecutionState &state,
+                                           KInstruction *target,
+                                           std::vector<ref<Expr> > &arguments) {
+    // XXX should type check args
+    //assert(arguments.size()==2 && "invalid number of arguments to kmalloc");
+    executor.executeAlloc(state, arguments[2], false, target, true);
 }
 
 void SpecialFunctionHandler::handleIminor(ExecutionState &state,
