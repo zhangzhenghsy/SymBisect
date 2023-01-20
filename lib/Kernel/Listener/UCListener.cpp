@@ -426,7 +426,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
         case llvm::Instruction::Load: {
             // if skip OOB error, we need to symbolize the dest value
             auto result = executor->getDestCell(state, ki).value;
-            if(!result){
+            if(!result||!executor->getDestCell(state, ki).value.ptr){
                 klee::klee_message("no return value");
                 symbolize_Inst_return(state, ki);
             }
@@ -504,7 +504,7 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
     std::string simplifyname = simplifyfuncname(name);
     std::string local_skipfunctions[] = {"llvm.read_register.i64", "llvm.write_register.i64", "nla_data", "console_lock", "console_unlock", "klee_div_zero_check", "klee_overshift_check", "kmem_cache_alloc", "kmem_cache_alloc_node",
     "syscall_enter_from_user_mode ", "_raw_spin_lock_irqsave", "irqentry_enter", "__schedule", "preempt_schedule_irq", "bad_range", "update_curr", "_raw_spin_lock_irq", "finish_task_switch", "call_rcu",
-    "__free_object", "free_unref_page", "path_init"};
+    "__free_object", "free_unref_page", "rcu_read_unlock", "rcu_lock_release", "ERR_PTR"};
     for (std::string local_skipfunction:local_skipfunctions)
     {
         skip_functions.insert(local_skipfunction);
@@ -558,13 +558,17 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
     int currentdistance = Calltrace.size();
 
     int endIndex = state.stack.size() - 1;
+    klee_message("index: %d", endIndex);
     std::string calltracefuncname;
 
+    llvm::Function* f = NULL;
+    klee_message("targetfuncname: %s", targetfuncname.c_str());
     for (int i = 0; i <= endIndex; i++) {
+      klee::klee_message("i: %d", i);
       auto const &sf = state.stack.at(i);
       klee::KFunction* kf = sf.kf;
-      llvm::Function* f = kf ? kf->function : 0;
-      if (Insametrace) {
+      f = kf ? kf->function : NULL;
+      if (Insametrace && i < Calltrace.size()) {
         calltracefuncname = Calltrace[i];
       }
       if (f)
@@ -572,7 +576,7 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
           // check cyclic callchain
           std::string funcname = f->getName().str();
           if(targetfuncname == funcname) {
-            klee_message("detected cyclic call chain: %s skipped", targetfuncname.c_str());
+            klee::klee_message("detected cyclic call chain: %s skipped", targetfuncname.c_str());
             return true;
           }
             if (funcname != calltracefuncname) {
