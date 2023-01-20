@@ -330,32 +330,34 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
 
     auto bb = ki->inst->getParent();
     auto name_bb = bb->getName().str();
+    auto name_l = dump_inst_sourceinfo(ki->inst);
+    auto name_f = get_real_function_name(bb->getParent());
+    string simple_name_l = simplifylineinfo(name_l);
     if (target_bbs.find(name_bb) != target_bbs.end()) {
         this->executor->haltExecution = true;
     }
     // for low_priority_bbs
     if (low_priority_bbs.find(name_bb) != low_priority_bbs.end()) {
+        klee::klee_message("%s is in low_priority_bbs terminate the state", name_bb.c_str());
+        this->executor->terminateState(state);
+        klee::klee_message("tmptest terminate the state done");
+    }
+    // for low_priority_functions   
+    else if (low_priority_functions.find(name_f) != low_priority_functions.end()) {
         this->executor->terminateState(state);
     }
-    // for low_priority_functions
-    auto name_f = get_real_function_name(bb->getParent());
-    if (low_priority_functions.find(name_f) != low_priority_functions.end()) {
-        this->executor->terminateState(state);
-    }
-    auto name_l = dump_inst_sourceinfo(ki->inst);
-    if (low_priority_lines.find(name_l) != low_priority_lines.end()) {
+    else if (low_priority_lines.find(name_l) != low_priority_lines.end()) {
         klee::klee_message("reach low priority line list terminate the state %s", name_l.c_str());
         this->executor->terminateState(state);
     }
-    string simple_name_l = simplifylineinfo(name_l);
-    if (simple_name_l != name_l) {
+    else if (simple_name_l != name_l) {
         if (low_priority_lines.find(simple_name_l) != low_priority_lines.end()) {
             klee::klee_message("reach low priority line list(after simplify) terminate the state %s", simple_name_l.c_str());
             this->executor->terminateState(state);
         }
     }
     //klee::klee_message("simple_name_l: %s", simple_name_l.c_str());
-    if (target_lines.find(simple_name_l) != target_lines.end()) {
+    else if (target_lines.find(simple_name_l) != target_lines.end()) {
         klee::klee_message("reach target line, do vulnerability check");
         bool result = OOBWcheck(state, ki);
         if (result) {
