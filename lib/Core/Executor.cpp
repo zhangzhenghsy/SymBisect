@@ -4614,6 +4614,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
 	 /// zheng: it's possible that the (symbolic offset) is larger than the size
 	 /// question, when concretize the address and get the object, is it possible that we don't get the corret object? 
         klee_message("possible OOBW detection");
+        state.OOBW = true;
 	  //std::cout << "It's possible that offset is larger than size!!! \n\n";
     ///return;
     }
@@ -4670,6 +4671,9 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     } else {
       klee::klee_message("memory error: out of bound pointer");
       klee::klee_message("ignore it now");
+      if(target) {
+        getDestCell(state, target).value.ptr = NULL;
+      }
       state.OOBW = true;
       //terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
       //                      NULL, getAddressInfo(*unbound, address));
