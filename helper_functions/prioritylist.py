@@ -12,6 +12,7 @@ import shutil
 import cfg_analysis
 import helper
 import cover_lineinfo
+from multiprocessing import Pool
 
 ref_linux = "/home/zzhan173/repos/linux"
 
@@ -265,6 +266,58 @@ def get_vmlinux_dbginfo(PATH):
     t1=time.time()
     print(PATH,(t1-t0))
 
+def execute_addreline(Argument):
+    PATH, Input, Output = Argument.split("___")
+    print(Input, Output)
+    image=PATH+"/"+"vmlinux"
+    with open(PATH+'/addr2line/'+Input,'r') as fi:
+        with open(PATH+"/addr2line/"+Output,'w') as fo:
+            subprocess.call([ADDR2LINE,'-afip','-e',image],stdin=fi,stdout=fo)
+
+def get_vmlinux_dbginfo_parallel(PATH):
+    os.mkdir(PATH+"/addr2line")
+    dumpresult = PATH+"/dumpresult"
+    #if not os.path.exists(dumpresult):
+    print("generate dumpresult")
+    string = "cd "+PATH+";objdump -d vmlinux > dumpresult"
+    command(string)
+    print("done!")
+
+    t0=time.time()
+    addrlist = []
+    with open(dumpresult,"r") as f:
+        s_buf = f.readlines()
+    for line in s_buf:
+        if line.startswith("ffff") and line[16]==":":
+            addrlist += [line.split(":")[0]]
+        if "__kprobes_text_end>:" in line:
+            break
+    
+    size = len(addrlist)
+
+    Arguments = []
+    Parrallelnumber = 24
+    for num in range(Parrallelnumber):
+        localaddrlist = addrlist[num*size//Parrallelnumber: (num+1)*size//Parrallelnumber]
+        if num == Parrallelnumber-1:
+            localaddrlist = addrlist[num*size//Parrallelnumber:]
+        with open(PATH+"/addr2line/tmp_i"+str(num),"w") as f:
+            for addr in localaddrlist:
+                f.write(addr+"\n")
+        Arguments += [PATH+"___tmp_i"+str(num) + "___tmp_o"+str(num)]
+        
+    with Pool(32) as p:
+        p.map(execute_addreline, Arguments)
+
+    print("done! then try to concatenate the tmp_o")
+    for num in range(Parrallelnumber):
+        string = "cd "+PATH+"/addr2line;cat tmp_o"+str(num)+" >> tmp_o_total"
+        print(string)
+        command(string)
+    shutil.copy(PATH+"/addr2line/tmp_o_total", PATH+"/tmp_o");
+    t1=time.time()
+    print(PATH,(t1-t0))
+
 def get_vmlinux_dbginfo_func(PATH, func):
     funcaddrs = get_funcname_addrs(PATH, func)
     with open("addrs_"+func, "w") as f:
@@ -283,7 +336,7 @@ def get_cover_lineinfo(PATH, cover = "/cover", output = "/coverlineinfo"):
     #debugino: debug file (tmp_o) extracted from vmlinux
     cover = PATH + cover
     output = PATH + output
-    print("\nget_cover_lineinfo()", cover, output)
+    print("get_cover_lineinfo()", cover, output)
     debuginfo = PATH+"/tmp_o"
     with open(debuginfo,"r") as f:
         debug_buf = f.readlines()
@@ -954,8 +1007,12 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
     config["3_entry_function"] = entryfunc
 
     target_line_list = []
-    with open(PATH+"/4_target_line_list", "r") as f:
-        s_buf = f.readlines()
+    if os.path.exists(PATH+"/4_target_line_list"):
+        with open(PATH+"/4_target_line_list", "r") as f:
+            s_buf = f.readlines()
+    else:
+        with open(PATH+"/targetline", "r") as f:
+            s_buf = f.readlines()
     for line in s_buf:
         target_line_list += [line[:-1]]
     config["4_target_line_list"] = target_line_list
@@ -1007,7 +1064,7 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
         all_index_value = concolic.get_concolicmap(parameterlist)
         config["96_concolic_map"] = all_index_value
         
-    config["91_print_inst"] = True
+    config["91_print_inst"] = False
     if not os.path.exists(PATH + "/92_indirectcall.json"):
         with open(PATH + "/92_indirectcall.json", 'w') as f:
             json.dump({}, f, indent=4)
@@ -1019,9 +1076,11 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
     config["95_kernelversion"] = PATH
     
     config["97_calltrace"] = calltracefunclist
-
-    with open(PATH + "/order_func_whitelines/BB_targetBB/total.json", "r") as f:
-        BB_targetBB = json.load(f)
+    
+    BB_targetBB = {}
+    if os.path.exists(PATH + "/order_func_whitelines/BB_targetBB/total.json"):
+        with open(PATH + "/order_func_whitelines/BB_targetBB/total.json", "r") as f:
+            BB_targetBB = json.load(f)
     config["98_BB_targetBB"] = BB_targetBB
 
     with open(output, 'w') as f:
@@ -1546,6 +1605,8 @@ def compile_gcc(PATH):
     string1 = "cd "+ref_linux+";cp "+PATH+"/config .config;make olddefconfig;make -j32"
     print(string1)
     result = command(string1)
+
+def copy_compiledkernel(PATH):
     srcpath = ref_linux
     dstpath = PATH
     print("copy vmlinux/System.map/bzImage/.config to", dstpath)
@@ -1618,7 +1679,7 @@ def get_BBlinelist_doms(PATH):
     get_line_blacklist_doms_postdoms_calltrace(PATH)
 
 #requirement: cover, config_withoutkasan, calltracefunclist
-def get_all(PATH, targetline = ""):
+def get_all(PATH, targetline = "", mustBBs = []):
     get_cover_lineinfo(PATH)
     if targetline:
         cover_lineinfo.cut_cover_line(PATH, targetline)
@@ -1629,7 +1690,31 @@ def get_all(PATH, targetline = ""):
     get_linelist(PATH)
     get_BBlist(PATH)
     get_BBlinelist_doms(PATH)
-    generate_kleeconfig(PATH)
+    cfg_analysis.get_cfg_files(PATH)
+    generate_kleeconfig(PATH, [], mustBBs)
+
+def get_cover_from_vmlog(PATH):
+    print("\nget_cover_from_vmlog()\n")
+    with open(PATH+"/vm.log") as f:
+        s_buf = f.readlines()
+    
+    addrlist = []
+    completed = False
+    for line in s_buf:
+        if "KCOV:" in line:
+            addr = line[:-1].split("KCOV: ")[1]
+            addrlist += [addr]
+        if "Completed" in line:
+            completed = True
+
+    if completed:
+        print("Complete coverage from KCOV output")
+    else:
+        print("Not Complete coverage from KCOV output?")
+    
+    with open(PATH+"/cover", "w") as f:
+        for addr in addrlist:
+            f.write(str(addr)+"\n")
 
 #prerequirement: bzImage, cover, config_withoutkasan, calltracefunclist
 if __name__ == "__main__":
@@ -1637,7 +1722,7 @@ if __name__ == "__main__":
     
     option = sys.argv[1]
     PATH = ""
-    targetline = "/home/zzhan173/repos/linux/fs/squashfs/lzo_wrapper.c:68"
+    #targetline = "/home/zzhan173/repos/linux/fs/squashfs/lzo_wrapper.c:68"
     #targetline = "/home/zzhan173/repos/linux/lib/bitmap.c:1278"
     #targetline = "/home/zzhan173/repos/linux/mm/percpu.c:1746"
     #targetline = "/home/zzhan173/repos/linux/drivers/gpu/drm/drm_fb_helper.c:733"
@@ -1658,18 +1743,32 @@ if __name__ == "__main__":
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a"
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0"
     #PATH = "/home/zzhan173/OOBW2020-2021/08d60e599954/e68061375f79"
-    PATH = "/home/zzhan173/OOBW2020-2021/e812cbbbbbb1/a0d54b4f5b21"
+    #PATH = "/home/zzhan173/OOBW2020-2021/e812cbbbbbb1/a0d54b4f5b21"
+    PATH = "/data/zzhan173/Qemu/OOBW/pocs/dfd3d526/4f1b4da541db"
     if not PATH:
         PATH = sys.argv[2]
+    # Manualwork: set the targetline manually
+    with open(PATH+"/targetline", "r") as f:
+        targetline = f.readlines()[0][:-1]
+        print("targetline:", targetline)
     #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with later BC files
     # requirement config file; optional: codeadaptation.json
+    # update: with yu's method, we may ONLY need a fixed codeadaptation.json to add KCOV output.
     if option == "compile_refkernel":
         compile_gcc(PATH)
+    # Manual work: now we manually add the KCOV output in end_report()
+    elif option == "copy_refkernel":
+        copy_compiledkernel(PATH)
     #0.1) get and store debuginfo from vmlinux, stored as tmp_o (get dumpresult of vmlinux by the way)
-    if option == "get_vmlinux_dbginfo":
+    elif option == "get_vmlinux_dbginfo":
         #PATH = sys.argv[2]
-        get_vmlinux_dbginfo(PATH)
-    #1) get cover file from syzkaller reproducer
+        #get_vmlinux_dbginfo(PATH)
+        get_vmlinux_dbginfo_parallel(PATH)
+    #elif option == "get_vmlinux_dbginfo_parallel":
+    #    get_vmlinux_dbginfo_parallel(PATH)
+    #1) Manual work: get KCOV output from syzkaller reproducer
+    elif option == "get_cover_from_vmlog":
+        get_cover_from_vmlog(PATH)
     # note that we need to compile corresponding syzkaller, sometimes we need to adapt the source code
     # requirement repro.syz, compiled kernel from 0), compiled corresponding syzkaller tool
     #all) requirement config_withoutkasan calltracefunclist
@@ -1744,7 +1843,8 @@ if __name__ == "__main__":
     #    #PATH += "/O0result"
     #13) get config file
     elif option == "generate_kleeconfig":
-        generate_kleeconfig(PATH)
+        cfg_analysis.get_cfg_files(PATH)
+        generate_kleeconfig(PATH, [], ["built-in.bc-sctp_setsockopt-15"])
     #elif option == "generate_kleeconfig_filterwithfunctioncall":
     #    generate_kleeconfig(PATH, "functioncall")
     elif option == "generate_kleeconfig_filterwithfunctioncallordoms_concolic":
