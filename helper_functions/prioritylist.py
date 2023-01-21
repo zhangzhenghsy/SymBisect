@@ -1742,15 +1742,11 @@ if __name__ == "__main__":
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/a770bf51/cbf3d60329c4"
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a"
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0"
-    #PATH = "/home/zzhan173/OOBW2020-2021/08d60e599954/e68061375f79"
     #PATH = "/home/zzhan173/OOBW2020-2021/e812cbbbbbb1/a0d54b4f5b21"
-    PATH = "/data/zzhan173/Qemu/OOBW/pocs/dfd3d526/4f1b4da541db"
+    #PATH = "/data/zzhan173/Qemu/OOBW/pocs/dfd3d526/4f1b4da541db"
+    PATH = "/home/zzhan173/OOBW2020-2021/08d60e599954/e68061375f79"
     if not PATH:
         PATH = sys.argv[2]
-    # Manualwork: set the targetline manually
-    with open(PATH+"/targetline", "r") as f:
-        targetline = f.readlines()[0][:-1]
-        print("targetline:", targetline)
     #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with later BC files
     # requirement config file; optional: codeadaptation.json
     # update: with yu's method, we may ONLY need a fixed codeadaptation.json to add KCOV output.
@@ -1773,6 +1769,10 @@ if __name__ == "__main__":
     # requirement repro.syz, compiled kernel from 0), compiled corresponding syzkaller tool
     #all) requirement config_withoutkasan calltracefunclist
     elif option == "get_all":
+        # Manualwork: set the targetline manually
+        with open(PATH+"/targetline", "r") as f:
+            targetline = f.readlines()[0][:-1]
+            print("targetline:", targetline)
         get_all(PATH, targetline)
     #1.1) get coverline info from cover with vmlinux
     elif option == "get_cover_lineinfo":
