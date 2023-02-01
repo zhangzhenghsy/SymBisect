@@ -169,7 +169,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("kmem_cache_alloc_node_trace", handlekmem_cache_alloc_trace, true),
   add("kfree", handleFree, false),
   add("kmem_cache_free", handlekmem_cache_free, false),
-  
+  add("kmalloc_array", handleCalloc, true),
+  add("kcalloc", handleCalloc, true),
 #undef addDNR
 #undef add
 };
@@ -750,8 +751,8 @@ void SpecialFunctionHandler::handleCalloc(ExecutionState &state,
                             KInstruction *target,
                             std::vector<ref<Expr> > &arguments) {
   // XXX should type check args
-  assert(arguments.size()==2 &&
-         "invalid number of arguments to calloc");
+  //assert(arguments.size()==2 &&
+  //       "invalid number of arguments to calloc");
 
   ref<Expr> size = MulExpr::create(arguments[0],
                                    arguments[1]);
