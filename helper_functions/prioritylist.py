@@ -991,7 +991,20 @@ def get_low_priority_bb_list(PATH, MustBBs):
     low_priority_bb_list.sort()
     return low_priority_bb_list
 
-def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
+def generate_kleeconfig(PATH, parameterlist = []):
+    helper.get_mustBBs(PATH)
+    with open(PATH+"/mustBBs", "r") as f:
+        s_buf = f.readlines()
+    MustBBs = [line[:-1] for line in s_buf]
+
+    helper.get_indirectcalls(PATH)
+    indirectcall = {}
+    with open(PATH+"/indirectcalls", "r") as f:
+        s_buf = f.readlines()
+    for line in s_buf:
+        line,callee = line[:-1].split(" ")
+        indirectcall[line] = callee
+    
     config = {}
 
     #bcfile = PATH+"/do_mount_tag.bc"
@@ -1065,11 +1078,11 @@ def generate_kleeconfig(PATH, parameterlist = [], MustBBs = []):
         config["96_concolic_map"] = all_index_value
         
     config["91_print_inst"] = False
-    if not os.path.exists(PATH + "/92_indirectcall.json"):
-        with open(PATH + "/92_indirectcall.json", 'w') as f:
-            json.dump({}, f, indent=4)
-    with open(PATH + "/92_indirectcall.json", "r") as f:
-        indirectcall = json.load(f)
+    #if not os.path.exists(PATH + "/92_indirectcall.json"):
+    #    with open(PATH + "/92_indirectcall.json", 'w') as f:
+    #        json.dump({}, f, indent=4)
+    #with open(PATH + "/92_indirectcall.json", "r") as f:
+    #    indirectcall = json.load(f)
     config["92_indirectcall"] = indirectcall
     config["93_whitelist"] = {}
     config["94_looplimit"] = 3
@@ -1679,11 +1692,14 @@ def get_BBlinelist_doms(PATH):
     get_line_blacklist_doms_postdoms_calltrace(PATH)
 
 #requirement: cover, config_withoutkasan, calltracefunclist
-def get_all(PATH, targetline = "", mustBBs = []):
+def get_all(PATH):
+    helper.get_targetline_format(PATH)
+    with open(PATH+"/targetline", "r") as f:
+        targetline = f.readlines()[0][:-1]
+        print("targetline:", targetline)
     get_cover_lineinfo(PATH)
-    if targetline:
-        cover_lineinfo.cut_cover_line(PATH, targetline)
-        get_cover_lineinfo(PATH)
+    cover_lineinfo.cut_cover_line(PATH, targetline)
+    get_cover_lineinfo(PATH)
     compile_bcfiles(PATH)
     get_bcfile_fromcover(PATH)
     get_complete_coverage_coverline(PATH)
@@ -1691,7 +1707,7 @@ def get_all(PATH, targetline = "", mustBBs = []):
     get_BBlist(PATH)
     get_BBlinelist_doms(PATH)
     cfg_analysis.get_cfg_files(PATH)
-    generate_kleeconfig(PATH, [], mustBBs)
+    generate_kleeconfig(PATH, [])
 
 def get_cover_from_vmlog(PATH):
     print("\nget_cover_from_vmlog()\n")
@@ -1704,7 +1720,7 @@ def get_cover_from_vmlog(PATH):
         if "KCOV:" in line:
             addr = line[:-1].split("KCOV: ")[1]
             addrlist += [addr]
-        if "Completed" in line:
+        if "Done!" in line:
             completed = True
 
     if completed:
@@ -1744,7 +1760,8 @@ if __name__ == "__main__":
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/033724d6/04300d66f0a0"
     #PATH = "/home/zzhan173/OOBW2020-2021/e812cbbbbbb1/a0d54b4f5b21"
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/dfd3d526/4f1b4da541db"
-    PATH = "/home/zzhan173/OOBW2020-2021/08d60e599954/e68061375f79"
+    #PATH = "/home/zzhan173/OOBW2020-2021/08d60e599954/e68061375f79"
+    PATH = "/data/zzhan173/Qemu/OOBW/pocs/0d1c3530/b74b991fb8b9"
     if not PATH:
         PATH = sys.argv[2]
     #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with later BC files
@@ -1765,15 +1782,11 @@ if __name__ == "__main__":
     #1) Manual work: get KCOV output from syzkaller reproducer
     elif option == "get_cover_from_vmlog":
         get_cover_from_vmlog(PATH)
-    # note that we need to compile corresponding syzkaller, sometimes we need to adapt the source code
+    # # note that we need to compile corresponding syzkaller
     # requirement repro.syz, compiled kernel from 0), compiled corresponding syzkaller tool
-    #all) requirement config_withoutkasan calltracefunclist
+    #all) Manual work: config_withoutkasan callstack(just copy from bug report)
     elif option == "get_all":
-        # Manualwork: set the targetline manually
-        with open(PATH+"/targetline", "r") as f:
-            targetline = f.readlines()[0][:-1]
-            print("targetline:", targetline)
-        get_all(PATH, targetline)
+        get_all(PATH)
     #1.1) get coverline info from cover with vmlinux
     elif option == "get_cover_lineinfo":
         get_cover_lineinfo(PATH)
