@@ -184,8 +184,10 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             continue;
         }
         klee::ref<klee::Expr> operand = executor->eval(ki, i, state).value;
-        yhao_print(operand->print, str);
-        klee::klee_message("Inst operand %zu: %s", i, str.c_str());
+        //yhao_print(operand->print, str);
+        if (operand.get_ptr()){
+            klee::klee_message("Inst operand %zu: %s", i, operand.get_ptr()->dump2().c_str());
+        }
         i++;
     }
     }
@@ -341,6 +343,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             klee::klee_message("Inst value: Null");
         }
     }
+    bool OOBWcheck_result = OOBWcheck(state, ki);
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
             //yhao_print(executor->getDestCell(state, ki).value->print, str);
@@ -375,6 +378,10 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             if (this->map_address_symbolic.find(address) == this->map_address_symbolic.end()){
                 break;
             }
+            // there is a symbolic address such as: concretebase+symoffset, thus we create a concrete address corresponding it
+            // However, sometimes what we really need to access is the object at concretebase
+            // Here we need to restore the concrete base and write to it
+            klee_message("restore sym address with concrete addr: %s", address.get_ptr()->dump2().c_str());
             address = this->map_address_symbolic[address];
             klee_message("sym address: %s", address.get_ptr()->dump2().c_str());
             //if (klee::ConstantExpr* CE1 = dyn_cast<klee::ConstantExpr>(address)) {
@@ -396,23 +403,28 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
                 klee::ref<klee::Expr> objectbase = klee::ConstantExpr::create(object->address, klee::Context::get().getPointerWidth());
                 klee::ref<klee::Expr> currentaddr;
                 int loop = 0;
+                // Now the offset if symbolic, for every offset at the object which may equal the symoffset, we try to make the value there to be original value or the new writing value 
                 for (offset = 0 ; offset < (uint64_t)object->size; offset += size) {
                     loop ++;
                     if (loop > 32) break;
                     ref<Expr> Offset = klee::ConstantExpr::create(offset, klee::Context::get().getPointerWidth());
+                    klee_message("objectbase: %s", objectbase.get_ptr()->dump2().c_str());
+                    klee_message("Offset: %s", Offset.get_ptr()->dump2().c_str());
                     ref<Expr> currentaddr = AddExpr::create(objectbase, Offset);
                     ref<Expr> oldvalue = os->read(offset, size*8);
 
                     bool res;
                     klee_message("currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());
                     klee_message("address: %s", address.get_ptr()->dump2().c_str());
+                    klee_message("oldvalue: %s", oldvalue.get_ptr()->dump2().c_str());
                     ref<Expr> condition = EqExpr::create(currentaddr, address);
                     bool success = executor->solver->mayBeTrue(state.constraints, condition, res,
                                   state.queryMetaData);
                     if (!res) { 
-                        klee_message("address cannot equal current address, skip. currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());
+                        klee_message("sym address cannot equal current address, skip. currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());
                         continue; 
                     }
+                    // create a new symvalue which can equal old value at current address or new written value, then write the symvalue back to current address
                     auto name = "["+currentaddr.get_ptr()->dump2()+"]" + "(symvar)";
                     ref<Expr> currentvalue = executor->manual_make_symbolic(name, size, size*8);
                     ref<Expr> newconstraint = OrExpr::create(EqExpr::create(currentvalue, oldvalue), EqExpr::create(currentvalue, value));
@@ -514,8 +526,7 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
         klee::klee_message("skip function: %s",name.c_str());
         return true;
     }
-    if (simplifyname == "")
-     if (skip_functions.find(simplifyname) != skip_functions.end()) {
+    if (skip_functions.find(simplifyname) != skip_functions.end()) {
         klee::klee_message("skip function: %s",name.c_str());
         return true;
     }
@@ -564,7 +575,7 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
     llvm::Function* f = NULL;
     klee_message("targetfuncname: %s", targetfuncname.c_str());
     for (int i = 0; i <= endIndex; i++) {
-      klee::klee_message("i: %d", i);
+      //klee::klee_message("i: %d", i);
       auto const &sf = state.stack.at(i);
       klee::KFunction* kf = sf.kf;
       f = kf ? kf->function : NULL;
@@ -573,15 +584,17 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
       }
       if (f)
       {
-          // check cyclic callchain
-          std::string funcname = f->getName().str();
-          if(targetfuncname == funcname) {
-            klee::klee_message("detected cyclic call chain: %s skipped", targetfuncname.c_str());
-            return true;
-          }
+            // check cyclic callchain
+            std::string funcname = f->getName().str();
+            if(targetfuncname == funcname) {
+                klee::klee_message("detected cyclic call chain: %s skipped", targetfuncname.c_str());
+                return true;
+            }
+            //klee_message("calltracefuncname:%s  funcname:%s ", calltracefuncname.c_str(), funcname.c_str());
             if (funcname != calltracefuncname) {
                 Insametrace = false;
             }
+            //klee_message("Insametrace: %s", Insametrace ? "true" : "false");
             if (Insametrace) {
                 currentdistance -= 1;
             } else {
@@ -798,7 +811,12 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
         if (skip_functions.find(name) != skip_functions.end()) {
             klee::klee_message("in skip_functions");
             goto create_return;
-        } else {
+        } 
+        else if (skip_functions.find(simplifyfuncname(name)) != skip_functions.end()){
+            klee::klee_message("in skip_functions");
+            goto create_return;
+        }
+        else {
             return;
         }
     } else if (!f) {
@@ -890,4 +908,65 @@ void kuc::UCListener::resolve_symbolic_expr(const klee::ref<klee::Expr> &symboli
             }
         }
     }
+}
+
+bool kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki) {
+    bool OOBW = state.OOBW;
+    if(OOBW) return OOBW;
+    switch (ki->inst->getOpcode()) {
+        case llvm::Instruction::GetElementPtr: {
+            klee::ObjectPair op;
+            bool success;
+            klee::ref<klee::Expr> address = executor->eval(ki, 0, state).value;
+            auto access_address = executor->getDestCell(state, ki).value;
+            klee::ref<klee::Expr> GEPoffset = SubExpr::create(access_address, address);
+            klee_message("GEP offset: %s", GEPoffset.get_ptr()->dump2().c_str());
+            // if the address is really concrete (no mapped symbolic address), we don't need to check the mapping between symbolic addr and base object
+            if (this->map_address_symbolic.find(address) == this->map_address_symbolic.end()){
+                break;
+            }
+            // there is a symbolic address such as: concretebase+symoffset, thus we create a concrete address corresponding it
+            // However, sometimes what we really need to access is the object at concretebase
+            // Here we need to restore the concrete base and write to it
+            klee_message("restore sym address with concrete addr: %s", address.get_ptr()->dump2().c_str());
+            address = this->map_address_symbolic[address];
+            klee_message("sym address: %s", address.get_ptr()->dump2().c_str());
+
+            if (state.symaddr_base.find(address) != state.symaddr_base.end()){                
+                klee::ref<klee::Expr> baseaddr = state.symaddr_base[address];
+                klee_message("find address in symaddr_base mapping, the base addr: %s", baseaddr.get_ptr()->dump2().c_str());
+                success = state.addressSpace.resolveOne(dyn_cast<klee::ConstantExpr>(baseaddr), op);
+                if (!success) {break;}
+                const klee::MemoryObject * object = op.first;
+                const ObjectState *os = op.second;
+                klee_message("Base corresponding obj addr: %lu obj size: %u", object->address, object->size);
+
+                klee::ref<klee::Expr> objectbase = klee::ConstantExpr::create(object->address, klee::Context::get().getPointerWidth());
+                ref<Expr> offset = object->getOffsetExpr(address);
+                klee_message("symaddr offset at the base object: %s", offset.get_ptr()->dump2().c_str());
+                offset = AddExpr::create(offset, GEPoffset);
+                klee_message("GEP offset at the base object: %s", offset.get_ptr()->dump2().c_str());
+                //SubExpr::create(address, objectbase);
+                ref<Expr> check = UltExpr::create(offset, klee::ConstantExpr::create(object->size, klee::Context::get().getPointerWidth()));
+
+                if(!object->issymsize.compare("True")){
+                    ref<Expr> symsize = object->symsize;
+                    klee_message("symbolic size of the base object: %s", symsize.get_ptr()->dump2().c_str());
+                    check = UltExpr::create(offset, symsize);
+                }
+
+                bool inBounds;
+                bool success = executor->solver->mustBeTrue(state.constraints, check, inBounds,
+                                                state.queryMetaData);
+                if (!success) { break;}
+                if (!inBounds) {
+                    klee_message("possible OOBW detection");
+                    state.OOBW = true;
+                }
+
+            }
+
+        }
+    }
+    return OOBW;
 }

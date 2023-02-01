@@ -4317,6 +4317,8 @@ void Executor::executeAlloc(ExecutionState &state,
     if (symsizeptr){
     //std::cout << "store symbolic size in object\n";
     //std::cout << "*symsizeptr" << ((*symsizeptr).ptr)->dump2() << "\n";
+    klee_message("store symbolic size in object");
+    klee_message("symbolic size: %s", (*symsizeptr).get_ptr()->dump2().c_str());
     mo->issymsize = "True";
     mo->symsize = *symsizeptr;
     }

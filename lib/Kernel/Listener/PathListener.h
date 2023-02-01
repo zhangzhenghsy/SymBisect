@@ -32,6 +32,8 @@ namespace kuc {
         bool BB1_reach_BB2(BasicBlock * A, BasicBlock * B);
         bool Isaloop(BasicBlock * A, BasicBlock * B, BasicBlock * C);
 
+        bool OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki);
+
     public:
         nlohmann::json config;
         std::set<std::string> target_bbs;

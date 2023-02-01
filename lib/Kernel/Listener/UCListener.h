@@ -29,6 +29,8 @@ namespace kuc {
 
         bool skip_calltrace_distance(klee::ExecutionState &state, klee::KInstruction *ki, std::string targetfuncname);
 
+        bool OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki);
+
         // count for global var name
         std::map<std::string, int64_t> count;
         // symbolic address <-> mo->getBaseExpr()

@@ -292,7 +292,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
     }
 }
 
-bool OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki) {
+bool kuc::PathListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki) {
     bool OOBW = state.OOBW;
     return OOBW;
 }
