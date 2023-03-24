@@ -236,6 +236,45 @@ def adapt_code(repo, codeadaptation):
             for line in s_buf2:
                 f.write(line)
 
+
+def adapt_end_report(repo):
+    print("adapt_end_report()")
+    addedlines = [
+        "\tstruct task_struct *t;\n",
+        "\tunsigned long *area;\n",
+        "\tunsigned long pos;\n",
+        "\tunsigned long i;\n",
+        '\tpr_err("==================================================================\\n");\n',
+        "\tt = current;\n",
+        "\tarea = t->kcov_area;\n",
+        "\tpos = READ_ONCE(area[0]);\n",
+        "\tfor (i = 1; i < pos + 1; i++) {\n",
+        '\t\tpr_err("KCOV: %lx\\n", area[i]);\n',
+        '\t\t}\n',
+        '\tpr_err("Done!");\n',
+    ]
+    filename = repo + "/mm/kasan/report.c"
+    if not os.path.exists(filename):
+        print(filename, "not exist. Need to manually add code")
+        exit()
+
+    with open(filename, "r") as f:
+        s_buf = f.readlines()
+    for i in range(len(s_buf)):
+        line = s_buf[i]
+        if line.startswith("static void end_report"):
+            s_buf2 = s_buf[:i+2] + addedlines + s_buf[i+2:]
+            break;
+    else:
+        print("don't find suitable location to insert code. Need to manually add code")
+        return
+    with open(filename, "w") as f:
+        for line in s_buf2:
+            f.write(line)
+
+
+
+
 def compile_gcc(PATH, commit = None):
     if PATH[-1] == "/":
         PATH = PATH[:-1]
