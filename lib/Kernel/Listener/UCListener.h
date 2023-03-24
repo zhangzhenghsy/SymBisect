@@ -31,6 +31,8 @@ namespace kuc {
 
         bool OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki);
 
+        void get_key_unsat_constraint(klee::ExecutionState &state, klee::ref<klee::Expr> cond);
+
         // count for global var name
         std::map<std::string, int64_t> count;
         // symbolic address <-> mo->getBaseExpr()

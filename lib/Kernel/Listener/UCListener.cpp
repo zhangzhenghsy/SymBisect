@@ -145,6 +145,31 @@ void print_constraints(klee::ExecutionState &state) {
 	klee::klee_message("----------------"); 
 }
 
+void kuc::UCListener::get_key_unsat_constraint(klee::ExecutionState &state, klee::ref<klee::Expr> cond) {
+    klee::ConstraintSet constraints = state.constraints;
+    std::map<const std::string, std::set<std::string>> constraint_lines = state.constraint_lines;
+
+    klee::ConstraintSet new_constraints = ConstraintSet();
+    bool result;
+    ConstraintManager m(new_constraints);
+    for (const auto &constraint : constraints) {
+        m.addConstraint(constraint);
+        bool success = executor->solver->mustBeFalse(new_constraints, cond, result,
+                                      state.queryMetaData);
+        if(result){
+            std::string str;
+            yhao_print(constraint->print, str);
+            klee_message("get_key_unsat_constraint: %s", str.c_str());
+            if (constraint_lines.find(str) != constraint_lines.end()){
+                for (auto it2 = constraint_lines[str].begin(); it2 != constraint_lines[str].end(); it2++)
+                {
+                    klee::klee_message("line: %s", (*it2).c_str());/* code */
+                }
+            }
+            break;
+        }
+    }
+}
 void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     klee::klee_message("\n\nUCListener::beforeExecuteInstruction()");
     std::string str;
@@ -153,6 +178,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     klee::klee_message("ExecutionState &state: %p", &state);
     klee::klee_message("bb name i->getParent()->getName().str() %s",ki->inst->getParent()->getName().str().c_str());
     klee::klee_message("sourcecodeLine: %s %u:%u", ki->info->file.c_str(), ki->info->line, ki->info->column);
+    std::string sourcecodeline = ki->info->file + ":"+ std::to_string(ki->info->line);
     //klee::klee_message("ki->inst->getOpcodeName(): %s", ki->inst->getOpcodeName());
     if (print_inst){
         yhao_print(ki->inst->print, str)
@@ -302,7 +328,38 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             break;
         }
         case llvm::Instruction::Br: {
-            print_constraints(state);
+            if (sourcecodeline != "drivers/video/fbdev/core/sysimgblt.c:226"){
+                break;
+            }
+            BranchInst *bi = cast<BranchInst>(ki->inst);
+            if (bi->isUnconditional()) {
+                break;
+            }
+            klee::ref<klee::Expr> cond = executor->eval(ki, 0, state).value;
+
+            klee::ConstraintSet constraints = state.constraints;
+
+            bool result;
+            bool success = executor->solver->mustBeFalse(state.constraints, cond, result,
+                                      state.queryMetaData);
+            if (!success)
+                break;
+            if (result){
+                klee_message("cond must be False");
+                get_key_unsat_constraint(state, cond);
+                break;
+            }
+            cond = Expr::createIsZero(cond);
+            success = executor->solver->mustBeFalse(state.constraints, cond, result,
+                                      state.queryMetaData);
+            if (!success)
+                break;
+            if (result){
+                klee_message("cond must be True");
+                get_key_unsat_constraint(state, cond);
+                break;
+            }
+            //print_constraints(state);
             break;
     	}
         case llvm::Instruction::Call: {
@@ -411,12 +468,12 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
                     klee_message("objectbase: %s", objectbase.get_ptr()->dump2().c_str());
                     klee_message("Offset: %s", Offset.get_ptr()->dump2().c_str());
                     ref<Expr> currentaddr = AddExpr::create(objectbase, Offset);
-                    ref<Expr> oldvalue = os->read(offset, size*8);
+                    //ref<Expr> oldvalue = os->read(offset, size*8);
 
                     bool res;
                     klee_message("currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());
                     klee_message("address: %s", address.get_ptr()->dump2().c_str());
-                    klee_message("oldvalue: %s", oldvalue.get_ptr()->dump2().c_str());
+                    //klee_message("oldvalue: %s", oldvalue.get_ptr()->dump2().c_str());
                     ref<Expr> condition = EqExpr::create(currentaddr, address);
                     bool success = executor->solver->mayBeTrue(state.constraints, condition, res,
                                   state.queryMetaData);
@@ -427,10 +484,10 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
                     // create a new symvalue which can equal old value at current address or new written value, then write the symvalue back to current address
                     auto name = "["+currentaddr.get_ptr()->dump2()+"]" + "(symvar)";
                     ref<Expr> currentvalue = executor->manual_make_symbolic(name, size, size*8);
-                    ref<Expr> newconstraint = OrExpr::create(EqExpr::create(currentvalue, oldvalue), EqExpr::create(currentvalue, value));
-                    klee_message("newconstraint: %s", newconstraint.get_ptr()->dump2().c_str());
+                    //ref<Expr> newconstraint = OrExpr::create(EqExpr::create(currentvalue, oldvalue), EqExpr::create(currentvalue, value));
+                    //klee_message("newconstraint: %s", newconstraint.get_ptr()->dump2().c_str());
                     executor->executeMemoryOperation(state, true, currentaddr, currentvalue, 0);
-                    executor->addConstraint(state, newconstraint);
+                    //executor->addConstraint(state, newconstraint);
                 }
             }
             break;
