@@ -1,9 +1,47 @@
 import os,sys,subprocess
 import match_targetlines
 import json
+import threading
+import psutil
+import get_stuckfunction
 
-def command(string1):
+class Command(object):
+    def __init__(self, cmd):
+        self.cmd = cmd
+        self.process = None
+
+    def run(self, timeout):
+        def target():
+            print('Thread started')
+            self.process = subprocess.Popen(self.cmd, shell=True)
+            self.process.communicate()
+            print('Thread finished')
+
+        thread = threading.Thread(target=target)
+        thread.start()
+
+        thread.join(timeout)
+        if thread.is_alive():
+            print('Terminating process')
+            self.process.terminate()
+            thread.join()
+        return self.process.returncode
+
+def kill(proc_pid):
+    process = psutil.Process(proc_pid)
+    for proc in process.children(recursive=True):
+        proc.kill()
+    process.kill()
+
+def command(string1, Timeout=None):
     p=subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if Timeout:
+        try:
+            p.wait(timeout = Timeout)
+        except subprocess.TimeoutExpired:
+            kill(p.pid)
+            return False
+        return True
     result=p.stdout.readlines()
     return result
 
@@ -128,8 +166,8 @@ def get_targetline_format(PATH):
 # get the clean call stack after formatting.
 # requirement: cleancallstack, format_line_targetline which logs the matching between before-format line and after-format line
 def get_cleancallstack_format(PATH):
-    if not os.path.exists(PATH+"/format_line_targetline.json"):
-        get_matchedlines_afterformat(PATH)
+    #if not os.path.exists(PATH+"/format_line_targetline.json"):
+    get_matchedlines_afterformat(PATH)
 
     with open(PATH+"/format_line_targetline.json") as f:
         format_line_targetline = json.load(f)
@@ -217,13 +255,54 @@ def Check_indirectcall(bcfile, BB, callee):
         return True
     return False
 
+def add_skipfunction(configpath, skipfuncname):
+    print("add_skipfunction:", skipfuncname, "in", configpath)
+    with open(configpath) as f:
+        config = json.load(f)
+    config["13_skip_function_list"] += [skipfuncname]
+    with open(configpath, 'w') as f:
+        json.dump(config, f, indent=4, sort_keys=True)
+
+def automate_addskipfunction(configfile):
+    # whether the execution can be completed in timelimit
+    result = False
+    #configfile = "/data/zzhan173/Qemu/OOBW/pocs/0d1c3530/b74b991fb8b9/configs/ori_sock_sendmsg.json"
+    casepath = configfile.split("/configs/")[0]
+    string1 = "cd /home/zzhan173/Linux_kernel_UC_KLEE/; klee --config=" + configfile + " 2>" + casepath + "/output"
+
+    #string2 = "cd /home/zzhan173/Linux_kernel_UC_KLEE/; python get_lineoutput.py output > lineoutput"
+    string2 = "cd " + casepath + "; python /home/zzhan173/Linux_kernel_UC_KLEE/get_lineoutput.py output > lineoutput" 
+    while True:
+        result = command(string1, 600)
+        # if completed the execution within time limit, it will return True
+        if result:
+            break
+        result2 = command(string2)
+        # there is a 97_calltrace option in config
+        callstack_functions = get_stuckfunction.get_callstack_functions(configfile)
+        skipfuncname = get_stuckfunction.get_func_percent(casepath, callstack_functions)
+        add_skipfunction(configfile, skipfuncname)
+
+
 if __name__ == "__main__":
-    caller = "netlink_sendmsg"
-    callee = "netlink_unicast"
-    PATH = "/data/zzhan173/Qemu/OOBW/pocs/0d1c3530/b74b991fb8b9"
+    #caller = "netlink_sendmsg"
+    #callee = "netlink_unicast"
+    #PATH = "/data/zzhan173/Qemu/OOBW/pocs/0d1c3530/b74b991fb8b9"
     #get_callBB(PATH, caller, callee)
     #get_matchedlines_afterformat(PATH)
-    get_targetline_format(PATH)
+    #get_targetline_format(PATH)
     #get_cleancallstack_format(PATH)
-    get_indirectcalls(PATH)
-    get_mustBBs(PATH)
+    #get_indirectcalls(PATH)
+    #get_mustBBs(PATH)
+    
+    #configfile = "/data/zzhan173/Qemu/OOBW/pocs/0d1c3530/b74b991fb8b9/configs/ori_sock_sendmsg.json"
+    #string1 = "cd /home/zzhan173/Linux_kernel_UC_KLEE/; klee --config=" + configfile + " 2>output"
+    #print(string1)
+    
+    #command = Command(string1)
+    #result = command.run(timeout = 60)
+    #result = command(string1, 60)
+    #print(result)
+
+    configfile = "/home/zzhan173/OOBW2020-2021/3b0c40612471/f40ddce88593/configs/fbcon_modechanged.json"
+    automate_addskipfunction(configfile)
