@@ -275,7 +275,8 @@ def execute_addreline(Argument):
             subprocess.call([ADDR2LINE,'-afip','-e',image],stdin=fi,stdout=fo)
 
 def get_vmlinux_dbginfo_parallel(PATH):
-    os.mkdir(PATH+"/addr2line")
+    if not os.path.exists(PATH+"/addr2line"):
+        os.mkdir(PATH+"/addr2line")
     dumpresult = PATH+"/dumpresult"
     #if not os.path.exists(dumpresult):
     print("generate dumpresult")
@@ -1612,6 +1613,7 @@ def compile_gcc(PATH):
     result = command(string1)
     if os.path.exists(PATH+"/codeadaptation.json"):
         compilebc.adapt_code(ref_linux, PATH+"/codeadaptation.json")
+    compilebc.adapt_end_report(ref_linux)
     print("compilebc.format_linux()")
     compilebc.format_linux()
     helper.add_fnoinline_Makefile(ref_linux+"/Makefile")
@@ -1691,12 +1693,16 @@ def get_BBlinelist_doms(PATH):
     get_line_whitelist_doms_postdoms_calltrace(PATH, calltracefunclist)
     get_line_blacklist_doms_postdoms_calltrace(PATH)
 
-#requirement: cover, config_withoutkasan, calltracefunclist
+#requirement: vm.log, config_withoutkasan, calltracefunclist
 def get_all(PATH):
-    helper.get_targetline_format(PATH)
+    if not os.path.exists(PATH + "/targetline"):
+        helper.get_targetline_format(PATH)
     with open(PATH+"/targetline", "r") as f:
         targetline = f.readlines()[0][:-1]
         print("targetline:", targetline)
+    # sometimes we need to generate the cover manually
+    if not os.path.exists(PATH + "/cover"):
+        get_cover_from_vmlog(PATH)
     get_cover_lineinfo(PATH)
     cover_lineinfo.cut_cover_line(PATH, targetline)
     get_cover_lineinfo(PATH)
@@ -1738,6 +1744,7 @@ if __name__ == "__main__":
     
     option = sys.argv[1]
     PATH = ""
+    targetline = ""
     #targetline = "/home/zzhan173/repos/linux/fs/squashfs/lzo_wrapper.c:68"
     #targetline = "/home/zzhan173/repos/linux/lib/bitmap.c:1278"
     #targetline = "/home/zzhan173/repos/linux/mm/percpu.c:1746"
@@ -1761,29 +1768,23 @@ if __name__ == "__main__":
     #PATH = "/home/zzhan173/OOBW2020-2021/e812cbbbbbb1/a0d54b4f5b21"
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/dfd3d526/4f1b4da541db"
     #PATH = "/home/zzhan173/OOBW2020-2021/08d60e599954/e68061375f79"
-    PATH = "/data/zzhan173/Qemu/OOBW/pocs/0d1c3530/b74b991fb8b9"
+    #PATH = "/data/zzhan173/Qemu/OOBW/pocs/0d1c3530/b74b991fb8b9" done
+    #PATH = "/home/zzhan173/OOBW2020-2021/3b0c40612471/f40ddce88593"
     if not PATH:
         PATH = sys.argv[2]
     #0) compile the refkernel with given config, note that we need to format the kernel first to keep consistent with later BC files
-    # requirement config file; optional: codeadaptation.json
-    # update: with yu's method, we may ONLY need a fixed codeadaptation.json to add KCOV output.
+    # Manual work: config file;
     if option == "compile_refkernel":
-        compile_gcc(PATH)
-    # Manual work: now we manually add the KCOV output in end_report()
-    elif option == "copy_refkernel":
+        #compile_gcc(PATH)
         copy_compiledkernel(PATH)
-    #0.1) get and store debuginfo from vmlinux, stored as tmp_o (get dumpresult of vmlinux by the way)
-    elif option == "get_vmlinux_dbginfo":
-        #PATH = sys.argv[2]
-        #get_vmlinux_dbginfo(PATH)
+        #0.1) get and store debuginfo from vmlinux, stored as tmp_o (get dumpresult of vmlinux by the way)
         get_vmlinux_dbginfo_parallel(PATH)
-    #elif option == "get_vmlinux_dbginfo_parallel":
-    #    get_vmlinux_dbginfo_parallel(PATH)
-    #1) Manual work: get KCOV output from syzkaller reproducer
+    elif option == "get_vmlinux_dbginfo_parallel":
+        get_vmlinux_dbginfo_parallel(PATH)
+    #1) Manual work: get KCOV output vm.0 from syzkaller reproducer
+    # requirement repro.syz, compiled kernel from 0), compiled corresponding syzkaller tool
     elif option == "get_cover_from_vmlog":
         get_cover_from_vmlog(PATH)
-    # # note that we need to compile corresponding syzkaller
-    # requirement repro.syz, compiled kernel from 0), compiled corresponding syzkaller tool
     #all) Manual work: config_withoutkasan callstack(just copy from bug report)
     elif option == "get_all":
         get_all(PATH)
