@@ -165,6 +165,12 @@ def get_matchedlines_git(PATH1, PATH2):
         s_buf1 = f.readlines()
     with open(PATH2, "r") as f:
         s_buf2 = f.readlines()
+    if len(p_buf) == 0:
+        print("no difference between two files")
+        filter_line_targetline = {}
+        for i in range(len(s_buf1)):
+            filter_line_targetline[i+1] = i+1
+        return filter_line_targetline
     trim_lines(s_buf1)
     trim_lines(s_buf2)
 
