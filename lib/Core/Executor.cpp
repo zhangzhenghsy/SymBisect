@@ -2134,13 +2134,7 @@ std::string getCalltrace(ExecutionState &state) {
   calltrace.pop_back();
   return calltrace;
 }
-void Executor::checkLoopLimit(ExecutionState &state, KInstruction *ki, bool terminate = false) {
-  unsigned int looplimit;
-  if (config.contains("94_looplimit")){
-        looplimit = config["94_looplimit"];
-  } else {
-    looplimit = 10;
-  }
+void Executor::checkLoopLimit(ExecutionState &state, KInstruction *ki, unsigned int looplimit, bool terminate = false) {
   std::string BBname = ki->inst->getParent()->getName().str();
   // for Intrinsic function no need to set the limit
   if (BBname.find("bc-") == std::string::npos){
@@ -2351,6 +2345,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     break;
   }
   case Instruction::Br: {
+    klee_message("Instruction::Br");
     BranchInst *bi = cast<BranchInst>(i);
     if (bi->isUnconditional()) {
       klee::klee_message("Instruction::Br is Unconditional");
@@ -2416,7 +2411,12 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), *branches.second);
 
       
-
+      unsigned int looplimit;
+      if (config.contains("94_looplimit")){
+        looplimit = config["94_looplimit"];
+      } else {
+        looplimit = 10;
+      }
       // only when both paths are feasible, we only to check loop limit and add the missing listener_service->afterExecuteInstruction
       if (branches.first && branches.second) {
         ExecutionState& newstate = *state2;
@@ -2425,10 +2425,14 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         klee_message("logNewConstraint for state : %p",  &newstate);
         logNewConstraint(newstate, ki);
         // should we log the BB execution number when there is only one path feasible?
-        checkLoopLimit(state, ki);
-        checkLoopLimit(newstate, ki, true);
+        checkLoopLimit(state, ki, looplimit);
+        checkLoopLimit(newstate, ki, looplimit, true);
         klee_message("this->listener_service->afterExecuteInstruction(newstate, ki) newstate: %p", &newstate);
         this->listener_service->afterExecuteInstruction(newstate, ki);
+      } else if (branches.first) {
+        checkLoopLimit(*branches.first, ki, 128, true);
+      } else {
+        checkLoopLimit(*branches.second, ki, 128, true);
       }
 
       std::string TargetBB = targetBB(state, ki);
@@ -2835,6 +2839,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     // Arithmetic / logical
 
   case Instruction::Add: {
+    klee_message("Instruction::Add");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     bindLocal(ki, state, AddExpr::create(left, right));
@@ -2842,6 +2847,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::Sub: {
+    klee_message("Instruction::Sub");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     bindLocal(ki, state, SubExpr::create(left, right));
@@ -2849,6 +2855,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
  
   case Instruction::Mul: {
+    klee_message("Instruction::Mul");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     bindLocal(ki, state, MulExpr::create(left, right));
@@ -2856,6 +2863,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::UDiv: {
+    klee_message("Instruction::Udiv");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = UDivExpr::create(left, right);
@@ -2864,6 +2872,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::SDiv: {
+    klee_message("Instruction::SDiv");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = SDivExpr::create(left, right);
@@ -2872,6 +2881,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::URem: {
+    klee_message("Instruction::URem");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = URemExpr::create(left, right);
@@ -2880,6 +2890,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::SRem: {
+    klee_message("Instruction::SRem");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = SRemExpr::create(left, right);
@@ -2888,6 +2899,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::And: {
+    klee_message("Instruction::And");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = AndExpr::create(left, right);
@@ -2896,6 +2908,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::Or: {
+    klee_message("Instruction::Or");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = OrExpr::create(left, right);
@@ -2904,6 +2917,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::Xor: {
+    klee_message("Instruction::Xor");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = XorExpr::create(left, right);
@@ -2912,6 +2926,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::Shl: {
+    klee_message("Instruction::Shl");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = ShlExpr::create(left, right);
@@ -2920,6 +2935,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::LShr: {
+    klee_message("Instruction::LShr");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = LShrExpr::create(left, right);
@@ -2928,6 +2944,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::AShr: {
+    klee_message("Instruction::AShr");
     ref<Expr> left = eval(ki, 0, state).value;
     ref<Expr> right = eval(ki, 1, state).value;
     ref<Expr> result = AShrExpr::create(left, right);
@@ -2938,6 +2955,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     // Compare
 
   case Instruction::ICmp: {
+    klee_message("Instruction::ICmp");
     CmpInst *ci = cast<CmpInst>(i);
     ICmpInst *ii = cast<ICmpInst>(ci);
 
@@ -3031,6 +3049,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
  
     // Memory instructions...
   case Instruction::Alloca: {
+    klee_message("Instruction::Alloca");
     AllocaInst *ai = cast<AllocaInst>(i);
     unsigned elementSize = 
       kmodule->targetData->getTypeStoreSize(ai->getAllocatedType());
@@ -3065,11 +3084,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::Load: {
+    klee_message("Instruction::Load");
     ref<Expr> base = eval(ki, 0, state).value;
     executeMemoryOperation(state, false, base, 0, ki);
     break;
   }
   case Instruction::Store: {
+    klee_message("Instruction::Store");
     ref<Expr> base = eval(ki, 1, state).value;
     ref<Expr> value = eval(ki, 0, state).value;
     executeMemoryOperation(state, true, base, value, 0);
@@ -3077,6 +3098,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::GetElementPtr: {
+    klee_message("Instruction::GetElementPtr");
     KGEPInstruction *kgepi = static_cast<KGEPInstruction*>(ki);
     ref<Expr> base = eval(ki, 0, state).value;
 
@@ -3106,6 +3128,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     break;
   }
   case Instruction::ZExt: {
+    klee_message("Instruction::ZExt");
     CastInst *ci = cast<CastInst>(i);
     ref<Expr> result = ZExtExpr::create(eval(ki, 0, state).value,
                                         getWidthForLLVMType(ci->getType()));
@@ -3113,6 +3136,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     break;
   }
   case Instruction::SExt: {
+    klee_message("Instruction::SExt");
     CastInst *ci = cast<CastInst>(i);
     ref<Expr> result = SExtExpr::create(eval(ki, 0, state).value,
                                         getWidthForLLVMType(ci->getType()));
@@ -3136,6 +3160,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::BitCast: {
+    klee_message("Instruction::BitCast");
     ref<Expr> result = eval(ki, 0, state).value;
     bindLocal(ki, state, result);
     break;
