@@ -14,7 +14,7 @@ def cut_cover_line(PATH, targetline):
     
     if lastindex == 0:
         print("dont find the targetline in coverline :", targetline)
-        exit()
+        return False
     else:
         print(lastindex, s_buf[lastindex])
     
@@ -46,6 +46,7 @@ def cut_cover_line(PATH, targetline):
     with open(PATH+"/cover", "w") as f:
         for addr in coverlist:
             f.write(addr+"\n")
+    return True
     
 if __name__ == "__main__":
     PATH = "/data/zzhan173/Qemu/OOBW/pocs/a770bf51/cbf3d60329c4"
