@@ -18,17 +18,15 @@ def command(string1):
     result=p.stdout.readlines()
     return result
 
-repopath = "/home/zzhan173/repos/linux/"
 clang_path =  "/home/zzhan173/Linux_kernel_UC_KLEE/install/bin/clang"
-def compile_bc_extra(option, targetdir = None, filename = None):
+def compile_bc_extra(option, PATH, kernel, filename = None):
     #option = "compile" or "check"
-    sourcecoverage = False
     regx = r'echo \'[ \t]*CC[ \t]*(([A-Za-z0-9_\-.]+\/)+([A-Za-z0-9_.\-]+))\';'
     #base = os.path.join(self.case_path, 'linux')
     #base = "/home/zzhan173/repos/linux"
     #path = os.path.join(base, 'llvmclang_log')
     #path = os.path.join(base, 'clang_log')
-    path = '/home/zzhan173/repos/linux/clang_log'
+    path = kernel+'/clang_log'
     #clang_path = '/data2/zheng/clangs/clang11/clang11.0.1/bin/clang'
     #clang_path = "/home/zzhan173/repos/Linux_kernel_UC_KLEE/build/llvm-project/build/bin/clang"
     #clang_path = "/data2/zheng/clangs/clang10/clang10/bin/clang"
@@ -67,8 +65,8 @@ def compile_bc_extra(option, targetdir = None, filename = None):
                 if cmd[0] == clang_path:
                     new_cmd.append(cmd[0])
                     new_cmd.append('-emit-llvm -g -O0 -fno-short-wchar -fno-discard-value-names -fno-inline -fno-inline-functions')
-                    if sourcecoverage:
-                        new_cmd.append(' -fprofile-instr-generate -fcoverage-mapping')
+                    #if sourcecoverage:
+                    #    new_cmd.append(' -fprofile-instr-generate -fcoverage-mapping')
                     #new_cmd.append('-emit-llvm -g -fno-short-wchar')
                     #if cmd[0] == 'wllvm':
                     #    new_cmd.append('{}/tools/llvm/build/bin/clang'.format(self.proj_path))
@@ -81,6 +79,9 @@ def compile_bc_extra(option, targetdir = None, filename = None):
                 continue
                 #self.case_logger.error('No \'wllvm\' or \';\' found in \'{}\''.format(line))
                 #raise CompilingError
+            #print("new_cmd:", new_cmd)
+            while new_cmd[-1] == "":
+                new_cmd = new_cmd[:-1]
             idx_obj = len(new_cmd)-2
             st = new_cmd[idx_obj]
             if st[len(st)-1] == 'o':
@@ -94,17 +95,18 @@ def compile_bc_extra(option, targetdir = None, filename = None):
             newcmd = newcmd.replace("-O2 ","")
             newcmd = newcmd.replace("-Os ","")
             newcmd = newcmd.replace("-fshort-wchar ","")
+            newcmd = newcmd.replace("-fno-inline-small-functions ","")
             #newcmd = newcmd.replace(clang_path, newclang_path)
             #print(newcmd)
-            newcmd = "cd "+repopath+";"+newcmd
+            newcmd = "cd "+kernel+";"+newcmd
             newcmds += [newcmd]
     if option == "check":
         print("\n not compile file:")
         notcompiledbc = []
         for bcfile in bcfiles:
-            if not os.path.exists(repopath+"/"+bcfile):
-                notcompiledbc += [repopath+"/"+bcfile]
-                print(repopath+"/"+bcfile)
+            if not os.path.exists(kernel+"/"+bcfile):
+                notcompiledbc += [kernel+"/"+bcfile]
+                print(kernel+"/"+bcfile)
         #for cmd in newcmds:
         #    if any(bcfile in cmd for bcfile in notcompiledbc):
         #        print(cmd)
@@ -121,19 +123,19 @@ def compile_bc_extra(option, targetdir = None, filename = None):
         #targetdir = "/home/zzhan173/Qemu/OOBW/pocs/253a496d/b3c424eb6a1a/source"
         #targetdir = sys.argv[2]+"/source"
     if option == "copy":
-        targetdir = targetdir+"/source"
+        targetdir = PATH + "/source"
         if not os.path.exists(targetdir):
             os.mkdir(targetdir)
-        copy_bcfiles(targetdir, bcfiles)
+        copy_bcfiles(targetdir, bcfiles, kernel)
 
 
-def copy_bcfiles(targetdir, bcfiles):
+def copy_bcfiles(targetdir, bcfiles, sourcedir):
     for bcfile in bcfiles:
-        if not os.path.exists(repopath+"/"+bcfile):
+        if not os.path.exists(sourcedir+"/"+bcfile):
             continue
-        src = repopath+"/"+bcfile
+        src = sourcedir+"/"+bcfile
         dst = targetdir+"/" + bcfile
-        cfile = repopath+"/"+bcfile.replace(".bc", ".c")
+        cfile = sourcedir+"/"+bcfile.replace(".bc", ".c")
         dstcfile = targetdir+"/" + bcfile.replace(".bc", ".c")
 
         dstfolder = os.path.dirname(dst)
@@ -208,8 +210,8 @@ def format_dir_commands(PATH):
                 commandlist += [path]
     return commandlist
 
-def format_linux(PATH = "/home/zzhan173/repos/linux"):
-    commands = format_dir_commands(PATH)
+def format_linux(kernel = "/home/zzhan173/repos/linux"):
+    commands = format_dir_commands(kernel)
     print("size of files to be formatted:", len(commands))
     with Pool(32) as p:
         #p.map(command, commands)
@@ -272,38 +274,69 @@ def adapt_end_report(repo):
         for line in s_buf2:
             f.write(line)
 
+def adapt_CONFIG_LOG_BUF_SHIFT(PATH):
+    filename = PATH + "/config"
+    with open(filename, "r") as f:
+        s_buf = f.readlines()
+    for i in range(len(s_buf)):
+        line = s_buf[i]
+        if line.startswith("CONFIG_LOG_BUF_SHIFT="):
+            s_buf[i] = "CONFIG_LOG_BUF_SHIFT=25\n"
+            break
+    else:
+        print("don't find suitable location to change value of CONFIG_LOG_BUF_SHIFT. Need to manually add code")
+        return
+    with open(filename, "w") as f:
+        for line in s_buf:
+            f.write(line)
 
+def get_config_withoutkasan(PATH):
+    with open(PATH+"/config", "r") as f:
+        s_buf = f.readlines()
+    for i in range(len(s_buf)):
+        line = s_buf[i]
+        if "CONFIG_KASAN=y" in line:
+            s_buf[i] = "# CONFIG_KASAN is not set\n"
+        if "CONFIG_KCOV=y" in line:
+            s_buf[i] = "# CONFIG_KCOV is not set\n"
+        if "CONFIG_MODVERSIONS=y" in line:
+            s_buf[i] = "# CONFIG_MODVERSIONS is not set\n"
+    with open(PATH+"/config_withoutkasan", "w") as f:
+        for line in s_buf:
+            f.write(line)
 
-
-def compile_gcc(PATH, commit = None):
-    if PATH[-1] == "/":
-        PATH = PATH[:-1]
-    if not commit:
-        if PATH.split("/")[-1] in ["alloc", "crash"]:
-            commit = PATH.split("/")[-2]
-        else:
-            commit = PATH.split("/")[-1]
-    string1 = "cd /home/zzhan173/repos/linux;find . -name '*.bc' | xargs rm; git checkout -f "+commit+";make mrproper"
+def compile_gcc(PATH, kernel):
+    #if PATH[-1] == "/":
+    #    PATH = PATH[:-1]
+    #if not commit:
+    #    if PATH.split("/")[-1] in ["alloc", "crash"]:
+    #        commit = PATH.split("/")[-2]
+    #    else:
+    #        commit = PATH.split("/")[-1]
+    #string1 = "cd /home/zzhan173/repos/linux;find . -name '*.bc' | xargs rm; git checkout -f "+commit+";make mrproper"
+    string1 = "cd " + kernel + ";make mrproper"
     print(string1)
     result = command(string1)
     #print("adapt_code()")
     #if os.path.exists(PATH+"/codeadaptation.json"):
     #    adapt_code("/home/zzhan173/repos/linux", PATH+"/codeadaptation.json")
-    print("format_linux()")
-    format_linux()
-    string1 = "cd /home/zzhan173/repos/linux;cp "+PATH+"/config_withoutkasan .config;make olddefconfig;make -j32"
+    #print("format_linux()")
+    #format_linux()
+    #string1 = "cd /home/zzhan173/repos/linux;cp "+PATH+"/config_withoutkasan .config;make olddefconfig;make -j32"
+    string1 = "cd " + kernel + ";cp "+PATH+"/config_withoutkasan .config;make olddefconfig;make -j32"
     print(string1)
-    if not os.path.exists(PATH+"/config_withoutkasan"):
-        print("config_withoutkasan doesn't exist")
-        exit()
+    #if not os.path.exists(PATH+"/config_withoutkasan"):
+    #    print("config_withoutkasan doesn't exist")
+    #    exit()
     result = command(string1)
 
-def get_dryruncommands():
+def get_dryruncommands(kernel):
     #clang_path = "/data2/zheng/clangs/clang11/clang11.0.1/bin/clang"
-    string1 = "cd /home/zzhan173/repos/linux;make olddefconfig CC="+clang_path
+    #string1 = "cd /home/zzhan173/repos/linux;make olddefconfig CC="+clang_path
+    string1 = "cd " + kernel +";make olddefconfig CC="+clang_path
     print(string1)
     result = command(string1)
-    string1 = "cd /home/zzhan173/repos/linux; make -n CC="+clang_path+" > clang_log"
+    string1 = "cd " + kernel + "; make -n CC="+clang_path+" > clang_log"
     print(string1)
     result = command(string1)
 
