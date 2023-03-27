@@ -71,6 +71,10 @@ def add_fnoinline_Makefile(PATH):
                 insert = True
                 s_buf2 += ["KBUILD_CFLAGS   += -fno-inline-small-functions\n"]
                 continue
+            if "endif" in line and "KBUILD_CFLAGS += -Os" in s_buf[i-2]:
+                insert = True
+                s_buf2 += ["KBUILD_CFLAGS   += -fno-inline-small-functions\n"]
+                continue
 
     if not insert:
         print("Don't find location to insert -fno-inline-small-functions in", PATH)
@@ -96,6 +100,40 @@ def simplify_path(PATH):
 
     PATH = "/".join(elelist)
     return PATH
+
+def get_callstack(PATH):
+    print("get_callstack() from report.txt")
+    with open(PATH+"/report.txt", "r") as f:
+        s_buf = f.readlines()
+    s_buf2 = []
+    for i in range(len(s_buf)):
+        line = s_buf[i]
+        if "Call Trace" in line:
+            break
+    else:
+        print("Call Trace not detected")
+        return False
+    s_buf = s_buf[i+1:]
+
+    entry_funcs = ["do_sys", "_sys_", "syscall"]
+    for i in range(len(s_buf)):
+        if any(func in s_buf[i] for func in entry_funcs):
+            break
+    else:
+        print("Entry Function not detected")
+        return False
+    s_buf = s_buf[:i]
+
+    Ignore_funcs = ["kasan", "memcpy"]
+    startline = 0
+    for i in range(len(s_buf)):
+        if any(func in s_buf[i] for func in Ignore_funcs):
+            startline = i
+    print(s_buf)
+    s_buf = s_buf[startline+1:]
+    with open(PATH+"/callstack", "w") as f:
+        for line in s_buf:
+            f.write(line)
 
 def get_cleancallstack(PATH):
     cleancallstack = []
@@ -129,14 +167,16 @@ def get_callstackfiles(PATH):
 # This function should be called after the the kernel in /home/zzhan173/repos/linux is formatted
 # This function is used to generate 1) targetline 2) get the lines where caller call callee in the stack
 def get_matchedlines_afterformat(PATH):
-    ref_linux = "/home/zzhan173/repos/reflinux"
-    target_linux = "/home/zzhan173/repos/linux"
-    if PATH[-1] == "/":
-        PATH = PATH[:-1]
-    commit = PATH.split("/")[-1]
-    string1 = "cd "+ref_linux+"; git checkout -f "+commit
-    print(string1)
-    result = command(string1)
+    #ref_linux = "/home/zzhan173/repos/reflinux"
+    ref_linux = PATH + "/../linux_ref"
+    #target_linux = "/home/zzhan173/repos/linux"
+    target_linux = PATH + "/linux_ref"
+    #if PATH[-1] == "/":
+    #    PATH = PATH[:-1]
+    #commit = PATH.split("/")[-1]
+    #string1 = "cd "+ref_linux+"; git checkout -f "+commit
+    #print(string1)
+    #result = command(string1)
 
     filelist = get_callstackfiles(PATH)
 
