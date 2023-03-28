@@ -618,8 +618,9 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
         return false;
     }
     int threshold_distance = Calltrace.size();
-    if(threshold_distance < 6) {
-        threshold_distance = 6;
+    int default_depth = 3;
+    if(threshold_distance < default_depth) {
+        threshold_distance = default_depth;
     }
     //klee::klee_message("threshold_distance: %d", threshold_distance);
     bool Insametrace = true;
