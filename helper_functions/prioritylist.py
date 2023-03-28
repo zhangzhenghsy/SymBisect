@@ -1777,6 +1777,15 @@ def copy_refkernel(PATH):
     string1 = "cd " + PATH + "; cp -r ../linux_ref ."
     command(string1)
 
+def copy_lineguidance(PATH):
+    targetdir = PATH + "/lineguidance"
+    if not os.path.exists(targetdir):
+        os.mkdir(targetdir)
+    filelist = os.listdir(PATH)
+    for filename in filelist:
+        if any(keyword in filename for keyword in ["func_", "line_", "BB_", "mustBBs"]):
+            if "json" in filename:
+                shutil.move(PATH+"/"+ filename, targetdir+"/"+filename)
 #prerequirement: bzImage, cover, config_withoutkasan, calltracefunclist
 if __name__ == "__main__":
     #link_bclist(filelist)
