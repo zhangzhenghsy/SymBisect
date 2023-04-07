@@ -187,6 +187,8 @@ public:
     /// validity checks, and seed patching.
     /// zheng: moved to public
     void addConstraint(ExecutionState &state, ref<Expr> condition);
+    /// zheng: use this counter to log the number of correct jumps to targetBB.
+    std::map<std::string, int> BB_targetBB_counter;
 
 
 private:
