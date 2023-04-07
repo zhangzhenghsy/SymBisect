@@ -17,6 +17,8 @@ def extract_sourceinfo_fromoutput(filepath):
     prevsourceline = ""
     funcname = ""
     for index in range(len(s_buf)):
+        if index%100 == 0:
+            print(index)
         line = s_buf[index]
         line = line.strip()
         if "WARNING ONCE:" in line:

@@ -93,6 +93,7 @@ void klee::initializeSearchOptions() {
       //CoreSearch.push_back(Searcher::NURS_CovNew);
       // yu hao: set default search heuristic to dfs
       CoreSearch.push_back(Searcher::DFS);
+      //CoreSearch.push_back(Searcher::BFS);
     }
   }
 }

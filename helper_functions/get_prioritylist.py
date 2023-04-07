@@ -76,10 +76,12 @@ if __name__ == "__main__":
         prioritylist.get_bcfile_fromcover(PATH)
     
     if option == "get_lineguidance":
-        #prioritylist.get_complete_coverage_coverline(PATH)
-        #prioritylist.get_linelist(PATH)
-        #prioritylist.get_BBlist(PATH)
-        #prioritylist.get_BBlinelist_doms(PATH)
-        #prioritylist.cfg_analysis.get_cfg_files(PATH)
-        #prioritylist.generate_kleeconfig(PATH, [])
+        prioritylist.get_complete_coverage_coverline(PATH)
+        prioritylist.get_linelist(PATH)
+        prioritylist.get_BBlist(PATH)
+        prioritylist.get_BBlinelist_doms(PATH)
+        prioritylist.cfg_analysis.get_cfg_files(PATH)
         prioritylist.copy_lineguidance(PATH)
+
+    if option == "generate_kleeconfig":
+        prioritylist.generate_kleeconfig(PATH, [])
