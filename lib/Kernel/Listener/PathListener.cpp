@@ -347,8 +347,17 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
         this->executor->terminateState(state);
     }
     else if (low_priority_lines.find(name_l) != low_priority_lines.end()) {
-        klee::klee_message("reach low priority line list terminate the state %s", name_l.c_str());
-        this->executor->terminateState(state);
+        if (low_priority_lines_counter.count(name_l)) {
+            low_priority_lines_counter[name_l] += 1;
+        } else {
+            low_priority_lines_counter[name_l] = 1;
+        }
+        if (low_priority_lines_counter[name_l] > 5) {
+            klee::klee_message("Ignore low priority line list %s, count: %d", name_l.c_str(), low_priority_lines_counter[name_l]);
+        } else{
+            klee::klee_message("reach low priority line list terminate the state %s", name_l.c_str());
+            this->executor->terminateState(state);
+        }
     }
     else if (simple_name_l != name_l) {
         if (low_priority_lines.find(simple_name_l) != low_priority_lines.end()) {

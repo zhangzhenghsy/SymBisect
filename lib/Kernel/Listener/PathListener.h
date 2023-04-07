@@ -55,6 +55,7 @@ namespace kuc {
         std::uint32_t looplimit;
         std::string kernelversion;
         std::vector<std::string> Calltrace;
+        std::map<std::string, int> low_priority_lines_counter;
         GlobalContext GlobalCtx;
     };
 }
