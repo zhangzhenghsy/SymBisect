@@ -2351,6 +2351,21 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       klee::klee_message("Instruction::Br is Unconditional");
       transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
     } else {
+      std::string currentBB = bi->getParent()->getName().str();
+      std::string TargetBB = targetBB(state, ki);
+      if (BB_targetBB_counter.count(currentBB)) {
+        if (BB_targetBB_counter[currentBB] > 3) {
+          klee::klee_message("Forced Br %s to %s", currentBB.c_str(), TargetBB.c_str());
+          if(TargetBB == bi->getSuccessor(0)->getName().str()) {
+            transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
+          } else {
+            transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), state);
+          }
+          BB_targetBB_counter[currentBB] = 0;
+          break;
+        }
+      }
+
       // FIXME: Find a way that we don't have this hidden dependency.
       assert(bi->getCondition() == bi->getOperand(0) &&
              "Wrong operand index!");
@@ -2435,22 +2450,18 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         checkLoopLimit(*branches.second, ki, 128, true);
       }
 
-      std::string TargetBB = targetBB(state, ki);
       if (TargetBB != "") {
         klee_message("TargetBB: %s", TargetBB.c_str());
-        if (TargetBB == bi->getSuccessor(0)->getName().str()) {
-          if (branches.second)
-          {
-            terminateState(*branches.second);
-            klee_message("terminate the second branch");
+        if ( (TargetBB == bi->getSuccessor(0)->getName().str() && !branches.first) ||
+          (TargetBB == bi->getSuccessor(1)->getName().str() && !branches.second) ) {
+          if (BB_targetBB_counter.count(currentBB)) {
+            BB_targetBB_counter[currentBB] += 1;
+          } else {
+            BB_targetBB_counter[currentBB] = 1;
           }
-        } else {
-          if (branches.first) {
-            terminateState(*branches.first);
-            klee_message("terminate the first branch");
-          }
+          klee_message("BB_targetBB_counter[currentBB]:%d", BB_targetBB_counter[currentBB]);
         }
-      } 
+      }
     }
     break;
   }
@@ -3892,7 +3903,8 @@ void Executor::run(ExecutionState &initialState) {
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
   // main interpreter loop
-  auto start_time = std::time(NULL);
+  //auto start_time = std::time(NULL);
+  auto start_time = clock();
   while (!states.empty() && !haltExecution) {
     ExecutionState &state = searcher->selectState();
     //klee::klee_message("searcher->selectState() &state: %p", &state);
@@ -3915,7 +3927,8 @@ void Executor::run(ExecutionState &initialState) {
       updateStates(nullptr);
     }
 
-    auto execute_time = std::time(NULL)-start_time;
+    //auto execute_time = std::time(NULL)-start_time;
+    auto execute_time = ((double)(clock() - start_time))/CLOCKS_PER_SEC;
     if (execute_time > 12000) {
       // todo: check if target line has been reached?
       klee::klee_message("execution time out (12000) we think there is no OOB triggerred");
