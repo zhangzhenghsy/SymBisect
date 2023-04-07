@@ -4,6 +4,7 @@ import pydot
 import json
 import sys,os
 import subprocess
+import dot_analysis
 
 def command(string1):
     p=subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -31,11 +32,22 @@ def get_node_BB(PATH):
         name_label[name] = label
     return name_label
 
-def write_dompng(PATH, funcname):
+def write_dompng(PATH, funcname, node_colors = {}):
     dotpath = PATH+"/cfgs/."+funcname+".dot"
     output = PATH+"/cfgs/"+funcname+".png"
+    name_label = get_node_BB(dotpath)
     graphs = pydot.graph_from_dot_file(dotpath)
     graph = graphs[0]
+    #print(json.dumps(node_colors, indent=4))
+    for node in graph.get_nodes():
+        name = node.get_name()
+        if name not in name_label:
+            continue
+        label = name_label[name]
+        if label in node_colors:
+            fillcolor = node_colors[label]
+            node.set_fillcolor(fillcolor)
+            #print(label, fillcolor)
     graph.write_png(output)
 
 def get_BB_reachBBs(PATH, func):
@@ -45,7 +57,7 @@ def get_BB_reachBBs(PATH, func):
     if not os.path.exists(dotpath):
         print("no cfg for func", func)
         return None    
-    write_dompng(PATH, func)
+    #write_dompng(PATH, func)
     name_label = get_node_BB(dotpath)
     BB_reachBBs = {}
     netG = net.drawing.nx_agraph.read_dot(dotpath)
@@ -56,6 +68,27 @@ def get_BB_reachBBs(PATH, func):
         BB_reachBBs[BB] = reachBBs
         BB_reachBBs[BB].sort()
     return BB_reachBBs
+
+def get_BB_directBBs(PATH, func):
+    dotpath = PATH+"/cfgs/."+func+".dot"
+    graph = pydot.graph_from_dot_file(dotpath)[0]
+    name_label = get_node_BB(dotpath)
+    #print(json.dumps(name_label, indent=4))
+
+    BB_directBBs = {}
+    for edge in graph.get_edges():
+        srcnode = edge.get_source()
+        if ":" in srcnode:
+            srcnode = srcnode.split(":")[0]
+        srclabel = name_label[srcnode]
+        if srclabel not in BB_directBBs:
+            BB_directBBs[srclabel] = []
+        child_node = edge.get_destination()
+        dstlabel = name_label[child_node]
+        BB_directBBs[srclabel] += [dstlabel]
+
+    return BB_directBBs
+    #print(json.dumps(BB_directBBs, indent=4))
 
 def get_BB_childBBs(PATH, func):
     dotpath = PATH+"/cfgs/."+func+".dot"
@@ -77,14 +110,118 @@ def get_BB_childBBs(PATH, func):
         BB_childBBs[BB].sort()
     return BB_childBBs
 
+#
+def get_func_BB_blacklist(PATH, MustBB):
+    #Part I : the BBs which cannot reach targetBB
+    func = MustBB.split("built-in.bc-")[1].split("-")[0]
+    BB_reachBBs = get_BB_reachBBs(PATH, func)
+    blackBBs = [BB for BB in BB_reachBBs if MustBB not in BB_reachBBs[BB]]
+    blackBBs.remove(MustBB)
+
+    #Part II : the BBs in blacklinelist
+    with open(PATH + "/lineguidance/line_blacklist_doms.json", "r") as f:
+        low_priority_line_list_doms = json.load(f)
+    with open(PATH+"/lineguidance/BB_lineinfo.json") as f:
+        BB_lineinfo = json.load(f)
+    for BB in BB_reachBBs:
+        if any(line in low_priority_line_list_doms for line in BB_lineinfo[BB]):
+            blackBBs += [BB]
+    blackBBs = list(set(blackBBs))
+    blackBBs.sort()
+    return blackBBs
+
+def get_func_BB_mustlist(PATH, MustBB):
+    func = MustBB.split("built-in.bc-")[1].split("-")[0]
+    func_BB_mustBBs = dot_analysis.get_node_premustnodes(PATH, func)
+    mustBBs = func_BB_mustBBs[MustBB]
+    return mustBBs
+
+def get_node_colors(MustBB, mustBBs, blackBBs):
+    node_colors = {}
+    node_colors[MustBB] = "green"
+    for mustBB in mustBBs:
+        node_colors[mustBB] = "green"
+    for blackBB in blackBBs:
+        node_colors[blackBB] = "blue"
+    return node_colors
+
+def write_color_png(PATH, MustBB):
+    func = MustBB.split("built-in.bc-")[1].split("-")[0]
+    blackBBs = get_func_BB_blacklist(PATH, MustBB)
+    print("blackBBs:", blackBBs)
+    mustBBs = get_func_BB_mustlist(PATH, MustBB)
+    print("mustBBs:", mustBBs)
+    node_colors = get_node_colors(MustBB, mustBBs, blackBBs)
+
+    coverBBs = get_func_BB_coverlist(PATH, func)
+    for coverBB in  coverBBs:
+        if coverBB not in node_colors:
+            node_colors[coverBB] = "yellow"
+    write_dompng(PATH, func, node_colors)
+
+# Get the BBs executed. Note that there may be FPs (the BBs which cannot reach targetBB)
+# and FNs (can be alleviated with dom trees)
+def get_func_BB_coverlist(PATH, func):
+    with open(PATH+"/lineguidance/func_BB_whitelist_predoms.json") as f:
+        func_BB_whitelist_predoms = json.load(f)
+    return func_BB_whitelist_predoms[func]
+
+# I'm trying to summarize some patterns where there is a guidance that BB1 -> BB2.
+# In symbolic execution if it doesn't happen, I will try to under-constraint the condition
+def get_func_BB_targetBB(PATH, MustBB):
+    BB_targetBB = {}
+
+    func = MustBB.split("built-in.bc-")[1].split("-")[0]
+    BB_directBBs = get_BB_directBBs(PATH, func)
+
+    blackBBs = get_func_BB_blacklist(PATH, MustBB)
+    #print("blackBBs:", blackBBs)
+    mustBBs = get_func_BB_mustlist(PATH, MustBB)
+    #print("mustBBs:", mustBBs)
+    coverBBs = get_func_BB_coverlist(PATH, func)
+
+    for BB in BB_directBBs:
+        directBBs = BB_directBBs[BB]
+        if len(directBBs) != 2:
+            continue
+        if BB in blackBBs:
+            continue
+        targetBB1 = directBBs[0]
+        targetBB2 = directBBs[1]
+        if targetBB1 in blackBBs and targetBB2 not in blackBBs:
+            BB_targetBB[BB] = targetBB2
+        elif targetBB2 in blackBBs and targetBB1 not in blackBBs:
+            BB_targetBB[BB] = targetBB1
+        #elif targetBB1 in mustBBs and targetBB2 not in mustBBs and targetBB2 not in coverBBs:
+        elif targetBB1 in mustBBs and targetBB2 not in mustBBs:
+            BB_targetBB[BB] = targetBB1
+        #elif targetBB2 in mustBBs and targetBB1 not in mustBBs and targetBB1 not in coverBBs:
+        elif targetBB2 in mustBBs and targetBB1 not in mustBBs:
+            BB_targetBB[BB] = targetBB2
+    BB_targetBB = {k: BB_targetBB[k] for k in sorted(BB_targetBB)}
+    BB_targetBB = {k: BB_targetBB[k] for k in sorted(BB_targetBB, key=lambda x:len(x))}
+
+    with open(PATH+"/lineguidance/BB_targetBB.json", "w") as f:
+        json.dump(BB_targetBB, f, indent=4)
+
+    with open(PATH+"/lineguidance/BB_lineinfo.json", "r") as f:
+        BB_lineinfo = json.load(f)
+    for BB in BB_targetBB:
+        print("\n"+BB, BB_lineinfo[BB])
+        print(BB_targetBB[BB], BB_lineinfo[BB_targetBB[BB]])
+
 if __name__ == "__main__":
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/"
     #func = "do_mount"
     PATH = sys.argv[1]
-    func = sys.argv[2]
+    MustBB = sys.argv[2]
+    func = MustBB.split("built-in.bc-")[1].split("-")[0]
     #get_cfg_files(PATH)
     #func = sys.argv[1]
-    write_dompng(PATH, func)
+    #write_dompng(PATH, func)
+    #write_color_png(PATH, MustBB)
+    #get_BB_directBBs(PATH, func)
+    get_func_BB_targetBB(PATH, MustBB)
     #BB_reachBBs = get_BB_reachBBs(PATH, func)
     #print(json.dumps(BB_reachBBs, sort_keys=True, indent=4))
 
