@@ -664,9 +664,9 @@ def get_line_whitelist(PATH, kernel):
         whitelist += func_whitelist[func]
     whitelist = list(set(whitelist))
 
-    with open(PATH +"/func_line_whitelist_v0.json", 'w') as f:
+    with open(PATH +"/lineguidance/func_line_whitelist_v0.json", 'w') as f:
         json.dump(func_whitelist,f, indent=4, sort_keys=True)
-    with open(PATH +"/line_whitelist_v0.json", 'w') as f:
+    with open(PATH +"/lineguidance/line_whitelist_v0.json", 'w') as f:
         json.dump(whitelist,f, indent=4, sort_keys=True)
 
     func_line_entryBBlist = get_line_entryBBlist(PATH)
@@ -683,9 +683,9 @@ def get_line_whitelist(PATH, kernel):
     for func in func_whitelist:
         line_whitelist += func_whitelist[func]
     line_whitelist.sort()
-    with open(PATH +"/func_line_whitelist_v1.json", 'w') as f:
+    with open(PATH +"/lineguidance/func_line_whitelist_v1.json", 'w') as f:
         json.dump(func_whitelist,f, indent=4, sort_keys=True)
-    with open(PATH +"/line_whitelist_v1.json", 'w') as f:
+    with open(PATH +"/lineguidance/line_whitelist_v1.json", 'w') as f:
         json.dump(whitelist,f, indent=4, sort_keys=True)
 
 # given an addr, get the complete addrs of the corresponding function
@@ -803,9 +803,9 @@ def get_line_completelist(PATH, kernel = None):
     for func in func_completelist:
         completelist += func_completelist[func]
     print("any line in func_completelist is duplicate in different func:", len(completelist) == len(set(completelist)))
-    with open(PATH+"/func_line_completelist.json", 'w') as f:
+    with open(PATH+"/lineguidance/func_line_completelist.json", 'w') as f:
         json.dump(func_completelist, f, indent=4, sort_keys=True)
-    with open(PATH+"/line_completelist.json", 'w') as f:
+    with open(PATH+"/lineguidance/line_completelist.json", 'w') as f:
         json.dump(completelist, f, indent=4, sort_keys=True)
     print("get_line_completelist cost time:", time.time()-t0)
 
@@ -815,10 +815,10 @@ def filter_complete_white_blacklist_funcrange(PATH, kernel = None):
     command(string1)
 
     print("\nfilter lines in func_completelist according to funcrange")
-    with open(PATH +"/func_line_completelist.json") as f:
+    with open(PATH +"/lineguidance/func_line_completelist.json") as f:
         func_line_completelist = json.load(f)
     func_line_completelist = filter_funclist_funcrange(func_line_completelist)
-    with open(PATH+"/func_line_completelist.json", 'w') as f:
+    with open(PATH+"/lineguidance/func_line_completelist.json", 'w') as f:
         json.dump(func_line_completelist, f, indent=4, sort_keys=True)
 
     print("\nfilter lines in func_whitelist according to funcrange")
@@ -829,10 +829,10 @@ def filter_complete_white_blacklist_funcrange(PATH, kernel = None):
         json.dump(func_line_whitelist, f, indent=4, sort_keys=True)
 
     print("\nfilter lines in func_blacklist according to funcrange")
-    with open(PATH +"/func_line_blacklist.json") as f:
+    with open(PATH +"/lineguidance/func_line_blacklist.json") as f:
         func_line_blacklist = json.load(f)
     func_line_blacklist = filter_funclist_funcrange(func_line_blacklist)
-    with open(PATH+"/func_line_blacklist.json", 'w') as f:
+    with open(PATH+"/lineguidance/func_line_blacklist.json", 'w') as f:
         json.dump(func_line_blacklist, f, indent=4, sort_keys=True)
 
 
@@ -879,7 +879,7 @@ def filter_funclist_funcrange(func_linelist, kernel):
 def get_line_entryBBlist(PATH, kernel = None):
     if not kernel:
         kernel = PATH + "/linux_ref/"
-    with open(PATH +"/func_line_whitelist_v0.json") as f:
+    with open(PATH +"/lineguidance/func_line_whitelist_v0.json") as f:
         line_whitelist = json.load(f)
 
     dumpresult = PATH+"/dumpresult"
@@ -943,9 +943,9 @@ def get_line_entryBBlist(PATH, kernel = None):
         if len(line_func[line]) > 1:
             print("duplicate line:", line, line_func[line])
     print("no duplicate entry line in different func(should be True):", len(entrylist) == len(set(entrylist)))
-    with open(PATH+"/func_line_entryBBlist.json", 'w') as f:
+    with open(PATH+"/lineguidance/func_line_entryBBlist.json", 'w') as f:
         json.dump(func_entrylist, f, indent=4, sort_keys=True)
-    with open(PATH+"/line_entryBBlist.json", 'w') as f:
+    with open(PATH+"/lineguidance/line_entryBBlist.json", 'w') as f:
         json.dump(entrylist, f, indent=4, sort_keys=True)
     return func_entrylist
     #print(func_entrylist['do_mount'])
@@ -953,10 +953,10 @@ def get_line_entryBBlist(PATH, kernel = None):
 def get_line_blacklist(PATH):
     func_line_blacklist = {}
     line_blacklist = []
-    with open(PATH +"/func_line_completelist.json") as f:
+    with open(PATH +"/lineguidance/func_line_completelist.json") as f:
         func_line_completelist = json.load(f)
 
-    with open(PATH +"/func_line_whitelist_v1.json") as f:
+    with open(PATH +"/lineguidance/func_line_whitelist_v1.json") as f:
         func_line_whitelist = json.load(f)
 
 
@@ -978,15 +978,15 @@ def get_line_blacklist(PATH):
         func_line_blacklist[func] = refine_lineinfolist(func_line_blacklist[func])
     line_blacklist = refine_lineinfolist(line_blacklist)
 
-    with open(PATH+"/func_line_blacklist.json", 'w') as f:
+    with open(PATH+"/lineguidance/func_line_blacklist.json", 'w') as f:
         json.dump(func_line_blacklist, f, indent=4, sort_keys=True)
-    with open(PATH+"/line_blacklist.json", 'w') as f:
+    with open(PATH+"/lineguidance/line_blacklist.json", 'w') as f:
         json.dump(line_blacklist, f, indent=4, sort_keys=True)
 
 #def get_blacklist(PATH):
 #    blacklist = []
 #
-#    with open(PATH +"/line_blacklist.json") as f:
+#    with open(PATH +"/lineguidance/line_blacklist.json") as f:
 #        line_blacklist = json.load(f)
 #
 #    for func in line_blacklist:
@@ -998,12 +998,13 @@ def get_line_blacklist(PATH):
 #    blacklist.sort()
 #    return blacklist
 
+# get the BB list which cannot reach targetBB
 def get_low_priority_bb_list(PATH, MustBBs):
     low_priority_bb_list = []
     for MustBB in MustBBs:
         func = MustBB.split("built-in.bc-")[1].split("-")[0]
         BB_reachBBs = cfg_analysis.get_BB_reachBBs(PATH, func)
-        print(json.dumps(BB_reachBBs, sort_keys=True, indent=4))
+        #print("BB_reachBBs\n",json.dumps(BB_reachBBs, sort_keys=True, indent=4))
         blackBBs = [BB for BB in BB_reachBBs if MustBB not in BB_reachBBs[BB]]
         blackBBs.remove(MustBB)
         low_priority_bb_list += blackBBs
@@ -1087,7 +1088,7 @@ def generate_kleeconfig(PATH, parameterlist = []):
     #else:
     #    config["90_low_priority_line_list"] = []
     #    output = PATH+"/config_cover.json"
-    with open(PATH + "/line_blacklist_doms.json", "r") as f:
+    with open(PATH + "/lineguidance/line_blacklist_doms.json", "r") as f:
         low_priority_line_list_doms = json.load(f)
     config["90_low_priority_line_list"] = low_priority_line_list_doms
     output = PATH+"/config_cover_doms.json"
@@ -1111,9 +1112,11 @@ def generate_kleeconfig(PATH, parameterlist = []):
     config["97_calltrace"] = calltracefunclist
     
     BB_targetBB = {}
-    if os.path.exists(PATH + "/order_func_whitelines/BB_targetBB/total.json"):
-        with open(PATH + "/order_func_whitelines/BB_targetBB/total.json", "r") as f:
-            BB_targetBB = json.load(f)
+    #if os.path.exists(PATH + "/order_func_whitelines/BB_targetBB/total.json"):
+    #    with open(PATH + "/order_func_whitelines/BB_targetBB/total.json", "r") as f:
+    #        BB_targetBB = json.load(f)
+    with open(PATH+"/lineguidance/BB_targetBB.json", "r") as f:
+        BB_targetBB = json.load(f)
     config["98_BB_targetBB"] = BB_targetBB
 
     with open(output, 'w') as f:
@@ -1162,15 +1165,15 @@ def get_BB_lineinfo(PATH):
                             line_bb_without_loopBr[lineinfo] += [bb]
             #else:
             #    print("no dbginfo for",dbgnum)
-    output = PATH+"/BB_lineinfo.json"
+    output = PATH+"/lineguidance/BB_lineinfo.json"
     with open(output, 'w') as f:
         json.dump(bb_lines, f, indent=4, sort_keys=True)
 
-    output = PATH+"/line_BBinfo.json"
+    output = PATH+"/lineguidance/line_BBinfo.json"
     with open(output, 'w') as f:
         json.dump(line_bb, f, indent=4, sort_keys=True)
 
-    output = PATH+"/line_BBinfo_without_loopBr.json"
+    output = PATH+"/lineguidance/line_BBinfo_without_loopBr.json"
     with open(output, 'w') as f:
         json.dump(line_bb_without_loopBr, f, indent=4, sort_keys=True)
 
@@ -1248,13 +1251,13 @@ def get_dbginfo(PATH, bbfile=None):
 def get_completewhitelist(PATH):
     #with open(PATH +"/line_whitelist.json") as f:
     #    line_whitelist = json.load(f)
-    #with open(PATH +"/line_entryBBlist.json") as f:
+    #with open(PATH +"/lineguidance/line_entryBBlist.json") as f:
     #    line_entryBBlist = json.load(f)
     with open(PATH +"/func_line_whitelist.json") as f:
         func_line_whitelist = json.load(f)
-    with open(PATH +"/func_line_entryBBlist.json") as f:
+    with open(PATH +"/lineguidance/func_line_entryBBlist.json") as f:
         func_line_entryBBlist = json.load(f)
-    with open(PATH +"/func_line_completelist.json") as f:
+    with open(PATH +"/lineguidance/func_line_completelist.json") as f:
         func_line_completelist = json.load(f)
 
     whitelist = []
@@ -1280,9 +1283,9 @@ def get_completewhitelist(PATH):
 def get_BB_whitelist(PATH):
     #if not os.path.exists(PATH +"/func_line_completewhitelist.json"):
     #    whitelist = get_completewhitelist(PATH)
-    with open(PATH+"/func_line_whitelist_v1.json", 'r') as f:
+    with open(PATH+"/lineguidance/func_line_whitelist_v1.json", 'r') as f:
         func_line_whitelist = json.load(f)
-    with open(PATH+"/line_BBinfo_without_loopBr.json") as f:
+    with open(PATH+"/lineguidance/line_BBinfo_without_loopBr.json") as f:
         line_BBinfo = json.load(f)
 
     func_BB_whitelist = {}
@@ -1306,9 +1309,9 @@ def get_BB_whitelist(PATH):
         func_BB_whitelist[func].sort()
     BB_whitelist.sort()
 
-    with open(PATH+"/func_BB_whitelist.json", 'w') as f:
+    with open(PATH+"/lineguidance/func_BB_whitelist.json", 'w') as f:
         json.dump(func_BB_whitelist, f, indent=4, sort_keys=True)
-    with open(PATH+"/BB_whitelist.json", 'w') as f:
+    with open(PATH+"/lineguidance/BB_whitelist.json", 'w') as f:
         json.dump(BB_whitelist, f, indent=4, sort_keys=True)
 
 def get_line_blacklist_filterwithBB(PATH):
@@ -1316,19 +1319,19 @@ def get_line_blacklist_filterwithBB(PATH):
     #only used for debug
     with open(PATH+"/func_line_completewhitelist.json", 'r') as f:
         func_line_completewhitelist = json.load(f)
-    with open(PATH+"/BB_lineinfo.json") as f:
+    with open(PATH+"/lineguidance/BB_lineinfo.json") as f:
         BB_lineinfo = json.load(f)
 
-    with open(PATH +"/line_blacklist.json") as f:
+    with open(PATH +"/lineguidance/line_blacklist.json") as f:
         Blacklist = json.load(f)
-    with open(PATH +"/func_line_blacklist.json") as f:
+    with open(PATH +"/lineguidance/func_line_blacklist.json") as f:
         func_blacklist = json.load(f)
-    #if not os.path.exists(PATH +"/BB_whitelist.json"):
+    #if not os.path.exists(PATH +"/lineguidance/BB_whitelist.json"):
     get_BB_whitelist(PATH)
-    with open(PATH +"/BB_whitelist.json", "r") as f:
+    with open(PATH +"/lineguidance/BB_whitelist.json", "r") as f:
         BB_whitelist = json.load(f)
 
-    with open(PATH+"/line_BBinfo.json") as f:
+    with open(PATH+"/lineguidance/line_BBinfo.json") as f:
         line_BBinfo = json.load(f)
     
     total_filterlist = []
@@ -1382,7 +1385,7 @@ def get_line_blacklist_filterwithfunctioncall(PATH):
         line_functioncall += [dbglineinfo]
     line_functioncall = refine_lineinfolist(line_functioncall)
 
-    #with open(PATH +"/line_blacklist.json") as f:
+    #with open(PATH +"/lineguidance/line_blacklist.json") as f:
     with open(PATH +"/line_blacklist_filterwithBB.json") as f:
         blacklist = json.load(f)
     filterwithfunctioncall = []
@@ -1410,7 +1413,7 @@ def get_line_blacklist_filterwithdoms(PATH):
 
     whitelist = get_completewhitelist(PATH)
 
-    with open(PATH+"/line_BBinfo.json") as f:
+    with open(PATH+"/lineguidance/line_BBinfo.json") as f:
         line_BBinfo = json.load(f)
     whiteBBlist = []
     for line in whitelist:
@@ -1466,22 +1469,22 @@ def get_line_blacklist_filterwithdoms(PATH):
     with open(PATH+"/line_blacklist_filterwithdoms.json","w") as f:
         json.dump(blacklist, f, indent=4, sort_keys=True)
 
-def get_whiteBBlist(PATH):
-    whitelist = get_completewhitelist(PATH)
-    with open(PATH+"/line_BBinfo.json") as f:
-        line_BBinfo = json.load(f)
-    whiteBBlist = []
-    for line in whitelist:
-        if line in line_BBinfo:
-            whiteBBlist += line_BBinfo[line]
-    return whiteBBlist
+#def get_whiteBBlist(PATH):
+#    whitelist = get_completewhitelist(PATH)
+#    with open(PATH+"/lineguidance/line_BBinfo.json") as f:
+#        line_BBinfo = json.load(f)
+#    whiteBBlist = []
+#    for line in whitelist:
+#        if line in line_BBinfo:
+#            whiteBBlist += line_BBinfo[line]
+#    return whiteBBlist
 
 # step11 get the BBs which dominate anyline in whitelist, and union them with previous whiteBBlist
 def get_BB_whitelist_predoms(PATH):
     #whiteBBlist = get_whiteBBlist(PATH)
     #funclist = [BB.split(".bc-")[1].split("-")[0] for BB in whiteBBlist]
     #funclist = list(set(funclist))
-    with open(PATH+"/func_BB_whitelist.json", "r") as f:
+    with open(PATH+"/lineguidance/func_BB_whitelist.json", "r") as f:
         func_BB_whitelist = json.load(f)
     funclist = [func for func in func_BB_whitelist]
 
@@ -1492,14 +1495,15 @@ def get_BB_whitelist_predoms(PATH):
             if BB not in BB_mustBBs:
                 continue
             addBBlist += BB_mustBBs[BB]
-        func_BB_whitelist[func] += list(set(addBBlist))
+        func_BB_whitelist[func] += addBBlist
+        func_BB_whitelist[func] = list(set(func_BB_whitelist[func]))
         func_BB_whitelist[func].sort()
-    with open(PATH+"/func_BB_whitelist_predoms.json", "w") as f:
+    with open(PATH+"/lineguidance/func_BB_whitelist_predoms.json", "w") as f:
         json.dump(func_BB_whitelist, f, indent=4, sort_keys=True)
 
 # get the lines which dominate anyline in whitelist, and union them with previous whitelist
 def get_line_whitelist_predoms(PATH):
-    with open(PATH+"/BB_lineinfo.json") as f:
+    with open(PATH+"/lineguidance/BB_lineinfo.json") as f:
         BB_lineinfo = json.load(f)
     
     BB_whitelist_doms = get_BB_whitelist_predoms(PATH)
@@ -1518,7 +1522,7 @@ def get_line_whitelist_predoms(PATH):
 # step11 get the BBs which post dominate anyline in whitelist, and union them with previous whiteBBlist
 # We don't need to generate the post dominate BBs for function in call trace (they are terminated due to bug in refkernel)
 def get_BB_whitelist_doms(PATH, calltracefunclist):
-    with open(PATH+"/func_BB_whitelist_predoms.json", "r") as f:
+    with open(PATH+"/lineguidance/func_BB_whitelist_predoms.json", "r") as f:
         func_BB_whitelist = json.load(f)
     funclist = [func for func in func_BB_whitelist]
  
@@ -1536,14 +1540,14 @@ def get_BB_whitelist_doms(PATH, calltracefunclist):
         func_BB_whitelist[func] += list(set(addBBlist))
         func_BB_whitelist[func].sort()
     
-    with open(PATH+"/func_BB_whitelist_doms.json", "w") as f:
+    with open(PATH+"/"/lineguidance/func_BB_whitelist_doms.json", "w") as f:
         json.dump(func_BB_whitelist, f, indent=4, sort_keys=True)
 
 # step12 get the lines which post dominate anyline in whitelist, and union them with previous whitelist
 def get_line_whitelist_doms_postdoms_calltrace(PATH, calltracefunclist = []):
-    with open(PATH+"/BB_lineinfo.json") as f:
+    with open(PATH+"/lineguidance/BB_lineinfo.json") as f:
         BB_lineinfo = json.load(f)
-    with open(PATH+"/func_BB_whitelist_doms.json", "r") as f:
+    with open(PATH+"/"/lineguidance/func_BB_whitelist_doms.json", "r") as f:
         func_BB_whitelist = json.load(f)
     
     func_line_whitelist_doms = {}
@@ -1556,18 +1560,18 @@ def get_line_whitelist_doms_postdoms_calltrace(PATH, calltracefunclist = []):
         line_whitelist_doms += func_line_whitelist_doms[func]
 
     line_whitelist_doms.sort()
-    with open(PATH+"/func_line_whitelist_doms.json", 'w') as f:
+    with open(PATH+"/lineguidance/func_line_whitelist_doms.json", 'w') as f:
         json.dump(func_line_whitelist_doms, f, indent=4, sort_keys=True)
-    with open(PATH+"/line_whitelist_doms.json", 'w') as f:
+    with open(PATH+"/lineguidance/line_whitelist_doms.json", 'w') as f:
         json.dump(line_whitelist_doms, f, indent=4, sort_keys=True)
 
 # step12 filter the previous blacklist with line_whitelist_doms
 def get_line_blacklist_doms_postdoms_calltrace(PATH):
-    with open(PATH +"/func_line_blacklist.json") as f:
+    with open(PATH +"/lineguidance/func_line_blacklist.json") as f:
         func_line_blacklist = json.load(f)
-    with open(PATH +"/line_blacklist.json") as f:
+    with open(PATH +"/lineguidance/line_blacklist.json") as f:
         blacklist = json.load(f)
-    with open(PATH+"/line_whitelist_doms.json", 'r') as f:
+    with open(PATH+"/lineguidance/line_whitelist_doms.json", 'r') as f:
         line_whitelist_BBdoms = json.load(f)
 
     
@@ -1584,9 +1588,9 @@ def get_line_blacklist_doms_postdoms_calltrace(PATH):
     for func in func_line_blacklist:
         line_blacklist += func_line_blacklist[func]
     line_blacklist.sort()
-    with open(PATH+"/func_line_blacklist_doms.json","w") as f:
+    with open(PATH+"/lineguidance/func_line_blacklist_doms.json","w") as f:
         json.dump(func_line_blacklist, f, indent=4, sort_keys=True)
-    with open(PATH+"/line_blacklist_doms.json","w") as f:
+    with open(PATH+"/lineguidance/line_blacklist_doms.json","w") as f:
         json.dump(line_blacklist, f, indent=4, sort_keys=True)
 
 

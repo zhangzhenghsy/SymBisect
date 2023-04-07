@@ -189,7 +189,7 @@ def get_matchedlines_afterformat(PATH):
         for key in result:
             line_targetline[filename + ":"+str(key)] = filename + ":" + str(result[key])
         format_line_targetline.update(line_targetline)
-    with open(PATH+"/format_line_targetline.json", "w") as f:
+    with open(PATH+"/lineguidance/format_line_targetline.json", "w") as f:
         json.dump(format_line_targetline, f, indent=4, sort_keys=True)
 
 def get_targetline_format(PATH):
@@ -206,10 +206,10 @@ def get_targetline_format(PATH):
 # get the clean call stack after formatting.
 # requirement: cleancallstack, format_line_targetline which logs the matching between before-format line and after-format line
 def get_cleancallstack_format(PATH):
-    #if not os.path.exists(PATH+"/format_line_targetline.json"):
+    #if not os.path.exists(PATH+"/lineguidance/format_line_targetline.json"):
     get_matchedlines_afterformat(PATH)
 
-    with open(PATH+"/format_line_targetline.json") as f:
+    with open(PATH+"/lineguidance/format_line_targetline.json") as f:
         format_line_targetline = json.load(f)
     with open(PATH+"/cleancallstack", "r") as f:
         s_buf = f.readlines()
@@ -227,7 +227,7 @@ def get_cleancallstack_format(PATH):
 # Requirement: cleancallstack_format (the call stack after code format), line_BBinfo.json which includes matching between line and BB
 def get_mustBBs(PATH):
     mustBBs = []
-    with open(PATH+"/line_BBinfo.json") as f:
+    with open(PATH+"/lineguidance/line_BBinfo.json") as f:
         line_BBinfo = json.load(f)
     with open(PATH+"/cleancallstack_format", "r") as f:
         s_buf = f.readlines()
@@ -247,7 +247,7 @@ def get_indirectcalls(PATH):
     indirectcalls = {}
     with open(PATH+"/built-in_tag.ll", "r") as f:
         bcfile = f.readlines()
-    with open(PATH+"/line_BBinfo.json") as f:
+    with open(PATH+"/lineguidance/line_BBinfo.json") as f:
         line_BBinfo = json.load(f)
     with open(PATH+"/cleancallstack_format", "r") as f:
         s_buf = f.readlines()

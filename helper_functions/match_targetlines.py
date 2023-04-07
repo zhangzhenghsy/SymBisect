@@ -226,7 +226,7 @@ def get_matchedlines_git(PATH1, PATH2):
     return filter_line_targetline
 
 def get_ref_files(PATH):
-    with open(PATH+"/line_whitelist_v1.json") as f:
+    with open(PATH+"/lineguidance/line_whitelist_v1.json") as f:
         line_whitelist_v1 = json.load(f)
     file_list = []
     for line in line_whitelist_v1:
@@ -303,9 +303,9 @@ def generate_target_list(PATH1, PATH2):
     print("\n\ngenerate_target_list\n")
     # question: should we use the original blacklist or blacklist filter with refkernel bc dom tree?
     # question： should we check if the function is renamed?
-    with open(PATH1+"/func_line_blacklist_doms.json") as f:
+    with open(PATH1+"/lineguidance/func_line_blacklist_doms.json") as f:
         func_line_blacklist = json.load(f)
-    with open(PATH1+"/func_line_whitelist_doms.json") as f:
+    with open(PATH1+"/lineguidance/func_line_whitelist_doms.json") as f:
         func_line_whitelist = json.load(f)
 
     #if not os.path.exists(PATH2+"/all_matchedlines.json"):
