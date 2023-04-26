@@ -17,8 +17,8 @@ def extract_sourceinfo_fromoutput(filepath):
     prevsourceline = ""
     funcname = ""
     for index in range(len(s_buf)):
-        if index%100 == 0:
-            print(index)
+        #if index%100 == 0:
+        #    print(index)
         line = s_buf[index]
         line = line.strip()
         if "WARNING ONCE:" in line:
@@ -55,7 +55,7 @@ def extract_sourceinfo_fromoutput(filepath):
                 state_sourceinfo[state] += [newline]
             #sourceinfolist +=[state+" "+funcname + " "+sourceinfo]
         #if "reach low priority line list" in line or "branches" in line or "BBkey" in line:
-        if any(ele in line for ele in ["reach low priority line list", "branches", "BBkey", "terminate"]):
+        if any(ele in line for ele in ["reach low priority line list", "branches", "BBkey", "terminate", "Forced Br", "Ignore low priority line list"]):
             #if line not in sourceinfolist:
             sourceinfolist += [state+" "+str(index)+" "+funcname+" "+line]
             if state not in state_sourceinfo:

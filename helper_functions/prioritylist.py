@@ -1540,14 +1540,14 @@ def get_BB_whitelist_doms(PATH, calltracefunclist):
         func_BB_whitelist[func] += list(set(addBBlist))
         func_BB_whitelist[func].sort()
     
-    with open(PATH+"/"/lineguidance/func_BB_whitelist_doms.json", "w") as f:
+    with open(PATH+"/lineguidance/func_BB_whitelist_doms.json", "w") as f:
         json.dump(func_BB_whitelist, f, indent=4, sort_keys=True)
 
 # step12 get the lines which post dominate anyline in whitelist, and union them with previous whitelist
 def get_line_whitelist_doms_postdoms_calltrace(PATH, calltracefunclist = []):
     with open(PATH+"/lineguidance/BB_lineinfo.json") as f:
         BB_lineinfo = json.load(f)
-    with open(PATH+"/"/lineguidance/func_BB_whitelist_doms.json", "r") as f:
+    with open(PATH+"/lineguidance/func_BB_whitelist_doms.json", "r") as f:
         func_BB_whitelist = json.load(f)
     
     func_line_whitelist_doms = {}
