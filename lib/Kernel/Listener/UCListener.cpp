@@ -367,6 +367,8 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             auto cs = llvm::cast<llvm::CallBase>(ki->inst);
             llvm::Value *fp = cs->getCalledOperand();
             llvm::Function *f = executor->getTargetFunction(fp, state);
+            if(!f) {
+                break;}
             std::string name = f->getName().str();
 
             if (name == "strcmp"){
@@ -374,6 +376,12 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
                 auto ty = ki->inst->getOperand(1)->getType();
                 //Question: what's the size of object should we create?
                 //Note that we will match all the corresponding symaddrs (within the size) to the object
+                klee::ref<klee::Expr> concrete_addr = create_symaddr_object(state, ki, base, ty, 64);
+                executor->un_eval(ki, 1, state).value = concrete_addr;
+            }
+            else if (name == "strchr") {
+                klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
+                auto ty = ki->inst->getOperand(1)->getType();
                 klee::ref<klee::Expr> concrete_addr = create_symaddr_object(state, ki, base, ty, 64);
                 executor->un_eval(ki, 1, state).value = concrete_addr;
             }
@@ -1166,6 +1174,8 @@ void kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction 
             auto cs = llvm::cast<llvm::CallBase>(ki->inst);
             llvm::Value *fp = cs->getCalledOperand();
             llvm::Function *f = executor->getTargetFunction(fp, state);
+            if(!f) {
+                break;}
             std::string name = f->getName().str();
 
             if (name == "memcpy"){

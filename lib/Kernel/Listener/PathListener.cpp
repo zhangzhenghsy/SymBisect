@@ -355,7 +355,7 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
         if (low_priority_lines_counter[name_l] > 5) {
             klee::klee_message("Ignore low priority line list %s, count: %d", name_l.c_str(), low_priority_lines_counter[name_l]);
         } else{
-            klee::klee_message("reach low priority line list terminate the state %s", name_l.c_str());
+            klee::klee_message("reach low priority line list terminate the state %s, count: %d", name_l.c_str(), low_priority_lines_counter[name_l]);
             this->executor->terminateState(state);
         }
     }
