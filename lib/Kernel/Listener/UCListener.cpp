@@ -217,7 +217,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
         i++;
     }
     }
-    
+    OOBWcheck(state, ki);
     //print_constraints(state);
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
@@ -362,9 +362,22 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             //print_constraints(state);
             break;
     	}
+        // For the modelled functions, we should concretize symbolic addr if necessary
         case llvm::Instruction::Call: {
-            //print_constraints(state);
-    	}
+            auto cs = llvm::cast<llvm::CallBase>(ki->inst);
+            llvm::Value *fp = cs->getCalledOperand();
+            llvm::Function *f = executor->getTargetFunction(fp, state);
+            std::string name = f->getName().str();
+
+            if (name == "strcmp"){
+                klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
+                auto ty = ki->inst->getOperand(1)->getType();
+                //Question: what's the size of object should we create?
+                //Note that we will match all the corresponding symaddrs (within the size) to the object
+                klee::ref<klee::Expr> concrete_addr = create_symaddr_object(state, ki, base, ty, 64);
+                executor->un_eval(ki, 1, state).value = concrete_addr;
+            }
+        }
         default: {
 
         }
@@ -400,7 +413,6 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             klee::klee_message("Inst value: Null");
         }
     }
-    bool OOBWcheck_result = OOBWcheck(state, ki);
     switch (ki->inst->getOpcode()) {
         case llvm::Instruction::GetElementPtr: {
             //yhao_print(executor->getDestCell(state, ki).value->print, str);
@@ -429,6 +441,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
         case llvm::Instruction::Store: {
             ObjectPair op;
             bool success;
+            symbolic_after_store(state, ki);
             klee::ref<klee::Expr> value = executor->eval(ki, 0, state).value;
             klee::ref<klee::Expr> address = executor->eval(ki, 1, state).value;
             // if the address is really concrete (no mapped symbolic address), we don't need to check the mapping between symbolic addr and base object
@@ -438,12 +451,12 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             // there is a symbolic address such as: concretebase+symoffset, thus we create a concrete address corresponding it
             // However, sometimes what we really need to access is the object at concretebase
             // Here we need to restore the concrete base and write to it
-            klee_message("restore sym address with concrete addr: %s", address.get_ptr()->dump2().c_str());
-            address = this->map_address_symbolic[address];
-            klee_message("sym address: %s", address.get_ptr()->dump2().c_str());
-            //if (klee::ConstantExpr* CE1 = dyn_cast<klee::ConstantExpr>(address)) {
-            //    break;
-            //}
+            // klee_message("restore sym address with concrete addr: %s", address.get_ptr()->dump2().c_str());
+            //address = this->map_address_symbolic[address];
+            //klee_message("sym address: %s", address.get_ptr()->dump2().c_str());
+            if (klee::ConstantExpr* CE1 = dyn_cast<klee::ConstantExpr>(address)) {
+                break;
+            }
             if (state.symaddr_base.find(address) != state.symaddr_base.end()){                
                 klee::ref<klee::Expr> baseaddr = state.symaddr_base[address];
                 klee_message("find address in symaddr_base mapping, the base addr: %s", baseaddr.get_ptr()->dump2().c_str());
@@ -501,6 +514,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             }
             yhao_print(executor->getDestCell(state, ki).value->print, str);
             //klee::klee_message("Load Inst value: %s", str.c_str());
+            // restore the symbolic address
             symbolic_after_load(state, ki);
             break;
         }
@@ -699,15 +713,80 @@ std::string kuc::UCListener::create_global_var_name(klee::KInstruction *ki, int6
     return name;
 }
 
+klee::ref<klee::Expr> kuc::UCListener::create_symaddr_object(klee::ExecutionState &state, klee::KInstruction *ki, klee::ref<klee::Expr> base, llvm::Type *ty, unsigned size = 0) {
+    for (auto& pair:map_symbolic_address){
+        klee::ref<klee::Expr> symbolic_address = pair.first;
+        ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
+        //klee_message("equal_expr:%s", equal_expr.get_ptr()->dump2().c_str());
+        bool equal_result;
+        bool success = executor->solver->mustBeTrue(state.constraints, equal_expr, equal_result,
+                                                state.queryMetaData);
+        if(equal_result){
+            klee_message("base equals to previous sym_addr:%s", symbolic_address.get_ptr()->dump2().c_str());
+            base = symbolic_address;
+            break;
+        }
+    }
+    auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
+    if (real_address) {
+        klee::klee_message("real_address");
+        return base;
+    } else if (map_symbolic_address.find(base) != map_symbolic_address.end()) {
+        // question: is it possible that the previous allocated object size is too limited for the new use?
+        klee::klee_message("find corresponding real_address of load symbolic address %s", map_symbolic_address[base].get_ptr()->dump2().c_str());
+        return map_symbolic_address[base];
+    } else {
+        klee::klee_message("create_symaddr_object");
+        // yhao: create mo for non constant address
+        // e.g. value load symbolic_address
+        // create new mo and symbolic_address = mo->getBaseExpr();
+        // do not consider address calculation
+        // mainly for the case concrete address + symbolic offset
+        //auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
+        auto name = "obj("+base.get_ptr()->dump2()+")";
+        klee::MemoryObject *mo = executor->create_mo(state, ty, ki->inst, name);
+        //executor->un_eval(ki, 0, state).value = mo->getBaseExpr();
+        klee::ref<klee::Expr> concrete_addr = mo->getBaseExpr();
+        this->map_symbolic_address[base] = concrete_addr;
+        this->map_address_symbolic[mo->getBaseExpr()] = base;
+        klee::klee_message("Symaddr:%s Concreteaddr: %s", base.get_ptr()->dump2().c_str(), concrete_addr.get_ptr()->dump2().c_str());
+
+        klee::ref<klee::Expr> one = klee::ConstantExpr::create(1, klee::Context::get().getPointerWidth());
+        for(int i=1; i< size; i++){
+            base = AddExpr::create(base, one);
+            concrete_addr =  AddExpr::create(concrete_addr, one);
+            this->map_symbolic_address[base] = concrete_addr;
+            this->map_address_symbolic[concrete_addr] = base;
+            klee::klee_message("Symaddr:%s Concreteaddr: %s", base.get_ptr()->dump2().c_str(), concrete_addr.get_ptr()->dump2().c_str());
+        }
+        return mo->getBaseExpr();
+    }
+}
 void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
     klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
+    klee_message("symbolic_before_load() base:%s", base.get_ptr()->dump2().c_str());
+    //klee_message("executor->optimizer.optimizeExpr(base, true):%s", executor->optimizer.optimizeExpr(base, true).get_ptr()->dump2().c_str());
+    //klee_message("klee::ConstraintManager::simplifyExpr(state.constraints, base):%s", klee::ConstraintManager::simplifyExpr(state.constraints, base).get_ptr()->dump2().c_str());
 
+    for (auto& pair:map_symbolic_address){
+        klee::ref<klee::Expr> symbolic_address = pair.first;
+        ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
+        //klee_message("equal_expr:%s", equal_expr.get_ptr()->dump2().c_str());
+        bool equal_result;
+        bool success = executor->solver->mustBeTrue(state.constraints, equal_expr, equal_result,
+                                                state.queryMetaData);
+        if(equal_result){
+            klee_message("base equals to previous sym_addr:%s", symbolic_address.get_ptr()->dump2().c_str());
+            base = symbolic_address;
+            break;
+        }
+    }
     auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
     if (real_address) {
         klee::klee_message("real_address");
     } else if (map_symbolic_address.find(base) != map_symbolic_address.end()) {
-        klee::klee_message("find load symbolic");
+        klee::klee_message("find corresponding real_address of load symbolic address %s", map_symbolic_address[base].get_ptr()->dump2().c_str());
         executor->un_eval(ki, 0, state).value = map_symbolic_address[base];
     } else {
         klee::klee_message("make load symbolic");
@@ -720,16 +799,25 @@ void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KI
             // do not consider address calculation
             // mainly for the case concrete address + symbolic offset
             //auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
-            auto name = base.get_ptr()->dump2();
+            auto name = "obj("+base.get_ptr()->dump2()+")";
             klee::MemoryObject *mo = executor->create_mo(state, ty, ki->inst, name);
             executor->un_eval(ki, 0, state).value = mo->getBaseExpr();
             this->map_symbolic_address[base] = mo->getBaseExpr();
             this->map_address_symbolic[mo->getBaseExpr()] = base;
-            yhao_print(mo->getBaseExpr()->print, str);
-            klee::klee_message("%s", str.c_str());
+            //yhao_print(mo->getBaseExpr()->print, str);
+            klee::klee_message("Concrete base: %s", mo->getBaseExpr().get_ptr()->dump2().c_str());
         } else {
             klee::klee_message("symbolic address, type is not integer or pointer");
         }
+    }
+}
+
+// restore the symbolic address
+void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KInstruction *ki) {
+    klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
+    if (this->map_address_symbolic.find(base) != this->map_address_symbolic.end()){
+        executor->un_eval(ki, 0, state).value = this->map_address_symbolic[base];
+        klee_message("symbolic_after_load() restore sym addr:%s", this->map_address_symbolic[base].get_ptr()->dump2().c_str());
     }
 }
 
@@ -737,7 +825,24 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
     std::string str;
     klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
 
+    for (auto& pair:map_symbolic_address){
+        klee::ref<klee::Expr> symbolic_address = pair.first;
+        ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
+        //klee_message("equal_expr:%s", equal_expr.get_ptr()->dump2().c_str());
+        bool equal_result;
+        bool success = executor->solver->mustBeTrue(state.constraints, equal_expr, equal_result,
+                                                state.queryMetaData);
+        if(equal_result){
+            klee_message("base equals to previous sym_addr:%s", symbolic_address.get_ptr()->dump2().c_str());
+            base = symbolic_address;
+            break;
+        }
+    }
+
     auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
+    klee_message("symbolic_before_store() base:%s", base.get_ptr()->dump2().c_str());
+    //klee_message("executor->optimizer.optimizeExpr(base, true):%s", executor->optimizer.optimizeExpr(base, true).get_ptr()->dump2().c_str());
+    //klee_message("klee::ConstraintManager::simplifyExpr(state.constraints, base):%s", klee::ConstraintManager::simplifyExpr(state.constraints, base).get_ptr()->dump2().c_str());
     if (real_address) {
         klee::klee_message("real_address");
     } else if (map_symbolic_address.find(base) != map_symbolic_address.end()) {
@@ -767,6 +872,16 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
     }
 }
 
+// restore the symbolic address
+void kuc::UCListener::symbolic_after_store(klee::ExecutionState &state, klee::KInstruction *ki) {
+    klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
+    if (this->map_address_symbolic.find(base) != this->map_address_symbolic.end()){
+        executor->un_eval(ki, 1, state).value = this->map_address_symbolic[base];
+        klee_message("symbolic_after_store() restore sym addr:%s", this->map_address_symbolic[base].get_ptr()->dump2().c_str());
+    }
+}
+
+/*
 void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
     // check value of load, if it is pointer, create mo and symbolic os
@@ -823,6 +938,7 @@ void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KIn
 
     }
 }
+*/
 
 void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KInstruction *ki) {
     klee::klee_message("symbolic_after_call");
@@ -968,11 +1084,31 @@ void kuc::UCListener::resolve_symbolic_expr(const klee::ref<klee::Expr> &symboli
     }
 }
 
-bool kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki) {
+void kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki) {
     bool OOBW = state.OOBW;
-    if(OOBW) return OOBW;
+    if(OOBW) return;
+
+    Expr::Width type;
+    unsigned bytes;
     switch (ki->inst->getOpcode()) {
+        case llvm::Instruction::Load:{
+            klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
+            type = executor->getWidthForLLVMType(ki->inst->getType());
+            bytes = Expr::getMinBytesForWidth(type);
+            OOB_check(state, base, bytes);
+            break;
+        }
+        case llvm::Instruction::Store:{
+            klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
+            klee::ref<klee::Expr> value = executor->eval(ki, 0, state).value;
+            type = value->getWidth();
+            bytes = Expr::getMinBytesForWidth(type);
+            OOB_check(state, base, bytes);
+            break;
+        }
         case llvm::Instruction::GetElementPtr: {
+            break;
+            /*
             klee::ObjectPair op;
             bool success;
             klee::ref<klee::Expr> address = executor->eval(ki, 0, state).value;
@@ -1018,13 +1154,118 @@ bool kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction 
                                                 state.queryMetaData);
                 if (!success) { break;}
                 if (!inBounds) {
-                    klee_message("possible OOBW detection");
+                    klee_message("state.OOBW = true");
                     state.OOBW = true;
                 }
 
-            }
+            }*/
 
         }
+        // For the modelled functions, we should check if OOB happen in advance
+        case llvm::Instruction::Call: {
+            auto cs = llvm::cast<llvm::CallBase>(ki->inst);
+            llvm::Value *fp = cs->getCalledOperand();
+            llvm::Function *f = executor->getTargetFunction(fp, state);
+            std::string name = f->getName().str();
+
+            if (name == "memcpy"){
+                ref<Expr> targetaddr = executor->eval(ki, 1, state).value;
+                ref<Expr> len = executor->eval(ki, 3, state).value;
+                targetaddr = AddExpr::create(targetaddr, len);
+                targetaddr = SubExpr::create(targetaddr, klee::ConstantExpr::create(1, Context::get().getPointerWidth()));
+                OOB_check(state, targetaddr, 1);
+            }
+        }
     }
-    return OOBW;
+}
+
+// zheng
+// used for separate symbolic parts and concrete parts of a given symbolic expression
+// It may be used for finding the base of an symbolic address
+void kuc::UCListener::separateConstantAndSymbolic(const ref<Expr> &expr, std::set<ref<Expr>> &constants, std::set<ref<Expr>> &symbolics) {
+    if (expr->getKind() == Expr::Constant) {
+        constants.insert(expr);
+    } else if (expr->getKind() == Expr::Read || expr->getKind() == Expr::Concat) {
+        // Read and Concat expressions are considered symbolic
+        symbolics.insert(expr);
+    } else {
+        // Recursively process child expressions
+        for (unsigned i = 0; i < expr->getNumKids(); ++i) {
+            separateConstantAndSymbolic(expr->getKid(i), constants, symbolics);
+        }
+    }
+}
+
+// When there are multiple
+void kuc::UCListener::extract_baseaddr(ref<Expr> &symaddr, ref<Expr> &baseaddr) {
+    std::set<ref<Expr>> constants;
+    std::set<ref<Expr>> symbolics;
+    separateConstantAndSymbolic(symaddr, constants, symbolics);
+
+    //int64_t largest_address = 0;
+    klee_message("extract_baseaddr symaddr:%s", symaddr.get_ptr()->dump2().c_str());
+    for (ref<Expr> constant : constants) {
+        klee::ConstantExpr *CE = dyn_cast<klee::ConstantExpr>(constant);
+        klee::klee_message("constant: %s", constant.get_ptr()->dump2().c_str());
+        // Is it possible that there is no such a constant?
+        if(CE->getZExtValue() > 1000000){
+            klee::klee_message("baseaddr: %s", constant.get_ptr()->dump2().c_str());
+            baseaddr = constant;
+        }
+    }
+}
+
+void kuc::UCListener::OOB_check(klee::ExecutionState &state, ref<Expr> targetaddr, unsigned bytes) {
+
+    //Expr::Width type = (isWrite ? value->getWidth() :
+    //                 getWidthForLLVMType(target->inst->getType()));
+    //unsigned bytes = Expr::getMinBytesForWidth(type);
+    klee_message("OOB_check() for targetaddr %s  bytes:%u", targetaddr.get_ptr()->dump2().c_str(), bytes);
+    ref<Expr> baseaddress = klee::ConstantExpr::create(0, klee::Context::get().getPointerWidth());;
+    extract_baseaddr(targetaddr, baseaddress);
+    // Do we need a check whether targetbaseaddr is initialized?
+
+    // Some objects are allocated outside the symbolic execution scope. 
+    // For example, (Add w64 2 (ReadLSB w64 0 input_0)) (pointed by argument)
+    klee::ConstantExpr *CE = dyn_cast<klee::ConstantExpr>(baseaddress);
+    if(CE->getZExtValue() == 0){
+        return;
+    }
+
+    ObjectPair op;
+    bool success;
+    success = state.addressSpace.resolveOne(cast<klee::ConstantExpr>(baseaddress), op);
+
+    if (!success){
+        klee_message("L1116 OOB may happen state.OOBW = true");
+        state.OOBW = true;
+        return;
+    }
+
+    const MemoryObject *mo = op.first;
+    ref<Expr> offset = mo->getOffsetExpr(targetaddr);
+    ref<Expr> check = mo->getBoundsCheckOffset(offset, bytes);
+    klee::klee_message("check: %s", check.get_ptr()->dump2().c_str());
+
+    if (!mo->issymsize.compare("True")){
+        ref<Expr> symsize = mo->symsize;
+        ref<Expr> offset2 = AddExpr::create(offset, klee::ConstantExpr::create(bytes, Context::get().getPointerWidth()));
+        check = UleExpr::create(offset2, symsize);
+        klee::klee_message("mo->issymsize True new check: %s", check.get_ptr()->dump2().c_str());
+    }
+
+    bool inBounds;
+    success =  executor->solver->mustBeTrue(state.constraints, check, inBounds,
+                                  state.queryMetaData);
+    if (!success) {
+        klee::klee_message("timeout in OOB_check");
+        return;
+    }
+
+    if (!inBounds) {
+        klee_message("L1123 OOB may happen state.OOBW = true");
+        state.OOBW = true;
+    } else {
+        klee_message("L1123 OOB should not happen");
+    }
 }

@@ -29,7 +29,11 @@ namespace kuc {
 
         bool skip_calltrace_distance(klee::ExecutionState &state, klee::KInstruction *ki, std::string targetfuncname);
 
-        bool OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki);
+        void OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki);
+        void OOB_check(klee::ExecutionState &state, klee::ref<klee::Expr> targetaddr, unsigned bytes);
+        void separateConstantAndSymbolic(const klee::ref<klee::Expr> &expr, std::set<klee::ref<klee::Expr>> &constants, std::set<klee::ref<klee::Expr>> &symbolics);
+        void extract_baseaddr(klee::ref<klee::Expr> &symaddr, klee::ref<klee::Expr> &baseaddr);
+        klee::ref<klee::Expr> create_symaddr_object(klee::ExecutionState &state, klee::KInstruction *ki, klee::ref<klee::Expr> base, llvm::Type *ty, unsigned size);
 
         void get_key_unsat_constraint(klee::ExecutionState &state, klee::ref<klee::Expr> cond);
 
@@ -57,6 +61,8 @@ namespace kuc {
         void symbolic_before_store(klee::ExecutionState &state, klee::KInstruction *ki);
 
         void symbolic_after_load(klee::ExecutionState &state, klee::KInstruction *ki);
+
+        void symbolic_after_store(klee::ExecutionState &state, klee::KInstruction *ki);
 
         void symbolic_after_call(klee::ExecutionState &state, klee::KInstruction *ki);
 

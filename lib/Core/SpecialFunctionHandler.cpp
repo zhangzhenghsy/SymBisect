@@ -1290,7 +1290,7 @@ void SpecialFunctionHandler::handleStrcmp(ExecutionState &state,
       //ref<Expr> base = AddExpr::create(srcaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
       //executor.executeMemoryOperation(state, true, base, value, 0);
   }
-  //klee_message("constraint: %s", constraint.get_ptr()->dump2().c_str());
+  klee_message("constraint: %s", constraint.get_ptr()->dump2().c_str());
   Executor::StatePair equalstr = executor.fork(state, constraint, true);
   klee::klee_message("branches.first: %p branches.second: %p", equalstr.first, equalstr.second);
   if (equalstr.first) { // symbolic str cs == ct

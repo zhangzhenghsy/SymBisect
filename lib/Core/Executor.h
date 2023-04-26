@@ -187,8 +187,11 @@ public:
     /// validity checks, and seed patching.
     /// zheng: moved to public
     void addConstraint(ExecutionState &state, ref<Expr> condition);
-    /// zheng: use this counter to log the number of correct jumps to targetBB.
+    /// zheng: use this counter to log the number of correct jumps to targetBB. 
+    /// According to it we will decide if we will under-constraint to
     std::map<std::string, int> BB_targetBB_counter;
+
+    ExprOptimizer optimizer;
 
 
 private:
@@ -279,7 +282,7 @@ private:
   llvm::raw_string_ostream debugLogBuffer;
 
   /// Optimizes expressions
-  ExprOptimizer optimizer;
+  //ExprOptimizer optimizer;
 
   /// Points to the merging searcher of the searcher chain,
   /// `nullptr` if merging is disabled

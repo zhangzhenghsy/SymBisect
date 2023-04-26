@@ -1100,11 +1100,11 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   if (isSeeding)
     timeout *= static_cast<unsigned>(it->second.size());
   solver->setTimeout(timeout);
-  klee_message("dbg Executor::fork L1058");
+  //klee_message("dbg Executor::fork L1058");
   bool success = solver->evaluate(current.constraints, condition, res,
                                   current.queryMetaData);
   solver->setTimeout(time::Span());
-  klee_message("dbg Executor::fork L1061");
+  //klee_message("dbg Executor::fork L1061");
   if (!success) {
     current.pc = current.prevPC;
     terminateStateEarly(current, "Query timed out (fork).");
@@ -1186,7 +1186,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   // the value it has been fixed at, we should take this as a nice
   // hint to just use the single constraint instead of all the binary
   // search ones. If that makes sense.
-  klee_message("dbg Executor::fork L1143");
+  //klee_message("dbg Executor::fork L1143");
   if (res==Solver::True) {
     if (!isInternal) {
       if (pathWriter) {
@@ -1204,7 +1204,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 
     return StatePair(0, &current);
   } else {
-    klee_message("dbg Executor::fork L1161");
+    //klee_message("dbg Executor::fork L1161");
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;
 
@@ -1281,7 +1281,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       terminateStateEarly(*falseState, "max-depth exceeded.");
       return StatePair(0, 0);
     }
-    klee_message("dbg Executor::fork L1238");
+    //klee_message("dbg Executor::fork L1238");
     return StatePair(trueState, falseState);
   }
 }
@@ -3095,8 +3095,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   }
 
   case Instruction::Load: {
-    klee_message("Instruction::Load");
     ref<Expr> base = eval(ki, 0, state).value;
+    klee_message("Instruction::Load base:%s", base.get_ptr()->dump2().c_str());
     executeMemoryOperation(state, false, base, 0, ki);
     break;
   }
@@ -4606,7 +4606,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
 
     /// zheng: check whether it's symbolic size
     //std::cout << "mo->issymsize: " << mo->issymsize << "\n";
-    if (!mo->issymsize.compare("True")){
+    /*if (!mo->issymsize.compare("True")){
       ref<Expr> symsize = mo->symsize;
       //klee::klee_message("mo->issymsize True    symsize: %s", symsize.get_ptr()->dump2().c_str());
       //std::cout << "mo->issymsize True    symsize of object:\n";
@@ -4614,7 +4614,7 @@ void Executor::executeMemoryOperation(ExecutionState &state,
 	    check = UltExpr::create(offset, symsize);
       klee::klee_message("mo->issymsize True new check: %s", check.get_ptr()->dump2().c_str());
 	    //std::cout << "new check:\n"  << (check.ptr)->dump2() <<"\n";
-    }
+    }*/
 
     bool inBounds;
     solver->setTimeout(coreSolverTimeout);
@@ -4653,8 +4653,8 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     } else {
 	 /// zheng: it's possible that the (symbolic offset) is larger than the size
 	 /// question, when concretize the address and get the object, is it possible that we don't get the corret object? 
-        klee_message("possible OOBW detection");
-        state.OOBW = true;
+    //    klee_message("L4656 state.OOBW = true");
+    //    state.OOBW = true;
 	  //std::cout << "It's possible that offset is larger than size!!! \n\n";
     ///return;
     }
@@ -4714,7 +4714,8 @@ void Executor::executeMemoryOperation(ExecutionState &state,
       if(target) {
         getDestCell(state, target).value.ptr = NULL;
       }
-      state.OOBW = true;
+      //state.OOBW = true;
+      //klee_message("L4718 state.OOBW = true");
       //terminateStateOnError(*unbound, "memory error: out of bound pointer", Ptr,
       //                      NULL, getAddressInfo(*unbound, address));
       //klee_warning("memory error: out of bound pointer");
