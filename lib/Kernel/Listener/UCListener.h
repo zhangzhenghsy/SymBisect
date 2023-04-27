@@ -34,6 +34,7 @@ namespace kuc {
         void separateConstantAndSymbolic(const klee::ref<klee::Expr> &expr, std::set<klee::ref<klee::Expr>> &constants, std::set<klee::ref<klee::Expr>> &symbolics);
         void extract_baseaddr(klee::ref<klee::Expr> &symaddr, klee::ref<klee::Expr> &baseaddr);
         klee::ref<klee::Expr> create_symaddr_object(klee::ExecutionState &state, klee::KInstruction *ki, klee::ref<klee::Expr> base, llvm::Type *ty, unsigned size);
+        void find_equalsymaddr(klee::ExecutionState &state, klee::ref<klee::Expr> base, bool& find_equalsymaddr_result);
 
         void get_key_unsat_constraint(klee::ExecutionState &state, klee::ref<klee::Expr> cond);
 
