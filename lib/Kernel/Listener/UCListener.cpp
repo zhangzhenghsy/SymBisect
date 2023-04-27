@@ -760,7 +760,7 @@ klee::ref<klee::Expr> kuc::UCListener::create_symaddr_object(klee::ExecutionStat
         klee::klee_message("Symaddr:%s Concreteaddr: %s", base.get_ptr()->dump2().c_str(), concrete_addr.get_ptr()->dump2().c_str());
 
         klee::ref<klee::Expr> one = klee::ConstantExpr::create(1, klee::Context::get().getPointerWidth());
-        for(int i=1; i< size; i++){
+        for(unsigned i=1; i< size; i++){
             base = AddExpr::create(base, one);
             concrete_addr =  AddExpr::create(concrete_addr, one);
             this->map_symbolic_address[base] = concrete_addr;
@@ -875,6 +875,21 @@ void kuc::UCListener::symbolic_after_store(klee::ExecutionState &state, klee::KI
 }
 
 void kuc::UCListener::find_equalsymaddr(klee::ExecutionState &state, klee::ref<klee::Expr> base, bool& find_equalsymaddr_result){
+    // To Improve the performance, try to do the solve for once?
+    ref<Expr> total_equal_expr = klee::ConstantExpr::create(0, Expr::Bool);
+    bool any_equal_result = false;
+    for (auto& pair:map_symbolic_address){
+        klee::ref<klee::Expr> symbolic_address = pair.first;
+        ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
+        total_equal_expr = OrExpr::create(total_equal_expr, equal_expr);    
+    }
+    bool success = executor->solver->mustBeTrue(state.constraints, total_equal_expr, any_equal_result,
+                                            state.queryMetaData);
+    if (!any_equal_result){
+        klee_message("find_equalsymaddr() no sym_addr equal base. No need to check one by one");
+        return;
+    }
+
     for (auto& pair:map_symbolic_address){
         klee::ref<klee::Expr> symbolic_address = pair.first;
         ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
@@ -890,6 +905,7 @@ void kuc::UCListener::find_equalsymaddr(klee::ExecutionState &state, klee::ref<k
             break;
         }
     }
+    klee_message("find_equalsymaddr() map_symbolic_address.size():%u find_equalsymaddr_result:%d", map_symbolic_address.size(), find_equalsymaddr_result);
 }
 
 /*
