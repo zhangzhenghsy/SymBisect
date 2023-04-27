@@ -770,26 +770,13 @@ klee::ref<klee::Expr> kuc::UCListener::create_symaddr_object(klee::ExecutionStat
         return mo->getBaseExpr();
     }
 }
+
 void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
     klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
     klee_message("symbolic_before_load() base:%s", base.get_ptr()->dump2().c_str());
     //klee_message("executor->optimizer.optimizeExpr(base, true):%s", executor->optimizer.optimizeExpr(base, true).get_ptr()->dump2().c_str());
     //klee_message("klee::ConstraintManager::simplifyExpr(state.constraints, base):%s", klee::ConstraintManager::simplifyExpr(state.constraints, base).get_ptr()->dump2().c_str());
-
-    for (auto& pair:map_symbolic_address){
-        klee::ref<klee::Expr> symbolic_address = pair.first;
-        ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
-        //klee_message("equal_expr:%s", equal_expr.get_ptr()->dump2().c_str());
-        bool equal_result;
-        bool success = executor->solver->mustBeTrue(state.constraints, equal_expr, equal_result,
-                                                state.queryMetaData);
-        if(equal_result){
-            klee_message("base equals to previous sym_addr:%s", symbolic_address.get_ptr()->dump2().c_str());
-            base = symbolic_address;
-            break;
-        }
-    }
     auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
     if (real_address) {
         klee::klee_message("real_address");
@@ -797,6 +784,11 @@ void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KI
         klee::klee_message("find corresponding real_address of load symbolic address %s", map_symbolic_address[base].get_ptr()->dump2().c_str());
         executor->un_eval(ki, 0, state).value = map_symbolic_address[base];
     } else {
+        bool find_equalsymaddr_result = false;
+        find_equalsymaddr(state, base, find_equalsymaddr_result);
+        if(find_equalsymaddr_result){
+            executor->un_eval(ki, 0, state).value = map_symbolic_address[base];
+        } else {
         klee::klee_message("make load symbolic");
         auto ty = ki->inst->getOperand(0)->getType();
         if (ty->getTypeID() == llvm::Type::IntegerTyID || ty->getTypeID() == llvm::Type::PointerTyID) {
@@ -817,6 +809,7 @@ void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KI
         } else {
             klee::klee_message("symbolic address, type is not integer or pointer");
         }
+        }
     }
 }
 
@@ -833,20 +826,6 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
     std::string str;
     klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
 
-    for (auto& pair:map_symbolic_address){
-        klee::ref<klee::Expr> symbolic_address = pair.first;
-        ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
-        //klee_message("equal_expr:%s", equal_expr.get_ptr()->dump2().c_str());
-        bool equal_result;
-        bool success = executor->solver->mustBeTrue(state.constraints, equal_expr, equal_result,
-                                                state.queryMetaData);
-        if(equal_result){
-            klee_message("base equals to previous sym_addr:%s", symbolic_address.get_ptr()->dump2().c_str());
-            base = symbolic_address;
-            break;
-        }
-    }
-
     auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
     klee_message("symbolic_before_store() base:%s", base.get_ptr()->dump2().c_str());
     //klee_message("executor->optimizer.optimizeExpr(base, true):%s", executor->optimizer.optimizeExpr(base, true).get_ptr()->dump2().c_str());
@@ -857,6 +836,11 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
         klee::klee_message("find corresponding real_address of store symbolic address %s", map_symbolic_address[base].get_ptr()->dump2().c_str());
         executor->un_eval(ki, 1, state).value = map_symbolic_address[base];
     } else {
+        bool find_equalsymaddr_result = false;
+        find_equalsymaddr(state, base, find_equalsymaddr_result);
+        if(find_equalsymaddr_result){
+            executor->un_eval(ki, 1, state).value = map_symbolic_address[base];
+        } else {
         klee::klee_message("make store symbolic");
         auto ty = ki->inst->getOperand(0)->getType();
         if (ty->getTypeID() == llvm::Type::IntegerTyID || ty->getTypeID() == llvm::Type::PointerTyID) {
@@ -877,6 +861,7 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
         } else {
             klee::klee_message("symbolic address, type is not integer or pointer");
         }
+        }
     }
 }
 
@@ -886,6 +871,24 @@ void kuc::UCListener::symbolic_after_store(klee::ExecutionState &state, klee::KI
     if (this->map_address_symbolic.find(base) != this->map_address_symbolic.end()){
         executor->un_eval(ki, 1, state).value = this->map_address_symbolic[base];
         klee_message("symbolic_after_store() restore sym addr:%s", this->map_address_symbolic[base].get_ptr()->dump2().c_str());
+    }
+}
+
+void kuc::UCListener::find_equalsymaddr(klee::ExecutionState &state, klee::ref<klee::Expr> base, bool& find_equalsymaddr_result){
+    for (auto& pair:map_symbolic_address){
+        klee::ref<klee::Expr> symbolic_address = pair.first;
+        ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
+        //klee_message("equal_expr:%s", equal_expr.get_ptr()->dump2().c_str());
+        bool equal_result;
+        bool success = executor->solver->mustBeTrue(state.constraints, equal_expr, equal_result,
+                                                state.queryMetaData);
+        if(equal_result){
+            klee_message("base equals to previous sym_addr:%s", symbolic_address.get_ptr()->dump2().c_str());
+            //base = symbolic_address;
+            map_symbolic_address[base] = map_symbolic_address[symbolic_address];
+            find_equalsymaddr_result = true;
+            break;
+        }
     }
 }
 
