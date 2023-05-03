@@ -27,6 +27,7 @@ def compile_bcfiles(PATH, kernel = None):
 if __name__ == "__main__":
     option = sys.argv[1]
     PATH = "/home/zzhan173/OOBW2022/c8af247de385/59f2f4b8a757"
+    PATH = "/home/zzhan173/OOBW2022/c993ee0f9f81/91265a6da44d"
     if not PATH:
         PATH = sys.argv[2]
     if PATH[-1] == "/":

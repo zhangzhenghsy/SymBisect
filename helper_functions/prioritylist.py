@@ -1779,6 +1779,7 @@ def copy_refkernel(PATH):
         string1 = "rm -rf "+ PATH +"/linux_ref"
         command(string1)
     string1 = "cd " + PATH + "; cp -r ../linux_ref ."
+    print(string1)
     command(string1)
 
 def copy_lineguidance(PATH):
