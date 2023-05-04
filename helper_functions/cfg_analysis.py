@@ -166,6 +166,24 @@ def get_func_BB_coverlist(PATH, func):
         func_BB_whitelist_predoms = json.load(f)
     return func_BB_whitelist_predoms[func]
 
+def get_func_BB_targetBBs(PATH):
+    with open(PATH+"/mustBBs", "r") as f:
+        s_buf = f.readlines()
+    MustBBlist = [line[:-1] for line in s_buf]
+    total_BB_targetBB = {}
+    for MustBB in MustBBlist:
+        BB_targetBB = get_func_BB_targetBB(PATH, MustBB)
+        total_BB_targetBB.update(BB_targetBB)
+
+    with open(PATH+"/lineguidance/BB_targetBB.json", "w") as f:
+        json.dump(total_BB_targetBB, f, indent=4)
+
+    with open(PATH+"/lineguidance/BB_lineinfo.json", "r") as f:
+        BB_lineinfo = json.load(f)
+    for BB in BB_targetBB:
+        print("\n"+BB, BB_lineinfo[BB])
+        print(BB_targetBB[BB], BB_lineinfo[BB_targetBB[BB]])
+
 # I'm trying to summarize some patterns where there is a guidance that BB1 -> BB2.
 # In symbolic execution if it doesn't happen, I will try to under-constraint the condition
 def get_func_BB_targetBB(PATH, MustBB):
@@ -182,33 +200,31 @@ def get_func_BB_targetBB(PATH, MustBB):
 
     for BB in BB_directBBs:
         directBBs = BB_directBBs[BB]
-        if len(directBBs) != 2:
+        if len(directBBs) == 1:
             continue
         if BB in blackBBs:
             continue
-        targetBB1 = directBBs[0]
-        targetBB2 = directBBs[1]
-        if targetBB1 in blackBBs and targetBB2 not in blackBBs:
-            BB_targetBB[BB] = targetBB2
-        elif targetBB2 in blackBBs and targetBB1 not in blackBBs:
-            BB_targetBB[BB] = targetBB1
-        #elif targetBB1 in mustBBs and targetBB2 not in mustBBs and targetBB2 not in coverBBs:
-        elif targetBB1 in mustBBs and targetBB2 not in mustBBs:
-            BB_targetBB[BB] = targetBB1
-        #elif targetBB2 in mustBBs and targetBB1 not in mustBBs and targetBB1 not in coverBBs:
-        elif targetBB2 in mustBBs and targetBB1 not in mustBBs:
-            BB_targetBB[BB] = targetBB2
+
+        count_mustBBs = 0
+        count_blackBBs = 0
+        for targetBB in directBBs:
+            if targetBB in blackBBs:
+                count_blackBBs += 1
+            elif targetBB in mustBBs:
+                count_mustBBs += 1
+        if count_blackBBs == len(directBBs) -1:
+            for targetBB in directBBs:
+                if targetBB not in blackBBs:
+                    BB_targetBB[BB] = targetBB
+        elif count_mustBBs == 1:
+            for targetBB in directBBs:
+                if targetBB in mustBBs:
+                    BB_targetBB[BB] = targetBB
+
     BB_targetBB = {k: BB_targetBB[k] for k in sorted(BB_targetBB)}
     BB_targetBB = {k: BB_targetBB[k] for k in sorted(BB_targetBB, key=lambda x:len(x))}
-
-    with open(PATH+"/lineguidance/BB_targetBB.json", "w") as f:
-        json.dump(BB_targetBB, f, indent=4)
-
-    with open(PATH+"/lineguidance/BB_lineinfo.json", "r") as f:
-        BB_lineinfo = json.load(f)
-    for BB in BB_targetBB:
-        print("\n"+BB, BB_lineinfo[BB])
-        print(BB_targetBB[BB], BB_lineinfo[BB_targetBB[BB]])
+    write_color_png(PATH, MustBB)
+    return BB_targetBB
 
 if __name__ == "__main__":
     #PATH = "/data/zzhan173/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/"
