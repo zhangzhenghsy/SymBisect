@@ -2269,6 +2269,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       }
 
       if (ri->getFunction()->getName() == "_klee_eh_cxx_personality") {
+
         assert(dyn_cast<ConstantExpr>(result) &&
                "result from personality fn must be a concrete value");
 
@@ -2662,15 +2663,38 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     }
     break;
   }
-  case Instruction::Unreachable:
+  case Instruction::Unreachable: {
     // Note that this is not necessarily an internal bug, llvm will
     // generate unreachable instructions in cases where it knows the
     // program will crash. So it is effectively a SEGV or internal
     // error.
     //terminateStateOnExecError(state, "reached \"unreachable\" instruction");
     klee_warning("Error reached \"unreachable\" instruction");
-    break;
+    // IN UCKLEE sometimes it will reach the unreachable insts. The function may have no return ret
+    // Once faced with unreachable inst, try to return directly
+    klee_warning("return directly");
+    KInstIterator kcaller = state.stack.back().caller;
+    Instruction *caller = kcaller ? kcaller->inst : 0;
+    bool isVoidReturn = true;
 
+    if (state.stack.size() <= 1) {
+      assert(!caller && "caller set on initial stack frame");
+      terminateStateOnExit(state);
+    } else {
+      state.popFrame();
+
+      if (statsTracker)
+        statsTracker->framePopped(state);
+
+      if (InvokeInst *ii = dyn_cast<InvokeInst>(caller)) {
+        transferToBasicBlock(ii->getNormalDest(), caller->getParent(), state);
+      } else {
+        state.pc = kcaller;
+        ++state.pc;
+      }
+    }
+    break;
+  }
   case Instruction::Invoke:
   case Instruction::Call: {
  
