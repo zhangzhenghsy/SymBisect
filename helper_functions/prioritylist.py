@@ -479,12 +479,19 @@ def get_dump_line(s_buf,st,ed, addr):
         #print("edaddr == addr")
         return ed
 
+    if (ed-st) == 1:
+        if staddr < addr and addr < edaddr:
+            return ed
+        else:
+            print("get_dump_line() don't find ", addr, "between", st, ed)
+            return None
     mid = (int)((st+ed)/2)
     if 'ff' not in s_buf[mid]:
         mid +=1
 
     midaddr = s_buf[mid][:16]
     #print("midaddr:", midaddr)
+    #corner case: ed = st+1; mid = st; staddr < addr < edaddr 
     if midaddr < addr:
         return get_dump_line(s_buf,mid,ed,addr)
     else:
@@ -499,6 +506,8 @@ def get_bb_addrs(s_buf, addr):
     ed = len(s_buf) - 1
     index = get_dump_line(s_buf,st,ed, addr)
     addrs = ['0x'+addr]
+    if not index:
+        return addrs
     if '__sanitizer_cov_trace_pc' in s_buf[index-1]:
         addrs = ['0x'+s_buf[index-1][:16]] + addrs
     index +=1
@@ -699,6 +708,11 @@ def get_func_addrs(PATH, addr, s_buf, addr_buf):
     #    print("multiple corresponding lines in dumpresult: ", linelist)
     #line = linelist[0]
     #index = s_buf.index(line)
+    while addr not in addr_buf:
+        print("get_func_addrs(): addr not in dumpresult:", addr)
+        addr = str(hex(int(addr, 16)+1))[2:]
+        addr = addr[:-1] if addr[-1] == "L" else addr
+        print("try new addr instead:", addr)
     index = addr_buf.index(addr)
 
     previndex = index-1
