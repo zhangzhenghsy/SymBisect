@@ -140,15 +140,20 @@ def get_cleancallstack(PATH):
     calltracefunclist = []
     with open(PATH+"/callstack", "r") as f:
         s_buf = f.readlines()
+    prevfuncname = ""
     for line in s_buf:
         line = line[:-1].strip()
         funcname = line.split(" ")[0]
         if "+" in funcname:
             funcname = funcname.split("+")[0]
+        if funcname == prevfuncname:
+            print("get_cleancallstack() funcname == prevfuncname Ignore one:", funcname)
+            continue
         sourceline = line.split(" ")[1]
         if funcname+" "+sourceline not in  cleancallstack:
             cleancallstack.append(funcname+" "+sourceline)
             calltracefunclist.append(funcname)
+        prevfuncname = funcname
     with open(PATH+"/cleancallstack", "w") as f:
         for line in cleancallstack:
             f.write(line+"\n")
