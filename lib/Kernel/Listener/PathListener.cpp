@@ -327,12 +327,16 @@ std::string simplifylineinfo(string lineinfo) {
     return simplifylineinfo;
 }
 void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
+    klee::klee_message("PathListener::afterExecuteInstruction()");
 
     auto bb = ki->inst->getParent();
     auto name_bb = bb->getName().str();
     auto name_l = dump_inst_sourceinfo(ki->inst);
     auto name_f = get_real_function_name(bb->getParent());
     string simple_name_l = simplifylineinfo(name_l);
+    if (simple_name_l != name_l) {
+        klee::klee_message("simple_name_l != name_l: %s, %s", simple_name_l.c_str(), name_l.c_str());
+    }
     if (target_bbs.find(name_bb) != target_bbs.end()) {
         this->executor->haltExecution = true;
     }
@@ -346,27 +350,28 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
     else if (low_priority_functions.find(name_f) != low_priority_functions.end()) {
         this->executor->terminateState(state);
     }
-    else if (low_priority_lines.find(name_l) != low_priority_lines.end()) {
-        if (low_priority_lines_counter.count(name_l)) {
-            low_priority_lines_counter[name_l] += 1;
+    else if (low_priority_lines.find(simple_name_l) != low_priority_lines.end()) {
+        if (low_priority_lines_counter.count(simple_name_l)) {
+            low_priority_lines_counter[simple_name_l] += 1;
         } else {
-            low_priority_lines_counter[name_l] = 1;
+            low_priority_lines_counter[simple_name_l] = 1;
         }
-        if (low_priority_lines_counter[name_l] > 5) {
-            klee::klee_message("Ignore low priority line list %s, count: %d", name_l.c_str(), low_priority_lines_counter[name_l]);
+        if (low_priority_lines_counter[simple_name_l] > 5) {
+            klee::klee_message("Ignore low priority line list %s, count: %d", simple_name_l.c_str(), low_priority_lines_counter[simple_name_l]);
         } else{
-            klee::klee_message("reach low priority line list terminate the state %s, count: %d", name_l.c_str(), low_priority_lines_counter[name_l]);
+            klee::klee_message("reach low priority line list terminate the state %s, count: %d", simple_name_l.c_str(), low_priority_lines_counter[simple_name_l]);
             this->executor->terminateState(state);
         }
     }
-    else if (simple_name_l != name_l) {
-        if (low_priority_lines.find(simple_name_l) != low_priority_lines.end()) {
-            klee::klee_message("reach low priority line list(after simplify) terminate the state %s", simple_name_l.c_str());
-            this->executor->terminateState(state);
-        }
-    }
-    //klee::klee_message("simple_name_l: %s", simple_name_l.c_str());
-    else if (target_lines.find(simple_name_l) != target_lines.end()) {
+    //else if (simple_name_l != name_l) {
+    //    klee::klee_message("simple_name_l != name_l: %s, %s", simple_name_l.c_str(), name_l.c_str())
+    //    if (low_priority_lines.find(simple_name_l) != low_priority_lines.end()) {
+    //        klee::klee_message("reach low priority line list(after simplify) terminate the state %s", simple_name_l.c_str());
+    //        this->executor->terminateState(state);
+    //    }
+    //}
+    klee::klee_message("simple_name_l: %s", simple_name_l.c_str());
+    if (target_lines.find(simple_name_l) != target_lines.end()) {
         klee::klee_message("reach target line, do vulnerability check");
         bool result = OOBWcheck(state, ki);
         if (result) {
