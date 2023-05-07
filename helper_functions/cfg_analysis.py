@@ -133,7 +133,11 @@ def get_func_BB_blacklist(PATH, MustBB):
 def get_func_BB_mustlist(PATH, MustBB):
     func = MustBB.split("built-in.bc-")[1].split("-")[0]
     func_BB_mustBBs = dot_analysis.get_node_premustnodes(PATH, func)
-    mustBBs = func_BB_mustBBs[MustBB]
+    #print("get_func_BB_mustlist() func_BB_mustBBs:", func_BB_mustBBs)
+    if MustBB in func_BB_mustBBs:
+        mustBBs = [MustBB] + func_BB_mustBBs[MustBB]
+    else:
+        mustBBs = [MustBB]
     return mustBBs
 
 def get_node_colors(MustBB, mustBBs, blackBBs):
