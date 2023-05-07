@@ -192,6 +192,10 @@ public:
     std::map<std::string, int> BB_targetBB_counter;
 
     ExprOptimizer optimizer;
+    StatsTracker *statsTracker;
+    void transferToBasicBlock(llvm::BasicBlock *dst,
+			    llvm::BasicBlock *src,
+			    ExecutionState &state);
 
 
 private:
@@ -203,7 +207,6 @@ private:
   ExternalDispatcher *externalDispatcher;
   MemoryManager *memory;
   std::set<ExecutionState*, ExecutionStateIDCompare> states;
-  StatsTracker *statsTracker;
   TreeStreamWriter *pathWriter, *symPathWriter;
   SpecialFunctionHandler *specialFunctionHandler;
   TimerGroup timers;
@@ -330,9 +333,6 @@ private:
 
   void stepInstruction(ExecutionState &state);
   void updateStates(ExecutionState *current);
-  void transferToBasicBlock(llvm::BasicBlock *dst, 
-			    llvm::BasicBlock *src,
-			    ExecutionState &state);
 
   void callExternalFunction(ExecutionState &state,
                             KInstruction *target,

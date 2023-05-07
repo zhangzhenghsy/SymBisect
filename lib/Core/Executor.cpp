@@ -2661,6 +2661,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         ++bit;
       }
     }
+
     break;
   }
   case Instruction::Unreachable: {
@@ -2670,29 +2671,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     // error.
     //terminateStateOnExecError(state, "reached \"unreachable\" instruction");
     klee_warning("Error reached \"unreachable\" instruction");
-    // IN UCKLEE sometimes it will reach the unreachable insts. The function may have no return ret
-    // Once faced with unreachable inst, try to return directly
-    klee_warning("return directly");
-    KInstIterator kcaller = state.stack.back().caller;
-    Instruction *caller = kcaller ? kcaller->inst : 0;
-    bool isVoidReturn = true;
-
-    if (state.stack.size() <= 1) {
-      assert(!caller && "caller set on initial stack frame");
-      terminateStateOnExit(state);
-    } else {
-      state.popFrame();
-
-      if (statsTracker)
+    if (statsTracker)
         statsTracker->framePopped(state);
-
-      if (InvokeInst *ii = dyn_cast<InvokeInst>(caller)) {
-        transferToBasicBlock(ii->getNormalDest(), caller->getParent(), state);
-      } else {
-        state.pc = kcaller;
-        ++state.pc;
-      }
-    }
     break;
   }
   case Instruction::Invoke:
@@ -4933,9 +4913,9 @@ void Executor::runFunctionAsMain(Function *f,
   processTree = std::make_unique<PTree>(state);
   // yu hao: add listener service
   this->listener_service->beforeRun(*state);
-  auto current_time = std::time(NULL);
+  auto start_time = clock();
   run(*state);
-  auto execute_time = std::time(NULL)-current_time;
+  auto execute_time = ((double)(clock() - start_time))/CLOCKS_PER_SEC;;
   klee_message("execute_time: %ld", execute_time);
   this->listener_service->afterRun(*state);
   processTree = nullptr;

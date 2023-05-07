@@ -561,6 +561,41 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             */
             break;
         }
+        case llvm::Instruction::Unreachable: {
+            // IN UCKLEE sometimes it will reach the unreachable insts. The function may have no return ret
+            // Once faced with unreachable inst, try to return directly
+            klee_warning("return directly");
+            KInstIterator kcaller = state.stack.back().caller;
+            Instruction *caller = kcaller ? kcaller->inst : 0;
+            bool isVoidReturn = true;
+
+            if (state.stack.size() <= 1) {
+                assert(!caller && "caller set on initial stack frame");
+                executor->terminateStateOnExit(state);
+            } else {
+                state.popFrame();
+
+
+            if (InvokeInst *ii = dyn_cast<InvokeInst>(caller)) {
+                executor->transferToBasicBlock(ii->getNormalDest(), caller->getParent(), state);
+            } else {
+                state.pc = kcaller;
+                ++state.pc;
+            }
+            }
+            //when it requires a return value, symbolize it
+            Type *ty = caller->getType();
+            if (ty->getTypeID() == Type::VoidTyID){
+                break;
+            }
+            auto sym_name = this->create_global_var_name(ki, 0, "symbolic_call_return_unreachinst");
+            unsigned int size =  executor->kmodule->targetData->getTypeStoreSize(ty);
+            Expr::Width width = executor->getWidthForLLVMType(ty);
+            ref<Expr> symbolic = executor->manual_make_symbolic(sym_name, size, width);
+            executor->bindLocal(kcaller, state, symbolic);
+
+            break;
+        }
         default: {
             break;
         }
