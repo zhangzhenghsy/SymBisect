@@ -632,6 +632,7 @@ def refine_lineinfolist(lineinfolist):
 # it requires completecoverlineinfo
 # it will be used in get_line_blacklist()
 def get_line_whitelist(PATH, kernel):
+    print("get_line_whitelist()")
     #if PATH[-1] == "/":
     #    PATH = PATH[:-1]
     #commit = PATH.split("/")[-1]
@@ -732,6 +733,7 @@ def get_func_addrs(PATH, addr, s_buf, addr_buf):
     return set(addrlist),set(nopaddrlist)
 
 def get_complete_func_addrs(PATH):
+    print("get_complete_func_addrs()")
     t0 = time.time()
     cover = PATH+"/cover"
     with open(cover,'r') as f:
@@ -746,7 +748,7 @@ def get_complete_func_addrs(PATH):
             addr_buf += [""]
     print("generate addr_buf correctly:", len(addr_buf)==len(s_buf))
     coveraddrs = [line[2:] if line.startswith("0x") else line for line in bbcover ]
-    coveraddrs = [line[:-1] for line in bbcover]
+    coveraddrs = [line[:-1] if line[-1] == "\n" else line for line in coveraddrs]
     complete_func_addrs = set()
     complete_nop_addrs = set()
 
