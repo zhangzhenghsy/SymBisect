@@ -48,6 +48,7 @@ namespace kuc {
         nlohmann::json config;
         std::set<std::string> skip_functions;
         bool print_inst;
+        bool print_log;
         std::map<std::string, std::string> indirectcall_map;
         std::string kernelversion;
         std::map<std::string,std::map<std::string, uint64_t>> concolic_map;

@@ -1784,7 +1784,7 @@ def get_cover_from_vmlog(PATH):
         print("Complete coverage from KCOV output")
     else:
         print("Not Complete coverage from KCOV output?")
-    
+        exit()
     with open(PATH+"/cover", "w") as f:
         for addr in addrlist:
             f.write(str(addr)+"\n")
