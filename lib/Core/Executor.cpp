@@ -323,8 +323,8 @@ cl::opt<unsigned> MaxDepth(
 cl::opt<unsigned> MaxMemory("max-memory",
                             cl::desc("Refuse to fork when above this amount of "
                                      "memory (in MB) (see -max-memory-inhibit) and terminate "
-                                     "states when additional 100MB allocated (default=2000)"),
-                            cl::init(2000),
+                                     "states when additional 100MB allocated (default=20000)"),
+                            cl::init(20000),
                             cl::cat(TerminationCat));
 
 cl::opt<bool> MaxMemoryInhibit(
@@ -1097,18 +1097,24 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   }
 
   time::Span timeout = coreSolverTimeout;
+  timeout = time::Span("1min");
   if (isSeeding)
     timeout *= static_cast<unsigned>(it->second.size());
+  //klee_message("solver timeout(in seconds): %f", timeout.toSeconds());
   solver->setTimeout(timeout);
-  //klee_message("dbg Executor::fork L1058");
+  klee_message("dbg Executor::fork L1103");
   bool success = solver->evaluate(current.constraints, condition, res,
                                   current.queryMetaData);
   solver->setTimeout(time::Span());
-  //klee_message("dbg Executor::fork L1061");
+  klee_message("dbg Executor::fork L1107");
+  bool notaddconstraint = false;
   if (!success) {
-    current.pc = current.prevPC;
-    terminateStateEarly(current, "Query timed out (fork).");
-    return StatePair(0, 0);
+    klee_message("Fork() timeout L1110 choose not add constraint here");
+    notaddconstraint = true;
+    res = Solver::Unknown;
+    //current.pc = current.prevPC;
+    //terminateStateEarly(current, "Query timed out (fork).");
+    //return StatePair(0, 0);
   }
 
   if (!isSeeding) {
@@ -1271,9 +1277,9 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
         falseState->symPathOS << "0";
       }
     }
-
-    addConstraint(*trueState, condition);
-    addConstraint(*falseState, Expr::createIsZero(condition));
+    if(!notaddconstraint){
+        addConstraint(*trueState, condition);
+        addConstraint(*falseState, Expr::createIsZero(condition));}
 
     // Kinda gross, do we even really still want this option?
     if (MaxDepth && MaxDepth<=trueState->depth) {
@@ -2403,6 +2409,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         klee::klee_message("randvalue==1, pick the opposite Cond: %s", cond.get_ptr()->dump2().c_str());
       }
       Executor::StatePair branches = fork(state, cond, false);
+      klee::klee_message("fork() done");
       ExecutionState * state2 = branches.second;
 
       klee::klee_message("branches.first: %p branches.second: %p", branches.first, branches.second);
@@ -2763,7 +2770,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
       klee_message("previous target ptr 5: %p", getDestCell(state, ki).value.ptr);
       executeCall(state, ki, f, arguments);
-      klee_message("previous target ptr 6: %p", getDestCell(state, ki).value.ptr);
+      //klee_message("previous target ptr 6: %p", getDestCell(state, ki).value.ptr);
     } else {
       ref<Expr> v = eval(ki, 0, state).value;
 
@@ -4916,7 +4923,7 @@ void Executor::runFunctionAsMain(Function *f,
   auto start_time = clock();
   run(*state);
   auto execute_time = ((double)(clock() - start_time))/CLOCKS_PER_SEC;;
-  klee_message("execute_time: %ld", execute_time);
+  klee_message("execute_time: %lf", execute_time);
   this->listener_service->afterRun(*state);
   processTree = nullptr;
 
