@@ -46,13 +46,23 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
             Calltrace.push_back(temp.get<std::string>());
         }
     }
+
+    if (config.contains("98_print_log")) {
+        print_log = config["98_print_log"];
+    }
+    else {
+        print_log = true;
+    }
+
 }
 
 kuc::UCListener::~UCListener() = default;
 
 // used for concolic execution
 void kuc::UCListener::beforeRun(klee::ExecutionState &state) {
-    klee_message("\nUCListener::beforeRun");
+    if (print_log){
+        klee_message("\nUCListener::beforeRun");
+    }
     KInstruction *ki = state.pc;
     KFunction *kf = state.stack.back().kf;
     Function *f = kf->function;
@@ -157,6 +167,7 @@ void kuc::UCListener::get_key_unsat_constraint(klee::ExecutionState &state, klee
         bool success = executor->solver->mustBeFalse(new_constraints, cond, result,
                                       state.queryMetaData);
         if(result){
+            if(print_log) {
             std::string str;
             yhao_print(constraint->print, str);
             klee_message("get_key_unsat_constraint: %s", str.c_str());
@@ -166,18 +177,21 @@ void kuc::UCListener::get_key_unsat_constraint(klee::ExecutionState &state, klee
                     klee::klee_message("line: %s", (*it2).c_str());/* code */
                 }
             }
+            }
             break;
         }
     }
 }
 void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
-    klee::klee_message("\n\nUCListener::beforeExecuteInstruction()");
     std::string str;
     //yhao_log(1, inst_to_strID(ki->inst));
     //yhao_log(1, dump_inst_booltin(ki->inst));
-    klee::klee_message("ExecutionState &state: %p", &state);
-    klee::klee_message("bb name i->getParent()->getName().str() %s",ki->inst->getParent()->getName().str().c_str());
-    klee::klee_message("sourcecodeLine: %s %u:%u", ki->info->file.c_str(), ki->info->line, ki->info->column);
+    if (print_log){
+        klee::klee_message("\n\nUCListener::beforeExecuteInstruction()");
+        klee::klee_message("ExecutionState &state: %p", &state);
+        klee::klee_message("bb name i->getParent()->getName().str() %s",ki->inst->getParent()->getName().str().c_str());
+        klee::klee_message("sourcecodeLine: %s %u:%u", ki->info->file.c_str(), ki->info->line, ki->info->column);
+    }
     std::string sourcecodeline = ki->info->file + ":"+ std::to_string(ki->info->line);
     //klee::klee_message("ki->inst->getOpcodeName(): %s", ki->inst->getOpcodeName());
     if (print_inst){
@@ -199,7 +213,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
     int *find = std::find(std::begin(inst_type), std::end(inst_type), ki->inst->getOpcode());
     if (find != std::end(inst_type)){
     size_t i = 0;
-    klee::klee_message("ki->inst->getNumOperands(): %d", ki->inst->getNumOperands());
+    if (print_log){klee::klee_message("ki->inst->getNumOperands(): %d", ki->inst->getNumOperands());}
     
     while (i < ki->inst->getNumOperands())
     {
@@ -212,7 +226,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
         klee::ref<klee::Expr> operand = executor->eval(ki, i, state).value;
         //yhao_print(operand->print, str);
         if (operand.get_ptr()){
-            klee::klee_message("Inst operand %zu: %s", i, operand.get_ptr()->dump2().c_str());
+            if (print_log){klee::klee_message("Inst operand %zu: %s", i, operand.get_ptr()->dump2().c_str());}
         }
         i++;
     }
@@ -345,7 +359,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             if (!success)
                 break;
             if (result){
-                klee_message("cond must be False");
+                if (print_log){klee_message("cond must be False");}
                 get_key_unsat_constraint(state, cond);
                 break;
             }
@@ -355,7 +369,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
             if (!success)
                 break;
             if (result){
-                klee_message("cond must be True");
+                if (print_log){klee_message("cond must be True");}
                 get_key_unsat_constraint(state, cond);
                 break;
             }
@@ -379,11 +393,37 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
                 klee::ref<klee::Expr> concrete_addr = create_symaddr_object(state, ki, base, ty, 64);
                 executor->un_eval(ki, 1, state).value = concrete_addr;
             }
-            else if (name == "strchr") {
+            if (name == "memcpy" || name == "_copy_from_user" || name == "_copy_to_user" || name == "strncpy_from_user") {
+                klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
+                auto ty = ki->inst->getOperand(1)->getType();
+                klee::ref<klee::Expr> concrete_addr = create_symaddr_object(state, ki, base, ty, 4096);
+                executor->un_eval(ki, 1, state).value = concrete_addr;
+
+                base = executor->eval(ki, 2, state).value;
+                ty = ki->inst->getOperand(2)->getType();
+                concrete_addr = create_symaddr_object(state, ki, base, ty, 4096);
+                executor->un_eval(ki, 2, state).value = concrete_addr;
+
+            }
+            if (name == "memset" || name == "kfree") {
+                if (print_log) {klee::klee_message("Concrete the first argument of function if it's symbolic");}
+                klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
+                auto ty = ki->inst->getOperand(1)->getType();
+                klee::ref<klee::Expr> concrete_addr = create_symaddr_object(state, ki, base, ty, 4096);
+                if (print_log) {klee::klee_message("concrete_addr:%s", concrete_addr.get_ptr()->dump2().c_str());}
+                executor->un_eval(ki, 1, state).value = concrete_addr;
+            }
+            if (name == "strchr") {
                 klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
                 auto ty = ki->inst->getOperand(1)->getType();
                 klee::ref<klee::Expr> concrete_addr = create_symaddr_object(state, ki, base, ty, 64);
                 executor->un_eval(ki, 1, state).value = concrete_addr;
+            }
+            if (name == "kmem_cache_free") {
+                klee::ref<klee::Expr> base = executor->eval(ki, 2, state).value;
+                auto ty = ki->inst->getOperand(2)->getType();
+                klee::ref<klee::Expr> concrete_addr = create_symaddr_object(state, ki, base, ty, 64);
+                executor->un_eval(ki, 2, state).value = concrete_addr;
             }
         }
         default: {
@@ -397,7 +437,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
 void kuc::UCListener::symbolize_Inst_return(klee::ExecutionState &state, klee::KInstruction *ki){
     llvm::Type *ty = ki->inst->getType();
     auto sym_name = this->create_global_var_name(ki, 0, "symbolic_Inst_return");
-    klee_message("create symbolic return for Load Inst: %s", sym_name.c_str());
+    if (print_log){klee_message("create symbolic return for Load Inst: %s", sym_name.c_str());}
     unsigned int size =  executor->kmodule->targetData->getTypeStoreSize(ty);
     Expr::Width width = executor->getWidthForLLVMType(ty);
     ref<Expr> symbolic = executor->manual_make_symbolic(sym_name, size, width);
@@ -406,7 +446,7 @@ void kuc::UCListener::symbolize_Inst_return(klee::ExecutionState &state, klee::K
 
 void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     std::string str;
-    klee::klee_message("UCListener::afterExecuteInstruction()");
+    if (print_log){klee::klee_message("UCListener::afterExecuteInstruction()");}
 
     unsigned index = ki->dest;
     //klee::klee_message("ki->dest: %u", ki->dest);
@@ -416,9 +456,9 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
     int *find = std::find(std::begin(inst_type), std::end(inst_type), ki->inst->getOpcode());
     if (find != std::end(inst_type)){
         if(executor->getDestCell(state, ki).value.get_ptr()){
-            klee::klee_message("Inst value: %s", executor->getDestCell(state, ki).value.get_ptr()->dump2().c_str());
+            if (print_log){klee::klee_message("Inst value: %s", executor->getDestCell(state, ki).value.get_ptr()->dump2().c_str());}
         } else {
-            klee::klee_message("Inst value: Null");
+            if (print_log){klee::klee_message("Inst value: Null");}
         }
     }
     switch (ki->inst->getOpcode()) {
@@ -440,9 +480,9 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             }
             if(success) {
                 state.symaddr_base[executor->getDestCell(state, ki).value] = baseaddr;
-                klee_message("symaddr_base symaddr %s base addr %s\n", executor->getDestCell(state, ki).value.get_ptr()->dump2().c_str(), baseaddr.get_ptr()->dump2().c_str());
+                if (print_log){klee_message("symaddr_base symaddr %s base addr %s\n", executor->getDestCell(state, ki).value.get_ptr()->dump2().c_str(), baseaddr.get_ptr()->dump2().c_str());}
                 const klee::MemoryObject * object = op.first;
-                klee_message("Base corresponding obj addr: %lu obj size: %u", object->address, object->size);
+                if (print_log){klee_message("Base corresponding obj addr: %lu obj size: %u", object->address, object->size);}
             }
             break;
         }
@@ -467,15 +507,15 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             }
             if (state.symaddr_base.find(address) != state.symaddr_base.end()){                
                 klee::ref<klee::Expr> baseaddr = state.symaddr_base[address];
-                klee_message("find address in symaddr_base mapping, the base addr: %s", baseaddr.get_ptr()->dump2().c_str());
+                if (print_log){klee_message("find address in symaddr_base mapping, the base addr: %s", baseaddr.get_ptr()->dump2().c_str());}
                 success = state.addressSpace.resolveOne(dyn_cast<klee::ConstantExpr>(baseaddr), op);
                 if (!success) {break;}
                 const klee::MemoryObject * object = op.first;
                 const ObjectState *os = op.second;
-                klee_message("Base corresponding obj addr: %lu obj size: %u", object->address, object->size);
+                if (print_log){klee_message("Base corresponding obj addr: %lu obj size: %u", object->address, object->size);}
                 auto ty = ki->inst->getOperand(0)->getType();
                 uint64_t size = executor->kmodule->targetData->getTypeStoreSize(ty).getKnownMinSize();
-                klee_message("size of operand0 : %lu", size);
+                if (print_log){klee_message("size of operand0 : %lu", size);}
                 uint64_t offset;
                 // our starting address
                 klee::ref<klee::Expr> objectbase = klee::ConstantExpr::create(object->address, klee::Context::get().getPointerWidth());
@@ -486,20 +526,20 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
                     loop ++;
                     if (loop > 32) break;
                     ref<Expr> Offset = klee::ConstantExpr::create(offset, klee::Context::get().getPointerWidth());
-                    klee_message("objectbase: %s", objectbase.get_ptr()->dump2().c_str());
-                    klee_message("Offset: %s", Offset.get_ptr()->dump2().c_str());
+                    if (print_log){klee_message("objectbase: %s", objectbase.get_ptr()->dump2().c_str());}
+                    if (print_log){klee_message("Offset: %s", Offset.get_ptr()->dump2().c_str());}
                     ref<Expr> currentaddr = AddExpr::create(objectbase, Offset);
                     //ref<Expr> oldvalue = os->read(offset, size*8);
 
                     bool res;
-                    klee_message("currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());
-                    klee_message("address: %s", address.get_ptr()->dump2().c_str());
+                    if (print_log){klee_message("currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());}
+                    if (print_log){klee_message("address: %s", address.get_ptr()->dump2().c_str());}
                     //klee_message("oldvalue: %s", oldvalue.get_ptr()->dump2().c_str());
                     ref<Expr> condition = EqExpr::create(currentaddr, address);
                     bool success = executor->solver->mayBeTrue(state.constraints, condition, res,
                                   state.queryMetaData);
                     if (!res) { 
-                        klee_message("sym address cannot equal current address, skip. currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());
+                        if (print_log){klee_message("sym address cannot equal current address, skip. currentaddr: %s", currentaddr.get_ptr()->dump2().c_str());}
                         continue; 
                     }
                     // create a new symvalue which can equal old value at current address or new written value, then write the symvalue back to current address
@@ -681,7 +721,10 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
     }
     //klee::klee_message("threshold_distance: %d", threshold_distance);
     bool Insametrace = true;
+    // initilized to be calltracesize, decrease by 1 if in call trace. increase by 1 if not in call trace.
     int currentdistance = Calltrace.size();
+    // Another way to determine if skipped. 
+    int diverge_calltrace = 0;
 
     int endIndex = state.stack.size() - 1;
     klee_message("index: %d", endIndex);
@@ -717,6 +760,12 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
                 for(auto &BB: *f) {count++;}
                 if (count > 1) {
                     currentdistance += 1;
+                    diverge_calltrace += 1;
+                }
+                if (diverge_calltrace > 3)
+                {
+                    klee::klee_message("diverge_calltrace distance:%d  skip the function due diverge_calltrace", diverge_calltrace);
+                    return true;
                 }
             }
       }
@@ -757,6 +806,17 @@ std::string kuc::UCListener::create_global_var_name(klee::KInstruction *ki, int6
 }
 
 klee::ref<klee::Expr> kuc::UCListener::create_symaddr_object(klee::ExecutionState &state, klee::KInstruction *ki, klee::ref<klee::Expr> base, llvm::Type *ty, unsigned size = 0) {
+    auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
+    if (real_address) {
+        klee::klee_message("real_address");
+        return base;
+    }
+    if (map_symbolic_address.find(base) != map_symbolic_address.end()) {
+        // question: is it possible that the previous allocated object size is too limited for the new use?
+        klee::klee_message("find corresponding real_address of load symbolic address %s", map_symbolic_address[base].get_ptr()->dump2().c_str());
+        return map_symbolic_address[base];
+    }
+    
     for (auto& pair:map_symbolic_address){
         klee::ref<klee::Expr> symbolic_address = pair.first;
         ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
@@ -767,14 +827,10 @@ klee::ref<klee::Expr> kuc::UCListener::create_symaddr_object(klee::ExecutionStat
         if(equal_result){
             klee_message("base equals to previous sym_addr:%s", symbolic_address.get_ptr()->dump2().c_str());
             base = symbolic_address;
-            break;
+            return base;
         }
     }
-    auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
-    if (real_address) {
-        klee::klee_message("real_address");
-        return base;
-    } else if (map_symbolic_address.find(base) != map_symbolic_address.end()) {
+    if (map_symbolic_address.find(base) != map_symbolic_address.end()) {
         // question: is it possible that the previous allocated object size is too limited for the new use?
         klee::klee_message("find corresponding real_address of load symbolic address %s", map_symbolic_address[base].get_ptr()->dump2().c_str());
         return map_symbolic_address[base];
@@ -872,6 +928,7 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
         executor->un_eval(ki, 1, state).value = map_symbolic_address[base];
     } else {
         bool find_equalsymaddr_result = false;
+        // high overhead. ignore it for now
         find_equalsymaddr(state, base, find_equalsymaddr_result);
         if(find_equalsymaddr_result){
             executor->un_eval(ki, 1, state).value = map_symbolic_address[base];
@@ -910,7 +967,9 @@ void kuc::UCListener::symbolic_after_store(klee::ExecutionState &state, klee::KI
 }
 
 void kuc::UCListener::find_equalsymaddr(klee::ExecutionState &state, klee::ref<klee::Expr> base, bool& find_equalsymaddr_result){
-    // To Improve the performance, try to do the solve for once?
+    klee::klee_message("find_equalsymaddr() high overhead, ignore it for now");
+    //return;
+    //// To Improve the performance, try to do the solve for once?
     ref<Expr> total_equal_expr = klee::ConstantExpr::create(0, Expr::Bool);
     bool any_equal_result = false;
     for (auto& pair:map_symbolic_address){
