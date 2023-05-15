@@ -269,7 +269,7 @@ def adapt_end_report(repo):
             break;
     else:
         print("don't find suitable location to insert code. Need to manually add code")
-        return
+        exit()
     with open(filename, "w") as f:
         for line in s_buf2:
             f.write(line)

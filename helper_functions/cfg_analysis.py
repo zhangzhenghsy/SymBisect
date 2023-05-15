@@ -200,7 +200,7 @@ def get_func_BB_targetBB(PATH, MustBB):
     #print("blackBBs:", blackBBs)
     mustBBs = get_func_BB_mustlist(PATH, MustBB)
     #print("mustBBs:", mustBBs)
-    coverBBs = get_func_BB_coverlist(PATH, func)
+    #coverBBs = get_func_BB_coverlist(PATH, func)
 
     for BB in BB_directBBs:
         directBBs = BB_directBBs[BB]
