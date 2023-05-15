@@ -164,6 +164,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("__kzalloc", handleKmalloc, true),
   add("__do_kmalloc", handleKmalloc, true),
   add("__kmalloc_track_caller", handleKmalloc, true),
+  add("kvmalloc", handleKmalloc, true),
   add("bpf_map_area_alloc", handleKmalloc, true),
   add("kmem_cache_alloc_trace", handlekmem_cache_alloc_trace, true),
   add("kmem_cache_alloc_node_trace", handlekmem_cache_alloc_trace, true),
@@ -171,6 +172,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("kmem_cache_free", handlekmem_cache_free, false),
   add("kmalloc_array", handleCalloc, true),
   add("kcalloc", handleCalloc, true),
+  add("lock_page", handleLock, true),
 #undef addDNR
 #undef add
 };
@@ -759,6 +761,11 @@ void SpecialFunctionHandler::handleCalloc(ExecutionState &state,
   executor.executeAlloc(state, size, false, target, true);
 }
 
+void SpecialFunctionHandler::handleLock(ExecutionState &state,
+                            KInstruction *target,
+                            std::vector<ref<Expr> > &arguments) {
+}
+
 void SpecialFunctionHandler::handleRealloc(ExecutionState &state,
                             KInstruction *target,
                             std::vector<ref<Expr> > &arguments) {
@@ -1061,10 +1068,11 @@ void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
     else{
       //Use hard-coded concrete size.
       //todo: Compare the symbolic memcpy size and the object size to detect potential OOBW
-      //symsize = true;
-      length = std::min(length, (object->address+object->size-dyn_cast<ConstantExpr>(targetaddr)->getZExtValue()));
-      length = std::min(length, (object2->address+object2->size-dyn_cast<ConstantExpr>(srcaddr)->getZExtValue()));
+      length = 1024;
     }
+    length = std::min(length, (object->address+object->size-dyn_cast<ConstantExpr>(targetaddr)->getZExtValue()));
+    length = std::min(length, (object2->address+object2->size-dyn_cast<ConstantExpr>(srcaddr)->getZExtValue()));
+
     klee::klee_message("concrete length: %lu",length);
 
     const ObjectState *os = op2.second;
@@ -1074,8 +1082,9 @@ void SpecialFunctionHandler::handleMemcpy(ExecutionState &state,
     for(uint64_t i =0; i<length; i++){
       ref<Expr> offset = ConstantExpr::create((baseoffset + i), Context::get().getPointerWidth());
       ref<Expr> value = os->read(offset, 8);
-
       ref<Expr> base = AddExpr::create(targetaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
+      //klee::klee_message("executeMemoryOperation() offset:%s value:%s target:%s", offset.get_ptr()->dump2().c_str(),  value.get_ptr()->dump2().c_str(), base.get_ptr()->dump2().c_str());
+      //klee::klee_message("value->getWidth() :%u", value->getWidth());
       executor.executeMemoryOperation(state, true, base, value, 0);
     }
 
@@ -1322,7 +1331,8 @@ void SpecialFunctionHandler::handleStrchr(ExecutionState &state,
   if (!success) {
     klee_message("dont find src object, return symbolic value");
     auto name = "[strchr symreturn "+srcaddr.get_ptr()->dump2()+"]" + "(symvar)";
-    ref<Expr> symreturn = executor.manual_make_symbolic(name, 1, 8);
+    // return pointer to a char
+    ref<Expr> symreturn = executor.manual_make_symbolic(name, 8, 64);
     executor.bindLocal(target, state, symreturn);
     return;
   }
