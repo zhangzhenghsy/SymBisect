@@ -7,6 +7,8 @@ import compilebc,prioritylist
 import ast
 import shutil
 import helper
+import cfg_analysis
+import dot_analysis
 
 def trim_lines(buf):
     for i in range(len(buf)):
@@ -60,8 +62,6 @@ def get_files(p_buf):
             filenames.add(result)
     return filenames
 
-ref_kernel = "/data/zzhan173/repos/linux"
-target_kernel = "/data/zzhan173/repos/target_linux"
 
 #for example, ~/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/
 def get_commit_frompath(PATH):
@@ -72,22 +72,26 @@ def get_commit_frompath(PATH):
     else:
         return PATH.split("/")[-1]
 
-def get_diff_buf(PATH1, PATH2):
-    commit1 = get_commit_frompath(PATH1)
-    commit2 = get_commit_frompath(PATH2)
-    string1 = "cd "+ref_kernel+"; make mrproper; git checkout -f "+commit1
-    print(string1)
-    command(string1)
-    string1 = "cd "+target_kernel+"; make mrproper; git checkout -f "+commit2
-    print(string1)
-    command(string1)
+def get_diff_buf(refkernel, targetkernel, PATH2):
+    print("get_diff_buf()")
+    #commit1 = get_commit_frompath(PATH1)
+    #commit2 = get_commit_frompath(PATH2)
+    #string1 = "cd "+ref_kernel+"; make mrproper; git checkout -f "+commit1
+    #print(string1)
+    #command(string1)
+    #string1 = "cd "+target_kernel+"; make mrproper; git checkout -f "+commit2
+    #print(string1)
+    #command(string1)
 
-    if os.path.exists(PATH1+"/codeadaptation.json"):
-        print("adapt code according to codeadaptation.json")
-        compilebc.adapt_code(ref_kernel, PATH1+"/codeadaptation.json")
-    compilebc.format_linux(ref_kernel)
-    compilebc.format_linux(target_kernel)
-    string1 = "git diff --no-index "+ref_kernel+" "+target_kernel+" >"+PATH2+"/diffbuf"
+    #if os.path.exists(PATH1+"/codeadaptation.json"):
+    #    print("adapt code according to codeadaptation.json")
+    #    compilebc.adapt_code(ref_kernel, PATH1+"/codeadaptation.json")
+    #compilebc.format_linux(ref_kernel)
+    #compilebc.format_linux(target_kernel)
+    if os.path.exists(PATH2 +"/diffbuf"):
+        os.remove(PATH2 +"/diffbuf")
+    string1 = "git diff --no-index "+refkernel+" "+targetkernel+" >" + PATH2 +"/diffbuf"
+    print(string1)
     result = command(string1)
 
 def writelist(List, path):
@@ -95,9 +99,11 @@ def writelist(List, path):
         for ele in List:
             f.write(str(ele)+"\n")
 
-def get_matchfiles(PATH1, PATH2):
+def get_matchfiles(refkernel, targetkernel, PATH1, PATH2):
+    print("get_matchfiles() \n PATH1:",PATH1,"\nPATH2:",PATH2)
+    print("get_matchfiles() \n refkernel:",refkernel," targetkernel:",targetkernel)
     #if not os.path.exists(PATH2+"/diffbuf"):
-    get_diff_buf(PATH1, PATH2)
+    get_diff_buf(refkernel, targetkernel, PATH2)
 
     with open(PATH2+"/diffbuf", "r") as f:
         s_buf = f.readlines()
@@ -110,6 +116,8 @@ def get_matchfiles(PATH1, PATH2):
         if fn == None:
             continue
         if ".bc" in fn:
+            continue
+        if ".h" not in fn and ".c" not in fn:
             continue
         filter_matchedfiles += [(fn,fp)]
         filter_matchedfiles_dic[fn] = fp
@@ -215,6 +223,7 @@ def get_matchedlines_git(PATH1, PATH2):
     for i in line_targetline:
         if i > len(s_buf1):
             print(PATH1, PATH2, "i:",i)
+            continue
         if len(s_buf1[i-1]) == 0:
             continue
         if s_buf1[i-1] != s_buf2[line_targetline[i]-1]:
@@ -235,23 +244,49 @@ def get_ref_files(PATH):
         file_list += [line.split(":")[0]]
     return file_list
 
-def get_all_matchedlines_git(PATH1, PATH2):
+def store_matchedlines(matchedfile):
+    fn,fp,refkernel,targetkernel = matchedfile
+    matchedlines = get_matchedlines_git(fn, fp)
+    fnpath = fn.split(refkernel)[1]
+    fppath = fp.split(targetkernel)[1]
+    filematchedlines = {}
+    for i in matchedlines:
+        filematchedlines[fnpath+":"+str(i)] = fppath+":"+str(matchedlines[i])
+    output = fp.replace(".c", "_c_matchedlines.json")
+    output = output.replace(".h", "_h_matchedlines.json")
+    print("store_matchedlines in", output)
+    with open(output, 'w') as f:
+        json.dump(filematchedlines, f, indent=4, sort_keys=True)
+
+# format target kernel
+def format_targetkernel(targetkernel):
+    print("\nformat_targetkernel()\n")
+    compilebc.format_linux(targetkernel)
+
+#PATH1: the directory where refkernel info are stored
+#PATH2: the directory where targetkernel info are stored
+#refkernel
+#targetkernel
+def get_all_matchedlines_git(refkernel, targetkernel, PATH1, PATH2):
+    print("\nget_all_matchedlines_git()\n")
+    refkernel = refkernel + "/" if refkernel[-1] != "/" else refkernel
+    targetkernel = targetkernel + "/" if targetkernel[-1] != "/" else targetkernel
     t0 = time.time()
     all_matchedlines = {}
-    matchedfiles = get_matchfiles(PATH1, PATH2)
-
+    matchedfiles = get_matchfiles(refkernel, targetkernel, PATH1, PATH2)
     ref_files = get_ref_files(PATH1)
     ref_files = [helper.simplify_path(line) for line in ref_files]
     filter_matchedfiles = []
     for (fn, fp) in matchedfiles:
-        #fnpath = fn.split("source/")[1]
-        #get the relative path of file
-        fnpath = fn.split("repos/linux/")[1]
+        #fnpath: relative path
+        fnpath = fn.split(refkernel)[1]
+        #fp = fp.split(targetkernel)[1]
+        #fp = fp[:-1] if fp[-1] == "/" else fp
         if fnpath in ref_files:
-            if fp == None:
-                print(fnpath,"is deleted")
-                continue
-            filter_matchedfiles += [(fn, fp)]
+            #if fp == None:
+            #    print(fnpath,"is deleted")
+            #    continue
+            filter_matchedfiles += [(fn, fp, refkernel, targetkernel)]
     print("size of matchedfiles:", len(matchedfiles), "size of filter_matchedfiles:", len(filter_matchedfiles))
     #for ele in matchedfiles:
     #    print(ele)
@@ -260,15 +295,20 @@ def get_all_matchedlines_git(PATH1, PATH2):
         p.map(store_matchedlines,   filter_matchedfiles)
     #print("cost time2:", time.time()-t0)
 
-    for (fn, fp) in filter_matchedfiles:
-        inputfile = fp.replace(".c", "_matchedlines.json")
-        with open(inputfile, 'r') as f:
-            matchedlines = json.load(f)
-            all_matchedlines.update(matchedlines)
-        dstfile = inputfile.replace(target_kernel, PATH2+"/source")
+    for (fn, fp, refkernel, targetkernel) in filter_matchedfiles:
+        inputfile = fp
+        dstfile = inputfile.replace(targetkernel, PATH2+"/source/")
         dstfolder = os.path.dirname(dstfile)
         if not os.path.exists(dstfolder):
             os.makedirs(dstfolder)
+        shutil.copy(inputfile, dstfile)
+
+        inputfile = fp.replace(".c", "_c_matchedlines.json")
+        inputfile = inputfile.replace(".h", "_h_matchedlines.json")
+        with open(inputfile, 'r') as f:
+            matchedlines = json.load(f)
+            all_matchedlines.update(matchedlines)
+        dstfile = inputfile.replace(targetkernel, PATH2+"/source/")
         shutil.copy(inputfile, dstfile)
     with open(PATH2+"/all_matchedlines.json", 'w') as f:
         json.dump(all_matchedlines, f, indent=4, sort_keys=True)
@@ -276,139 +316,168 @@ def get_all_matchedlines_git(PATH1, PATH2):
     #for refline in all_matchedlines:
     #    print(refline, all_matchedlines[refline])
 
-def store_matchedlines(matchedfile):
-    fn,fp = matchedfile
-    matchedlines = get_matchedlines_git(fn, fp)
-    fnpath = fn.split("repos/linux/")[1]
-    fppath = fp.split("repos/target_linux/")[1]
-    filematchedlines = {}
-    for i in matchedlines:
-        filematchedlines[fnpath+":"+str(i)] = fppath+":"+str(matchedlines[i])
-    output = fp.replace(".c", "_matchedlines.json")
-    with open(output, 'w') as f:
-        json.dump(filematchedlines, f, indent=4, sort_keys=True)
-
-def compare_twomatches(line_target_context, line_targetline_git):
-    for line in line_target_context:
-        if line not in line_targetline_git:
-            print(line, "line_target_context[line]:", line_target_context[line],"no match in line_targetline_git")
-            continue
-        if line_target_context[line] != line_targetline_git[line]:
-            print(line, "line_target_context[line]:", line_target_context[line], "line_targetline_git[line]:", line_targetline_git[line])
-    for line in line_targetline_git:
-        if line not in line_target_context:
-            print(line, "no match in line_target_context line_targetline_git[line]:" , line_targetline_git[line])
-
-def generate_target_list(PATH1, PATH2):
-    print("\n\ngenerate_target_list\n")
-    # question: should we use the original blacklist or blacklist filter with refkernel bc dom tree?
-    # question： should we check if the function is renamed?
-    with open(PATH1+"/lineguidance/func_line_blacklist_doms.json") as f:
-        func_line_blacklist = json.load(f)
-    with open(PATH1+"/lineguidance/func_line_whitelist_doms.json") as f:
-        func_line_whitelist = json.load(f)
-
-    #if not os.path.exists(PATH2+"/all_matchedlines.json"):
-    get_all_matchedlines_git(PATH1, PATH2)
+def generate_linelist_targetkernel(refkernel, targetkernel, PATH1, PATH2, func_linelist_jsonfile):
     with open(PATH2+"/all_matchedlines.json") as f:
         all_matchedlines = json.load(f)
     with open(PATH2+"/filter_matchedfiles.json", "r") as f:
         filter_matchedfiles = json.load(f)
 
-    func_line_blacklist2 = {}
-    line_blacklist2 = []
+    if not os.path.exists(PATH2+"/lineguidance"):
+        os.mkdir(PATH2+"/lineguidance")
+
+    with open(PATH1+"/lineguidance/"+func_linelist_jsonfile) as f:
+        func_linelist = json.load(f)
+
+    func_linelist_targetkernel = {}
+    linelist_targetkernel = []
     notchangedfiles = []
-    for func in func_line_blacklist:
-        func_line_blacklist2[func] = []
-        for line in func_line_blacklist[func]:
-            #print(line)
+    for func in func_linelist:
+        func_linelist_targetkernel[func] = []
+        for line in func_linelist[func]:
             line = helper.simplify_path(line)
-            #print(line)
             filename = line.split(":")[0]
-            if "/data/zzhan173/repos/linux/"+filename not in filter_matchedfiles:
+            # The file is not changed, thus keep the original line
+            if refkernel+filename not in filter_matchedfiles:
                 if filename not in notchangedfiles:
                     notchangedfiles += [filename]
                     print(filename, "is not changed in target kernel")
-                func_line_blacklist2[func]  += [line]
-                line_blacklist2 += [line]
+                func_linelist_targetkernel[func]  += [line]
+                linelist_targetkernel += [line]
+            # The file is changed. And we find the corresponding line
             if line in all_matchedlines:
-                func_line_blacklist2[func]  += [all_matchedlines[line]]
-                line_blacklist2 += [all_matchedlines[line]]
-    line_blacklist2 = list(set(line_blacklist2))
-    line_blacklist2.sort()
+                func_linelist_targetkernel[func]  += [all_matchedlines[line]]
+                linelist_targetkernel += [all_matchedlines[line]]
+    linelist_targetkernel = list(set(linelist_targetkernel))
+    linelist_targetkernel.sort()
 
-    func_line_whitelist2 = {}
-    line_whitelist2 = []
-    for func in func_line_whitelist:
-        func_line_whitelist2[func] = []
-        for line in func_line_whitelist[func]:
-            line = helper.simplify_path(line)
-            filename = line.split(":")[0]
-            if "/data/zzhan173/repos/linux/"+filename not in filter_matchedfiles:
-                func_line_whitelist2[func]   += [line]
-                line_whitelist2 += [line]
-            if line in all_matchedlines:
-                func_line_whitelist2[func]  += [all_matchedlines[line]]
-                line_whitelist2 += [all_matchedlines[line]]
-    line_whitelist2 = list(set(line_whitelist2))
-    line_whitelist2.sort()
+    with open(PATH2 + "/lineguidance/" + func_linelist_jsonfile, 'w') as f:
+        json.dump(func_linelist_targetkernel, f, indent=4, sort_keys=True)
+    with open(PATH2 + "/lineguidance/" + func_linelist_jsonfile.replace("func_", ""), 'w') as f:
+        json.dump(linelist_targetkernel, f, indent=4, sort_keys=True)
 
-    with open(PATH2+"/func_line_blacklist_refdoms.json", 'w') as f:
-        json.dump(func_line_blacklist2, f, indent=4, sort_keys=True)
-    with open(PATH2+"/line_blacklist_refdoms.json", 'w') as f:
-        json.dump(line_blacklist2, f, indent=4, sort_keys=True)
+def generate_linelists_targetkernel(refkernel, targetkernel, PATH1, PATH2):
+    print("\ngenerate_linelist_targetkernel()\n")
+    
+    # question: should we use the original blacklist or blacklist filter with refkernel bc dom tree?
+    # question： should we check if the function is renamed?
+    generate_linelist_targetkernel(refkernel, targetkernel,PATH1, PATH2, "func_line_blacklist.json")
+    generate_linelist_targetkernel(refkernel, targetkernel,PATH1, PATH2, "func_line_blacklist_doms.json")
+    generate_linelist_targetkernel(refkernel, targetkernel,PATH1, PATH2, "func_line_whitelist_doms.json")
+    #generate_linelist_targetkernel(refkernel, targetkernel,PATH1, PATH2, "func_line_whitelist_v0.json")
+    generate_linelist_targetkernel(refkernel, targetkernel,PATH1, PATH2, "func_line_whitelist_v1.json")
 
-    with open(PATH2+"/func_line_whitelist_refdoms.json", 'w') as f:
-        json.dump(func_line_whitelist2, f, indent=4, sort_keys=True)
-    with open(PATH2+"/line_whitelist_refdoms.json", 'w') as f:
-        json.dump(line_whitelist2, f, indent=4, sort_keys=True)
-
-def compile_targetbc(PATH1, PATH2):
-    print("\n\ncompile_targetbc\n")
+# compile target kernel into bc files
+def compile_bcfiles_targetkernel(targetkernel, PATH1, PATH2):
+    print("\ncompile_bcfiles_targetkernel\n")
     #if not os.path.exists(PATH2+"/config"):
     #    shutil.copy(PATH1+"/config", PATH2+"/config")
     if not os.path.exists(PATH2+"/config_withoutkasan"):
+        shutil.copy(PATH1+"/config", PATH2+"/config")
         shutil.copy(PATH1+"/config_withoutkasan", PATH2+"/config_withoutkasan")
-    compilebc.compile_gcc(PATH2)
-    compilebc.get_dryruncommands()
-    compilebc.format_linux()
-    compilebc.compile_bc_extra("compile")
-    compilebc.compile_bc_extra("copy", PATH2)
-    compilebc.compile_bc_extra("check", PATH2)
+    #compilebc.format_linux(targetkernel)
+    compilebc.compile_gcc(PATH2, targetkernel)
+    compilebc.get_dryruncommands(targetkernel)
+    compilebc.compile_bc_extra("compile", PATH2, targetkernel)
+    compilebc.compile_bc_extra("copy", PATH2, targetkernel)
+    compilebc.compile_bc_extra("check", PATH2, targetkernel)
 
-def link_bclist_from_refcover(PATH1, PATH2):
-    print("\n\nlink_bclist_from_refcover\n")
+def link_bclist_fromcover__targetkernel(refkernel, targetkernel, PATH1, PATH2):
+    print("\nlink_bclist_fromcover__targetkernel()\n")
     coverlineinfo = PATH1+"/coverlineinfo"
     with open (coverlineinfo,"r") as f:
         s_buf =f.readlines()
     if 'number of c files' in s_buf[-4]:
+        # This line only includes c files (without .h files)
         filelist =  ast.literal_eval(s_buf[-3][:-1])
         print("num of reffiles:", len(filelist))
-    filelist = [line.replace("/home/zzhan173/repos/linux", ref_kernel) for line in filelist]
+    
+    #filelist = [line.replace("/home/zzhan173/repos/linux", refkernel) for line in filelist]
     target_filelist = []
     with open(PATH2+"/filter_matchedfiles.json", "r") as f:
         filter_matchedfiles = json.load(f)
-    for line in filelist:
-        if line not in filter_matchedfiles:
-            #print(line,"not in filter_matchedfiles")
-            target_filelist += [line.replace(ref_kernel+"/", "")]
-        elif filter_matchedfiles[line] == None:
+    for ref_file in filelist:
+        # The file is same in ref_kernel/target_kernel
+        if ref_file not in filter_matchedfiles:
+            target_filelist += [ref_file.replace(refkernel, targetkernel)]
+        # The file is deleted in target kernel (dont find corresponding file in target kernel)
+        elif filter_matchedfiles[ref_file] == None:
             print(line,"is deleted in target kernel")
             continue
         else:
-            target_filelist += [filter_matchedfiles[line].replace(target_kernel+"/", "")]
-    #target_filelist = [filter_matchedfiles[line] for line in filelist if line in filter_matchedfiles]
-    #target_filelist = [line.replace(target_kernel+"/", "") for line in target_filelist]
-    print("num of targetfiles:", len(target_filelist))
-    print(target_filelist)
-    prioritylist.link_bclist(target_filelist, PATH2, "built-in.bc")
+            target_filelist += [filter_matchedfiles[ref_file]]
+    bcfilelist = [filename.replace(".c",".bc") for filename in target_filelist]
+    print("num of targetfiles:", len(bcfilelist))
+    print(bcfilelist)
+    prioritylist.link_bclist(bcfilelist, PATH2 + "/built-in.bc")
     prioritylist.get_tagbcfile(PATH2)
 
-def generate_target_config(PATH, MustBBs):
-    print("\n\ngenerate_target_config\n")
+    if not os.path.exists(PATH2+"/lineguidance/"):
+        os.mkdir(PATH2+"/lineguidance/")
+    #get debug symbol information from .ll file. Mapping between !num and file,lineNo
+    prioritylist.get_dbginfo(PATH2)
+    #Mapping between BB name and line
+    prioritylist.get_BB_lineinfo(PATH2)
+
+# Now ignore the function rename, will it result in problem? maybe not, we only use the line num to get the target BB
+def get_callstack_targetkernel(refkernel, targetkernel, PATH1, PATH2):
+    print("\nget_callstack_targetkernel()\n")
+    with open(PATH2+"/filter_matchedfiles.json", "r") as f:
+        filter_matchedfiles = json.load(f)
+    with open(PATH2+"/all_matchedlines.json") as f:
+        all_matchedlines = json.load(f)
+
+    cleancallstack_format = []
+    calltracefunclist = []
+    with open(PATH1+"/cleancallstack_format", "r") as f:
+        s_buf = f.readlines()
+    for line in s_buf:
+        funcname, refline = line[:-1].split(" ")
+        filename = refline.split(":")[0]
+        # The file is not changed, thus keep the original line
+        if refkernel+filename not in filter_matchedfiles:
+            cleancallstack_format += [line[:-1]]
+            calltracefunclist += [line.split(" ")[0]]
+            continue
+        if refline not in all_matchedlines:
+            print("\nNo corresponding line in target kernel for", line)
+            if not os.path.exists(PATH2+"/cleancallstack_format"):
+                print("\nRequire manual get cleancallstack_format and calltracefunclist for target kernel\n")
+            else:
+                print("Use the manual get cleancallstack_format and calltracefunclist")
+            return
+        targetline = all_matchedlines[refline]
+        cleancallstack_format += [funcname+" "+targetline]
+        calltracefunclist += [funcname]
+    with open(PATH2+"/cleancallstack_format", "w") as f:
+        for line in cleancallstack_format:
+            f.write(line + "\n")
+    with open(PATH2+"/calltracefunclist", "w") as f:
+        for line in calltracefunclist:
+            f.write(line+"\n")
+    helper.get_targetline_format(PATH2)
+
+def get_targetline_format_targetkernel(PATH2):
+    print("\nget_targetline_format_targetkernel()\n")
+    helper.get_targetline_format(PATH2)
+
+def get_BBguidance_targetkernel(PATH2):
+    print("get_BBguidance_targetkernel")
+    # Just used for getting CFG png for debug
+    prioritylist.get_BB_whitelist(PATH2)
+    dot_analysis.get_dom_files(PATH2)
+    prioritylist.get_BB_whitelist_predoms(PATH2)
+
+    cfg_analysis.get_cfg_files(PATH2)
+    # used for generate low-priority BB list (the BB which cannot reach mustBB)
+    helper.get_mustBBs(PATH2)
+    # Make use of mustBBs to get the BB_targetBBs
+    # Also require the low-priority line list: PATH + "/lineguidance/line_blacklist_doms.json"
+    cfg_analysis.get_func_BB_targetBBs(PATH2)
+
+def generate_kleeconfig_targetkernel(PATH2):
+    print("\ngenerate_kleeconfig_targetkernel\n")
     # todo: do dom analysis for target kernel again (consider that we need to do source analysis to correct the func name in func_line_blacklist_refdoms.json/func_line_whitelist_refdoms.json)
-    #if not os.path.exists(PATH+"/line_blacklist_doms.json"):
-    shutil.copy(PATH+"/line_blacklist_refdoms.json", PATH+"/line_blacklist_doms.json")
-    prioritylist.generate_kleeconfig(PATH, [], MustBBs)
-    os.makedirs(PATH+"/configs")
-    shutil.copy(PATH+"/config_cover_doms.json", PATH+"/configs/config_cover_doms.json")
+    prioritylist.generate_kleeconfig(PATH2, [])
+    if not os.path.exists(PATH2+"/configs"):
+        os.mkdir(PATH2+"/configs")
+    shutil.copy(PATH2+"/config_cover_doms.json", PATH2+"/configs/config_cover_doms.json")
