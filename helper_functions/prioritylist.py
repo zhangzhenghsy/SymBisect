@@ -271,8 +271,9 @@ def execute_addreline(Argument):
             subprocess.call([ADDR2LINE,'-afip','-e',image],stdin=fi,stdout=fo)
 
 def get_vmlinux_dbginfo_parallel(PATH):
-    if not os.path.exists(PATH+"/addr2line"):
-        os.mkdir(PATH+"/addr2line")
+    if os.path.exists(PATH+"/addr2line"):
+        shutil.rmtree(PATH+"/addr2line")
+    os.mkdir(PATH+"/addr2line")
     dumpresult = PATH+"/dumpresult"
     #if not os.path.exists(dumpresult):
     print("generate dumpresult")
@@ -314,6 +315,7 @@ def get_vmlinux_dbginfo_parallel(PATH):
     shutil.copy(PATH+"/addr2line/tmp_o_total", PATH+"/tmp_o");
     t1=time.time()
     print(PATH,(t1-t0))
+    shutil.rmtree(PATH+"/addr2line")
 
 def get_vmlinux_dbginfo_func(PATH, func):
     funcaddrs = get_funcname_addrs(PATH, func)
@@ -825,33 +827,6 @@ def get_line_completelist(PATH, kernel = None):
         json.dump(completelist, f, indent=4, sort_keys=True)
     print("get_line_completelist cost time:", time.time()-t0)
 
-def filter_complete_white_blacklist_funcrange(PATH, kernel = None):
-    commit = PATH.split("/")[-1]
-    string1 = "cd /home/zzhan173/repos/linux/;git checkout -f "+commit
-    command(string1)
-
-    print("\nfilter lines in func_completelist according to funcrange")
-    with open(PATH +"/lineguidance/func_line_completelist.json") as f:
-        func_line_completelist = json.load(f)
-    func_line_completelist = filter_funclist_funcrange(func_line_completelist)
-    with open(PATH+"/lineguidance/func_line_completelist.json", 'w') as f:
-        json.dump(func_line_completelist, f, indent=4, sort_keys=True)
-
-    print("\nfilter lines in func_whitelist according to funcrange")
-    with open(PATH +"/func_line_whitelist.json") as f:
-        func_line_whitelist = json.load(f)
-    func_line_whitelist = filter_funclist_funcrange(func_line_whitelist)
-    with open(PATH+"/func_line_whitelist.json", 'w') as f:
-        json.dump(func_line_whitelist, f, indent=4, sort_keys=True)
-
-    print("\nfilter lines in func_blacklist according to funcrange")
-    with open(PATH +"/lineguidance/func_line_blacklist.json") as f:
-        func_line_blacklist = json.load(f)
-    func_line_blacklist = filter_funclist_funcrange(func_line_blacklist)
-    with open(PATH+"/lineguidance/func_line_blacklist.json", 'w') as f:
-        json.dump(func_line_blacklist, f, indent=4, sort_keys=True)
-
-
 def filter_funclist_funcrange(func_linelist, kernel):
     #repo = "/home/zzhan173/repos/linux/"
     kernel += "/"
@@ -1041,6 +1016,7 @@ def generate_kleeconfig(PATH, parameterlist = []):
     for line in s_buf:
         line,callee = line[:-1].split(" ")
         indirectcall[line] = callee
+        indirectcall["./"+line] = callee
     
     config = {}
 
@@ -1186,8 +1162,14 @@ def get_BB_lineinfo(PATH):
         json.dump(bb_lines, f, indent=4, sort_keys=True)
 
     output = PATH+"/lineguidance/line_BBinfo.json"
+    # Some line startswith "./", which is not shown in our clean callstack, add them to aviod missing
+    line_bb2 = {}
+    for line in line_bb:
+        line_bb2[line] = line_bb[line]
+        if line.startswith("./"):
+            line_bb2[line[2:]] = line_bb[line]
     with open(output, 'w') as f:
-        json.dump(line_bb, f, indent=4, sort_keys=True)
+        json.dump(line_bb2, f, indent=4, sort_keys=True)
 
     output = PATH+"/lineguidance/line_BBinfo_without_loopBr.json"
     with open(output, 'w') as f:
@@ -1642,8 +1624,8 @@ def check_duplicate_func_linelist(PATH):
         for line in line_func:
             if len(line_func[line]) > 1:
                 print(line, line_func[line])
-
-def compile_gcc(PATH):
+clang_path =  "/home/zzhan173/Linux_kernel_UC_KLEE/install/bin/clang"
+def compile_gcc_clang(PATH, clang=None):
     #if PATH[-1] == "/":
     #    PATH = PATH[:-1]
     #commit = PATH.split("/")[-1]
@@ -1652,15 +1634,20 @@ def compile_gcc(PATH):
     #result = command(string1)
     #if os.path.exists(PATH+"/codeadaptation.json"):
     #    compilebc.adapt_code(ref_linux, PATH+"/codeadaptation.json")
+    print("prioritylist.compile_gcc_clang() clang:",clang)
     ref_linux = PATH + "/linux_ref"
     compilebc.adapt_end_report(ref_linux)
     print("compilebc.format_linux()")
     compilebc.format_linux(ref_linux)
-    print("helper.add_fnoinline_Makefile()")
-    helper.add_fnoinline_Makefile(ref_linux+"/Makefile")
+    if not clang:
+        print("helper.add_fnoinline_Makefile()")
+        helper.add_fnoinline_Makefile(ref_linux+"/Makefile")
     print("compilebc.adapt_CONFIG_LOG_BUF_SHIFT()")
     compilebc.adapt_CONFIG_LOG_BUF_SHIFT(PATH)
-    string1 = "cd "+ref_linux+";cp "+PATH+"/config .config;make olddefconfig;make -j32"
+    if clang:
+        string1 = "cd "+ref_linux+";cp "+PATH+"/config .config;make CC="+clang_path+" olddefconfig;make -j32 CC="+clang_path
+    else:
+        string1 = "cd "+ref_linux+";cp "+PATH+"/config .config;make olddefconfig;make -j32"
     print(string1)
     result = command(string1)
 

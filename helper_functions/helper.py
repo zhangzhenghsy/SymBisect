@@ -4,6 +4,8 @@ import json
 import threading
 import psutil
 import get_stuckfunction
+import requests
+import shutil
 
 class Command(object):
     def __init__(self, cmd):
@@ -52,6 +54,11 @@ def compare_dics(dic1, dic2):
         if dic1[ele] != dic2[ele]:
             print(ele, dic1[ele], dic2[ele])
 
+def get_file_url(url, filename):
+    r = requests.request(method='GET', url=url)
+    text = r.text
+    with open(filename, "w") as f:
+        f.write(text)
 
 def add_fnoinline_Makefile(PATH):
     with open(PATH, "r") as f:
@@ -105,7 +112,12 @@ def get_callstack(PATH):
     print("get_callstack() from report.txt")
     with open(PATH+"/report.txt", "r") as f:
         s_buf = f.readlines()
-    s_buf2 = []
+
+    refkernels = ["syzkaller/managers/upstream-linux-next-kasan-gce-root/kernel/"]
+    for refkernel in refkernels:
+        for i in range(len(s_buf)):
+            s_buf[i] = s_buf[i].replace(refkernel, "")
+
     for i in range(len(s_buf)):
         line = s_buf[i]
         if "Call Trace" in line:
@@ -129,8 +141,8 @@ def get_callstack(PATH):
     for i in range(len(s_buf)):
         if any(func in s_buf[i] for func in Ignore_funcs):
             startline = i
-    print(s_buf)
     s_buf = s_buf[startline+1:]
+    print(s_buf)
     with open(PATH+"/callstack", "w") as f:
         for line in s_buf:
             f.write(line)
@@ -198,9 +210,6 @@ def get_matchedlines_afterformat(PATH):
         json.dump(format_line_targetline, f, indent=4, sort_keys=True)
 
 def get_targetline_format(PATH):
-    if not os.path.exists(PATH+"/cleancallstack_format"):
-        get_cleancallstack_format(PATH)
-
     with open(PATH+"/cleancallstack_format", "r") as f:
         s_buf = f.readlines()
 
@@ -211,8 +220,14 @@ def get_targetline_format(PATH):
 # get the clean call stack after formatting.
 # requirement: cleancallstack, format_line_targetline which logs the matching between before-format line and after-format line
 def get_cleancallstack_format(PATH):
-    #if not os.path.exists(PATH+"/lineguidance/format_line_targetline.json"):
+    print("get_cleancallstack_format()")
     get_matchedlines_afterformat(PATH)
+
+    if os.path.exists(PATH+"/cleancallstack_format_correct"):
+        print("Use cleancallstack_format_correct(manual get) as cleancallstack_format_correct")
+        shutil.copy(PATH+"/cleancallstack_format_correct", PATH+"/cleancallstack_correct")
+        #check_cleancallstack_format(PATH)
+        return
 
     with open(PATH+"/lineguidance/format_line_targetline.json") as f:
         format_line_targetline = json.load(f)
@@ -227,6 +242,55 @@ def get_cleancallstack_format(PATH):
     with open(PATH+"/cleancallstack_format", "w") as f:
         for line in cleancallstack_format:
             f.write(line+"\n")
+    check_result = check_cleancallstack_format(PATH)
+    if not check_result:
+        print("check_cleancallstack_format return False, exit()")
+        exit()
+
+# Sometimes the callstack we got from report.txt is not accurate, it ignores some simple function in the middle
+# For example, 8e28bba73ed1772a6802, vfs_get_tree->squashfs_get_tree->get_tree_bdev
+def check_cleancallstack_format(PATH):
+    print("check_cleancallstack_format()")
+    result = True
+    with open(PATH+"/cleancallstack_format", "r") as f:
+        s_buf = f.readlines()
+    for i in range(len(s_buf) -1):
+        callee = s_buf[i][:-1]
+        callee_func, callee_line = callee.split(" ")
+        caller = s_buf[i+1][:-1]
+        callee_funcs = get_callee_afterline_fromcoverline(PATH, caller)
+        print("caller:", caller, "  callee:", callee, "\ncallees in coverline:", callee_funcs, callee_func in callee_funcs)
+        if callee_funcs and callee_func not in callee_funcs:
+            print("\ncallee_func not in callee_funcs, require manual check\n")
+            result = False
+    return result
+
+def get_callee_afterline_fromcoverline(PATH, caller_line):
+    callee_funcs = []
+    with open(PATH+"/coverlineinfo", "r") as f:
+        s_buf = f.readlines()
+    for i in range(len(s_buf)):
+        line = s_buf[i]
+        if caller_line in line:
+            addr = line.split(" ")[0]
+            for j in range(i+1, len(s_buf)):
+                nextline = s_buf[j]
+                if addr in nextline:
+                    continue
+                nextaddr = nextline.split()[0]
+                if nextaddr not in s_buf[j+1]:
+                    calleefunc = nextline.split()[1]
+                    callee_funcs += [calleefunc]
+                    break
+                elif caller_line in s_buf[j+1]:
+                    calleefunc = nextline.split()[1]
+                    callee_funcs += [calleefunc]
+                    break
+            beforeline = s_buf[i-1]
+            if beforeline.split(" ")[0] == addr:
+                callee_funcs += [beforeline.split(" ")[1]]
+    callee_funcs = [func for func in set(callee_funcs)]
+    return callee_funcs
 
 # generate the BB where caller calls callee in callstack. 
 # Requirement: cleancallstack_format (the call stack after code format), line_BBinfo.json which includes matching between line and BB
@@ -249,6 +313,7 @@ def get_mustBBs(PATH):
 # generate the indirectcall in refkernel.
 # Requirement: cleancallstack_format (the call stack after code format), line_BBinfo.json which includes matching between line and BB
 def get_indirectcalls(PATH):
+    print("get_indirectcalls()")
     indirectcalls = {}
     with open(PATH+"/built-in_tag.ll", "r") as f:
         bcfile = f.readlines()
@@ -263,9 +328,11 @@ def get_indirectcalls(PATH):
         callee = callee.split(" ")[0]
         callerline = caller[:-1].split(" ")[1]
         caller = caller.split(" ")[0]
+        #print("callerline:", callerline)
         # only when the calller line corresponds unique BB, we generate the indirect call mapping. Thus there may be FNs which requires adding manually
         if callerline in line_BBinfo and len(line_BBinfo[callerline]) == 1:
             BB = line_BBinfo[callerline][0]
+            #print("BB:", BB)
             indirectcall = Check_indirectcall(bcfile, BB, callee)
             if indirectcall:
                 indirectcalls[callerline] = callee

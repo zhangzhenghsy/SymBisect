@@ -1220,7 +1220,7 @@ void SpecialFunctionHandler::handleUser_path_at(ExecutionState &state,
                                           std::vector<ref<Expr> > &arguments) {
     auto ty = target->inst->getOperand(4)->getType();
     auto name = create_var_name(target->inst, "user_path_at_sympath");
-    MemoryObject *mo = executor.create_mo(state, ty, target->inst, name);
+    MemoryObject *mo = executor.create_mo(state, ty, target->inst, name, 0);
     executor.un_eval(target, 4, state).value = mo->getBaseExpr();
 
     ref<Expr> ret = ConstantExpr::alloc(0, Expr::Int32);

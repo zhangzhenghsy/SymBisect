@@ -305,7 +305,7 @@ def get_config_withoutkasan(PATH):
         for line in s_buf:
             f.write(line)
 
-def compile_gcc(PATH, kernel):
+def compile_gcc(PATH, kernel, clang=None):
     #if PATH[-1] == "/":
     #    PATH = PATH[:-1]
     #if not commit:
@@ -323,7 +323,10 @@ def compile_gcc(PATH, kernel):
     #print("format_linux()")
     #format_linux()
     #string1 = "cd /home/zzhan173/repos/linux;cp "+PATH+"/config_withoutkasan .config;make olddefconfig;make -j32"
-    string1 = "cd " + kernel + ";cp "+PATH+"/config_withoutkasan .config;make olddefconfig;make -j32"
+    if clang:
+        string1 = "cd " + kernel + ";cp "+PATH+"/config_withoutkasan .config;make olddefconfig CC="+clang_path+";make -j32 CC="+clang_path
+    else:
+        string1 = "cd " + kernel + ";cp "+PATH+"/config_withoutkasan .config;make olddefconfig;make -j32"
     print(string1)
     #if not os.path.exists(PATH+"/config_withoutkasan"):
     #    print("config_withoutkasan doesn't exist")

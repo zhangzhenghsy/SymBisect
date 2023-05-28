@@ -214,6 +214,11 @@ public:
   /// @brief zheng: log the mapping between base address and symbolic address (concretebase: concretebase+symbolic offset)
   std::map<ref<Expr>, ref<Expr>> symaddr_base;
 
+  /// @brief zheng: symbolic address <-> mo->getBaseExpr()
+  std::map<klee::ref<klee::Expr>, klee::ref<klee::Expr>> map_symbolic_address;
+  /// @brief zheng: mo->getBaseExpr() <-> symbolic address
+  std::map<klee::ref<klee::Expr>, klee::ref<klee::Expr>> map_address_symbolic;
+
   /// @brief Pointer to the process tree of the current state
   /// Copies of ExecutionState should not copy ptreeNode
   PTreeNode *ptreeNode = nullptr;

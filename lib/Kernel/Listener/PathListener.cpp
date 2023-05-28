@@ -344,7 +344,7 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
     if (low_priority_bbs.find(name_bb) != low_priority_bbs.end()) {
         klee::klee_message("%s is in low_priority_bbs terminate the state", name_bb.c_str());
         this->executor->terminateState(state);
-        klee::klee_message("tmptest terminate the state done");
+        //klee::klee_message("tmptest terminate the state done");
     }
     // for low_priority_functions   
     else if (low_priority_functions.find(name_f) != low_priority_functions.end()) {
@@ -356,7 +356,7 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
         } else {
             low_priority_lines_counter[simple_name_l] = 1;
         }
-        if (low_priority_lines_counter[simple_name_l] > 5) {
+        if (low_priority_lines_counter[simple_name_l] > 4) {
             klee::klee_message("Ignore low priority line list %s, count: %d", simple_name_l.c_str(), low_priority_lines_counter[simple_name_l]);
         } else{
             klee::klee_message("reach low priority line list terminate the state %s, count: %d", simple_name_l.c_str(), low_priority_lines_counter[simple_name_l]);

@@ -304,7 +304,7 @@ private:
   /// add by zheng: log the new added constraint when forking states at the branch 
   void logNewConstraint(ExecutionState &state, KInstruction *ki);
   /// add by zheng: check if there is a targetBB guidance for current Br branch Inst
-  std::string targetBB(ExecutionState &state, KInstruction *ki);
+  std::string targetBB(ExecutionState &state, std::string currentBB);
 
   void run(ExecutionState &initialState);
 
@@ -607,7 +607,7 @@ public:
   // yu hao: useful functions
   Cell& un_eval(KInstruction *ki, unsigned index, ExecutionState &state) const;
   // make a mo with one whole symbolic value
-  MemoryObject *create_mo(ExecutionState &state, llvm::Type *ty, llvm::Instruction *inst, const std::string& name);
+  MemoryObject *create_mo(ExecutionState &state, llvm::Type *ty, llvm::Instruction *inst, const std::string& name, unsigned size);
   llvm::Module *get_module();
   bool getMemoryObject(ObjectPair& op, ExecutionState& state, ref<Expr> address);
   ref<Expr> read_value_from_address(ExecutionState& state, const ref<Expr>& address, Expr::Width type);

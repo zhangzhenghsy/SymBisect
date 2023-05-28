@@ -62,16 +62,6 @@ def get_files(p_buf):
             filenames.add(result)
     return filenames
 
-
-#for example, ~/Qemu/OOBW/pocs/c7a91bc7/e69ec487b2c7/
-def get_commit_frompath(PATH):
-    if PATH[-1] == "/":
-        PATH = PATH[:-1]
-    if PATH.split("/")[-1] in ["alloc","crash"]:
-        return PATH.split("/")[-2]
-    else:
-        return PATH.split("/")[-1]
-
 def get_diff_buf(refkernel, targetkernel, PATH2):
     print("get_diff_buf()")
     #commit1 = get_commit_frompath(PATH1)

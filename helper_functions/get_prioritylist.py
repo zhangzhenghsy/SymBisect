@@ -6,45 +6,44 @@ import cover_lineinfo
 import compilebc
 import cfg_analysis
 import shutil
+import json
 
-patchcommit_syzbothash = {
-    "c993ee0f9f81":"797c55d2697d19367c3dabc1e8661f5810014731",
-    "b293dcc473d2":"b32f38fe8c743a79f4420f3d0cdb3a9dbc9a5549",
-    "a6763080856f":"a1c13f6ee9868a7c554305d5aea7a4dc5a8e1d7a"
-}
-
-patchcommit_linux_ref_link = {
-        "b293dcc473d2":"https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/linux-next-6abab1b81b657ca74b7c443e832d95c87901e75b.tar.gz",
-        "a6763080856f":"https://git.kernel.org/pub/scm/linux/kernel/git/netdev/net-next.git/snapshot/net-next-000fe940e51f03210bd5fb1061d4d82ed9a7b1b6.tar.gz"
-        }
-
-def download_linux_ref(PATH):
+def download_linux_ref(PATH, syzbothash):
     print("download_linux_ref")
+    # put the linux kernel file in the parent directory
     PATH = "/".join(PATH.split("/")[:-1])
-    patchcommit = PATH.split("/")[-1]
-    link = patchcommit_linux_ref_link[patchcommit]
-
-    string1 = "cd "+PATH+"; wget "+ link
-    #print(string1)
-    print(command(string1))
-
+    with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/syzbothash_linux_ref_link.json", "r") as f:
+        syzbothash_linux_ref_link = json.load(f)
+    link = syzbothash_linux_ref_link[syzbothash]
+    if link == "manualget":
+        print("we need to manually get the linux_ref for", PATH)
+        return
     filename = link.split("/")[-1]
+    if os.path.exists(PATH+"/"+filename):
+        os.remove(PATH+"/"+filename)
+    string1 = "cd "+PATH+"; wget "+ link
+    print(string1)
+    command(string1)
+
     if not os.path.exists(PATH+"/"+filename):
         print("Download fail")
         return
+    else:
+        print("Download Done")
     string1 = "cd " + PATH + ";tar -xf " + filename
     print(string1)
     command(string1)
 
     dirname = filename.split(".")[0]
+    if os.path.exists(PATH+"/linux_ref"):
+        shutil.rmtree(PATH+"/linux_ref")
     string1 = "cd " + PATH + ";mv "+dirname + " linux_ref"
     command(string1)
 
-def copy_vmlog(PATH):
+def copy_vmlog(PATH, syzbothash):
+    syzbothash = syzbothash[:7]
     print("copy_vmlog()")
     PATH = PATH if PATH[-1] != "/" else PATH[:-1]
-    patchcommit = PATH.split("/")[-2]
-    syzbothash = patchcommit_syzbothash[patchcommit][:7]
     src = "/home/zzhan173/SyzMorph/projects/test/completed/" + syzbothash + "/Ucklee/qemu-"+syzbothash+"-zheng_kernel.log0"
     dst = PATH+"/vm.log"
     print("src:", src)
@@ -70,14 +69,51 @@ def compile_bcfiles(PATH, kernel = None):
     compilebc.compile_bc_extra("copy", PATH, kernel)
     compilebc.compile_bc_extra("check", PATH, kernel)
 
-def run_SyzMorph(PATH):
-    print("run_SyzMorph()")
-    patchcommit = PATH.split("/")[-2]
-    syzbothash = patchcommit_syzbothash[patchcommit]
-
-    string1 = "cd /home/zzhan173/SyzMorph; . venv/bin/activate "
+SyzMorph_PATH = "/home/zzhan173/SyzMorph"
+#run the syzmorph to add the case and get the config/report.txt files
+#PATH example: /data3/zzhan173/OOBR/9fcea5ef6dc4dc72d334/refkernel
+def run_SyzMorph_add(syzbothash):
+    print("\nrun_SyzMorph_add()\n")
+    string1 = "cd " + SyzMorph_PATH + "; . venv/bin/activate "
     #subprocess.run(string1, shell=True)
     string1 += "&& python3 syzmorph syzbot --proj test --get " + syzbothash + " --addition"
+    process = subprocess.Popen(string1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, error = process.communicate()
+    print("Output of the run_SyzMorph_add command:", str(output))
+    if error:
+        print("Error:", str(error))
+    return_code = process.returncode
+    print("Return code: ", return_code)
+
+def get_config_report_reflink(PATH, syzbothash):
+    print("\nget_config_report_reflink()\n")
+    case_infos_path = SyzMorph_PATH +"/projects/test/cases.json"
+    with open(case_infos_path, "r") as f:
+        case_infos = json.load(f)
+    case_info = case_infos[syzbothash]
+    syz_repro_url = case_info["syz_repro"]
+    helper.get_file_url(syz_repro_url, PATH+"/repro.syz")
+    report_url = case_info["report"]
+    helper.get_file_url(report_url, PATH+"/report.txt")
+    config_url = case_info["config"]
+    helper.get_file_url(config_url, PATH+"/config")
+
+    #get the refkernel link when pattern matching and update the cases/syzbothash_linux_ref_link.json
+    #refkernel = case_info["kernel"]
+    #commit = case_info["commit"]
+    #if refkernel == "upstream":
+    #    refkernel_link = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/snapshot/linux-"+commit+".tar.gz"
+    #elif refkernel == "linux-next":
+    #    refkernel_link = "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/linux-next-"+commit+".tar.gz"
+
+def run_SyzMorph_ucklee(syzbothash):
+    print("run_SyzMorph_ucklee()\n")
+    if os.path.exists("/home/zzhan173/SyzMorph/projects/test/completed/"+syzbothash[:7]):
+        print("remove previous generated", "/home/zzhan173/SyzMorph/projects/test/completed/"+syzbothash[:7])
+        shutil.rmtree("/home/zzhan173/SyzMorph/projects/test/completed/"+syzbothash[:7])
+    string1 = "cd /home/zzhan173/SyzMorph; . venv/bin/activate "
+    #subprocess.run(string1, shell=True)
+    #string1 += "&& python3 syzmorph syzbot --proj test --get " + syzbothash + " --addition"
     string1 += "&& python3 syzmorph run --proj test --case " + syzbothash + " --config ./my.cfg --ucklee"
     print(string1)
 
@@ -90,14 +126,19 @@ def run_SyzMorph(PATH):
     return_code = process.returncode
     print("Return code: ", return_code)
 
-def compile_refkernel(PATH):
-    download_linux_ref(PATH)
+def compile_refkernel(PATH, syzbothash):
+    print("\ncompile_refkernel()\n")
+    download_linux_ref(PATH, syzbothash)
     prioritylist.copy_refkernel(PATH)
     # Add -fno-inline-small-functions in Makefile
     # Format the code to avoid 2 BBs in a line
     # Call adapt_end_report() to add print in end_report() /mm/kasan/report.c
     # Change default CONFIG_LOG_BUF_SHIFT to max possible value 25
-    prioritylist.compile_gcc(PATH)
+    prioritylist.compile_gcc_clang(PATH)
+    if not os.path.exists(PATH+"/linux_ref/vmlinux"):
+        # try clang
+        prioritylist.copy_refkernel(PATH)
+        prioritylist.compile_gcc_clang(PATH, True)
     # Copy the compiled kernel/vmlinux to PATH
     prioritylist.copy_compiledkernel(PATH)
     # Get and store debuginfo from vmlinux, stored as tmp_o (get dumpresult of vmlinux by the way)
@@ -105,12 +146,14 @@ def compile_refkernel(PATH):
     # Used for SyzMorph
     shutil.copy(PATH+"/bzImage", "/home/zzhan173/OOBW2022")
 
-def get_cover_from_vmlog(PATH):
-    run_SyzMorph(PATH)
-    copy_vmlog(PATH)
+def get_cover_from_vmlog(PATH, syzbothash):
+    print("\nget_cover_from_vmlog()\n")
+    run_SyzMorph_ucklee(syzbothash)
+    copy_vmlog(PATH, syzbothash)
     prioritylist.get_cover_from_vmlog(PATH)
 
 def get_cover_lineinfo(PATH):
+    print("\nget_cover_lineinfo()\n")
     prioritylist.get_cover_lineinfo(PATH)
     #if not os.path.exists(PATH + "/targetline"):
     if not os.path.exists(PATH+"/lineguidance/"):
@@ -133,6 +176,7 @@ def get_cover_lineinfo(PATH):
     
 
 def get_lineguidance(PATH):
+    print("\nget_lineguidance()\n")
     prioritylist.get_complete_coverage_coverline(PATH)
     prioritylist.get_linelist(PATH)
     prioritylist.get_BBlist(PATH)
@@ -141,6 +185,7 @@ def get_lineguidance(PATH):
     prioritylist.copy_lineguidance(PATH)
 
 def generate_kleeconfig(PATH):
+    print("generate_kleeconfig()\n")
     helper.get_mustBBs(PATH)
     cfg_analysis.get_func_BB_targetBBs(PATH)
     prioritylist.generate_kleeconfig(PATH, [])
@@ -150,16 +195,21 @@ def generate_kleeconfig(PATH):
 
 if __name__ == "__main__":
     option = sys.argv[1]
-    PATH = "/home/zzhan173/OOBW2022/c8af247de385/59f2f4b8a757"
-    PATH = "/home/zzhan173/OOBW2022/c993ee0f9f81/91265a6da44d"
-    PATH = "/home/zzhan173/OOBW2022/b293dcc473d2/6abab1b81b65"
-    PATH = "/home/zzhan173/OOBW2022/a6763080856f/000fe940e51f"
+    PATH = "/data3/zzhan173/OOBR/9fcea5ef6dc4dc72d334/refkernel"
+    syzbothash = None
     if len(sys.argv) > 2:
         PATH = sys.argv[2]
     if PATH[-1] == "/":
         PATH = PATH[:-1]
+    if len(sys.argv) > 3:
+        syzbothash = sys.argv[3]
+    if not syzbothash:
+        syzbothash = PATH.split("/")[-2]
     if option == "tmptest":
-        run_SyzMorph(PATH)
+        #helper.check_cleancallstack_format(PATH)
+        #prioritylist.get_BB_lineinfo(PATH)
+        #helper.get_indirectcalls(PATH)
+        generate_kleeconfig(PATH)
     # Manual work1: config; report.txt;
     #1) Compile the refkernel with given config, note that we need to format the kernel first to keep consistent with later BC files
     if option == "compile_refkernel":
@@ -177,5 +227,15 @@ if __name__ == "__main__":
         prioritylist.get_bcfile_fromcover(PATH)
     if option == "get_lineguidance":
         get_lineguidance(PATH)
-    #if option == "generate_kleeconfig":
+    if option == "generate_kleeconfig":
+        generate_kleeconfig(PATH)
+    if option == "all":
+        run_SyzMorph_add(syzbothash)
+        get_config_report_reflink(PATH, syzbothash)
+        compile_refkernel(PATH, syzbothash)
+        get_cover_from_vmlog(PATH, syzbothash)
+        get_cover_lineinfo(PATH)
+        compile_bcfiles(PATH)
+        prioritylist.get_bcfile_fromcover(PATH)
+        get_lineguidance(PATH)
         generate_kleeconfig(PATH)

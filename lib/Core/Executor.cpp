@@ -2186,14 +2186,12 @@ void Executor::logNewConstraint(ExecutionState &state, KInstruction *ki) {
   }
 }
 
-std::string Executor::targetBB(ExecutionState &state, KInstruction *ki){
+std::string Executor::targetBB(ExecutionState &state, std::string currentBB){
   if (!config.contains("98_BB_targetBB")){
     return "";
   }
   
   std::map<std::string, std::string> BB_targetBB = config["98_BB_targetBB"];
-  BranchInst *bi = cast<BranchInst>(ki->inst);
-  std::string currentBB = bi->getParent()->getName().str();
   if (BB_targetBB.find(currentBB) != BB_targetBB.end()){
     return BB_targetBB[currentBB];
   }
@@ -2236,7 +2234,7 @@ bool Isaloop(BasicBlock * A, BasicBlock * B, BasicBlock * C){
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
   Instruction *i = ki->inst;
-  klee_message("Executor::executeInstruction()");
+  klee_message("\nExecutor::executeInstruction()");
   //std::string ld;
   //llvm::raw_string_ostream rso(ld);
   //i->print(rso);
@@ -2359,9 +2357,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
     } else {
       std::string currentBB = bi->getParent()->getName().str();
-      std::string TargetBB = targetBB(state, ki);
+      std::string TargetBB = targetBB(state, currentBB);
       if (BB_targetBB_counter.count(currentBB)) {
-        if (BB_targetBB_counter[currentBB] > 3) {
+        if (BB_targetBB_counter[currentBB] > 5) {
           klee::klee_message("Forced Br %s to %s", currentBB.c_str(), TargetBB.c_str());
           if(TargetBB == bi->getSuccessor(0)->getName().str()) {
             transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), state);
@@ -2469,11 +2467,19 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           }
           klee_message("BB_targetBB_counter[currentBB]:%d", BB_targetBB_counter[currentBB]);
         }
+        else {
+          // We can reach the targetBB, then reset the counter
+          if (BB_targetBB_counter.count(currentBB)) {
+            BB_targetBB_counter[currentBB] = 0;
+            klee_message("Reset BB_targetBB_counter[currentBB]:%d", BB_targetBB_counter[currentBB]);
+          }
+        }
       }
     }
     break;
   }
   case Instruction::IndirectBr: {
+    klee_message("Instruction::IndirectBr");
     // implements indirect branch to a label within the current function
     const auto bi = cast<IndirectBrInst>(i);
     auto address = eval(ki, 0, state).value;
@@ -2549,11 +2555,35 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     break;
   }
   case Instruction::Switch: {
+    klee_message("Instruction::Switch");
     SwitchInst *si = cast<SwitchInst>(i);
     ref<Expr> cond = eval(ki, 0, state).value;
     BasicBlock *bb = si->getParent();
 
+    std::string currentBB = bb->getName().str();
+    std::string TargetBB = targetBB(state, currentBB);
+    bool switchdone = false;
+    if (TargetBB != ""){
+      klee_message("currentBB:%s TargetBB:%s", currentBB.c_str(), TargetBB.c_str());
+      for (auto i : si->cases()) {
+        BasicBlock *caseSuccessor = i.getCaseSuccessor();
+        klee::klee_message("caseSuccessor->getName().str():%s", caseSuccessor->getName().str().c_str());
+        if(caseSuccessor->getName().str() == TargetBB){
+          klee::klee_message("Direct Br %s to %s", currentBB.c_str(), TargetBB.c_str());
+          transferToBasicBlock(caseSuccessor, si->getParent(), state);
+          switchdone = true;
+          break;
+        }
+      }
+    }
+    if (switchdone)
+    {
+      break;
+    }
+    
+
     cond = toUnique(state, cond);
+    klee_message("cond = toUnique(state, cond):%s", cond.get_ptr()->dump2().c_str());
     if (ConstantExpr *CE = dyn_cast<ConstantExpr>(cond)) {
       // Somewhat gross to create these all the time, but fine till we
       // switch to an internal rep.
@@ -2582,6 +2612,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         ref<Expr> value = evalConstant(i.getCaseValue());
 
         BasicBlock *caseSuccessor = i.getCaseSuccessor();
+        klee::klee_message("caseSuccessor->getName().str():%s", caseSuccessor->getName().str().c_str());
+        if(caseSuccessor->getName().str() == TargetBB){
+          klee::klee_message("Direct Br %s to %s", currentBB.c_str(), TargetBB.c_str());
+          transferToBasicBlock(caseSuccessor, si->getParent(), state);
+        }
         expressionOrder.insert(std::make_pair(value, caseSuccessor));
       }
 
@@ -5280,9 +5315,9 @@ Cell& Executor::un_eval(KInstruction *ki, unsigned index,
     }
 }
 
-MemoryObject *Executor::create_mo(ExecutionState &state, llvm::Type *ty, llvm::Instruction *inst, const std::string& name) {
-
-    auto size = kmodule->targetData->getTypeStoreSize(ty);
+MemoryObject *Executor::create_mo(ExecutionState &state, llvm::Type *ty, llvm::Instruction *inst, const std::string& name, unsigned size) {
+    if (size  == 0) {
+    size = kmodule->targetData->getTypeStoreSize(ty);
     // if char pointer (likley to be a char array buffer), then allocate 8192 bytes
     if (ty->isIntegerTy(8)) {
         klee_message("ty->isIntegerTy(8), allocate an array of 8192 chars");
@@ -5292,6 +5327,8 @@ MemoryObject *Executor::create_mo(ExecutionState &state, llvm::Type *ty, llvm::I
       // may be array of pointer
       klee_message("ty->isPointerTy(), allocate an array of 128 pointers");
       size = kmodule->targetData->getTypeStoreSize(ty) * 128;
+    }
+    klee_message("size according to type: %u", size);
     }
     //if (size == 0){
     //  klee_message("struct size is 0. Resize it to be 4096");

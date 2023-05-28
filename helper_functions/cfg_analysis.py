@@ -168,6 +168,8 @@ def write_color_png(PATH, MustBB):
 def get_func_BB_coverlist(PATH, func):
     with open(PATH+"/lineguidance/func_BB_whitelist_predoms.json") as f:
         func_BB_whitelist_predoms = json.load(f)
+    if func not in func_BB_whitelist_predoms:
+        return []
     return func_BB_whitelist_predoms[func]
 
 def get_func_BB_targetBBs(PATH):

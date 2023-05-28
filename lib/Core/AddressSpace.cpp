@@ -15,6 +15,7 @@
 
 #include "klee/Expr/Expr.h"
 #include "klee/Statistics/TimerStatIncrementer.h"
+#include "klee/Support/ErrorHandling.h"
 
 #include "CoreStats.h"
 
@@ -76,7 +77,28 @@ bool AddressSpace::resolveOne(const ref<ConstantExpr> &addr,
       result.second = res->second.get();
       return true;
     }
+    klee::klee_message("resolveOne() don't find object for address: address:%lu objects.lookup_previous(&address) mo->address:: %lu mo->size:: %u",address, mo->address, mo->size);
   }
+  /*
+  klee::klee_message("resolveOne() don't find object for address: address:%lu list all objects for debug", address);
+  MemoryMap::iterator oi = objects.upper_bound(&hack);
+  MemoryMap::iterator begin = objects.begin();
+  MemoryMap::iterator end = objects.end();
+      
+  MemoryMap::iterator start = oi;
+  klee::klee_message("search backward()");
+  while (oi!=begin) {
+    --oi;
+    const auto &mo = oi->first;
+    klee::klee_message("mo->address: %lu mo->size:: %u",mo->address, mo->size);
+  }
+  // search forwards
+  klee::klee_message("search forward()");
+  for (oi=start; oi!=end; ++oi) {
+    const auto &mo = oi->first;
+    klee::klee_message("mo->address: %lu mo->size:: %u",mo->address, mo->size);
+  }
+  */
 
   return false;
 }

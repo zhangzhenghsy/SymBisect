@@ -55,7 +55,7 @@ def extract_sourceinfo_fromoutput(filepath):
                 state_sourceinfo[state] += [newline]
             #sourceinfolist +=[state+" "+funcname + " "+sourceinfo]
         #if "reach low priority line list" in line or "branches" in line or "BBkey" in line:
-        if any(ele in line for ele in ["reach low priority line list", "branches", "BBkey", "terminate", "Forced Br", "Ignore low priority line list"]):
+        if any(ele in line for ele in ["reach low priority line list", "branches", "BBkey", "terminate", "BB_targetBB_counter[currentBB]", "Forced Br", "Ignore low priority line list"]):
             #if line not in sourceinfolist:
             sourceinfolist += [state+" "+str(index)+" "+funcname+" "+line]
             if state not in state_sourceinfo:
