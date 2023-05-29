@@ -255,15 +255,23 @@ def check_cleancallstack_format(PATH):
         callee = s_buf[i][:-1]
         callee_func, callee_line = callee.split(" ")
         caller = s_buf[i+1][:-1]
-        callee_funcs = get_callee_afterline_fromcoverline(PATH, caller)
-        #print("caller:", caller, "  callee:", callee, "\ncallees in coverline:", callee_funcs, callee_func in callee_funcs)
-        if callee_funcs and callee_func not in callee_funcs:
-            print("callee", callee_func, "not in callees in coverline", callee_funcs)
-            result = False
+        
+        coverline_checkresult = check_cleancallstack_format_coverline(PATH, caller, callee_func)
         src_checkresult = check_cleancallstack_format_src(PATH, caller, callee_func)
-        if not src_checkresult:
-            result = False
+        result = coverline_checkresult or src_checkresult
+        if not result:
+            print("coverline_checkresult:", coverline_checkresult, "src_checkresult:", src_checkresult)
     return result
+
+def check_cleancallstack_format_coverline(PATH, caller, callee_func):
+    callee_funcs = get_callee_afterline_fromcoverline(PATH, caller)
+    #print("caller:", caller, "  callee:", callee, "\ncallees in coverline:", callee_funcs, callee_func in callee_funcs)
+    if not callee_funcs:
+        return None
+    if callee_funcs and callee_func not in callee_funcs:
+        print("callee", callee_func, "not in callees of caller",caller, " in coverline", callee_funcs)
+        return False
+    return True
 
 def check_cleancallstack_format_src(PATH, callerline, callee_func):
     caller_func, caller_line = callerline.split(" ")
@@ -272,10 +280,13 @@ def check_cleancallstack_format_src(PATH, callerline, callee_func):
     with open(filepath, "r") as f:
         s_buf = f.readlines()
     caller_srccode = s_buf[int(caller_srcnum)-1][:-1]
-    if "->" not in caller_srccode and callee_func not in caller_srccode:
-        print(callee_func, "not in caller line",caller_line, caller_srccode)
+    if "->" in caller_srccode:
+        return None
+    if callee_func not in caller_srccode:
+        print(callee_func, "not in ",caller_func, caller_line, caller_srccode)
         return False
     return True
+
 def get_callee_afterline_fromcoverline(PATH, caller_line):
     callee_funcs = []
     with open(PATH+"/coverlineinfo", "r") as f:
@@ -301,8 +312,39 @@ def get_callee_afterline_fromcoverline(PATH, caller_line):
             if beforeline.split(" ")[0] == addr:
                 callee_funcs += [beforeline.split(" ")[1]]
     callee_funcs = [func for func in set(callee_funcs)]
+    if not callee_funcs:
+        callee_funcs = get_callee_afterline_fromcompletecoverline(PATH, caller_line)
     return callee_funcs
 
+def get_callee_afterline_fromcompletecoverline(PATH, caller_line):
+    print("get_callee_afterline_fromcompletecoverline")
+    caller_func, caller_linenum = caller_line.split(" ")
+    callee_funcs = []
+    with open(PATH+"/completecoverlineinfo", "r") as f:
+        s_buf = f.readlines()
+    for i in range(len(s_buf)):
+        line = s_buf[i]
+        if caller_line in line:
+            addr = line.split(" ")[0]
+            for j in range(i+1, len(s_buf)):
+                nextline = s_buf[j]
+                if addr in nextline:
+                    continue
+                nextaddr= nextline.split()[0]
+                calleefunc = nextline.split()[1]
+                if calleefunc == caller_func:
+                    continue
+                if nextaddr not in s_buf[j+1]:
+                    callee_funcs += [calleefunc]
+                    break
+                elif caller_line in s_buf[j+1]:
+                    callee_funcs += [calleefunc]
+                    break
+            beforeline = s_buf[i-1]
+            if beforeline.split(" ")[0] == addr:
+                callee_funcs += [beforeline.split(" ")[1]]
+    callee_funcs = [func for func in set(callee_funcs)]
+    return callee_funcs
 # generate the BB where caller calls callee in callstack. 
 # Requirement: cleancallstack_format (the call stack after code format), line_BBinfo.json which includes matching between line and BB
 def get_mustBBs(PATH):
