@@ -149,7 +149,6 @@ def get_callstack(PATH):
 
 def get_cleancallstack(PATH):
     cleancallstack = []
-    calltracefunclist = []
     with open(PATH+"/callstack", "r") as f:
         s_buf = f.readlines()
     prevfuncname = ""
@@ -164,14 +163,11 @@ def get_cleancallstack(PATH):
         sourceline = line.split(" ")[1]
         if funcname+" "+sourceline not in  cleancallstack:
             cleancallstack.append(funcname+" "+sourceline)
-            calltracefunclist.append(funcname)
         prevfuncname = funcname
     with open(PATH+"/cleancallstack", "w") as f:
         for line in cleancallstack:
             f.write(line+"\n")
-    with open(PATH+"/calltracefunclist", "w") as f:
-        for line in calltracefunclist:
-            f.write(line+"\n")
+
 
 def get_callstackfiles(PATH):
     if not os.path.exists(PATH+"/cleancallstack"):
@@ -244,11 +240,12 @@ def get_cleancallstack_format(PATH):
             f.write(line+"\n")
     check_result = check_cleancallstack_format(PATH)
     if not check_result:
-        print("check_cleancallstack_format return False, exit()")
+        print("check_cleancallstack_format return False, require manual check exit()")
         exit()
 
 # Sometimes the callstack we got from report.txt is not accurate, it ignores some simple function in the middle
 # For example, 8e28bba73ed1772a6802, vfs_get_tree->squashfs_get_tree->get_tree_bdev
+
 def check_cleancallstack_format(PATH):
     print("check_cleancallstack_format()")
     result = True
@@ -259,12 +256,26 @@ def check_cleancallstack_format(PATH):
         callee_func, callee_line = callee.split(" ")
         caller = s_buf[i+1][:-1]
         callee_funcs = get_callee_afterline_fromcoverline(PATH, caller)
-        print("caller:", caller, "  callee:", callee, "\ncallees in coverline:", callee_funcs, callee_func in callee_funcs)
+        #print("caller:", caller, "  callee:", callee, "\ncallees in coverline:", callee_funcs, callee_func in callee_funcs)
         if callee_funcs and callee_func not in callee_funcs:
-            print("\ncallee_func not in callee_funcs, require manual check\n")
+            print("callee", callee_func, "not in callees in coverline", callee_funcs)
+            result = False
+        src_checkresult = check_cleancallstack_format_src(PATH, caller, callee_func)
+        if not src_checkresult:
             result = False
     return result
 
+def check_cleancallstack_format_src(PATH, callerline, callee_func):
+    caller_func, caller_line = callerline.split(" ")
+    caller_file, caller_srcnum = caller_line.split(":")
+    filepath = PATH + "/linux_ref/" + caller_file
+    with open(filepath, "r") as f:
+        s_buf = f.readlines()
+    caller_srccode = s_buf[int(caller_srcnum)-1][:-1]
+    if "->" not in caller_srccode and callee_func not in caller_srccode:
+        print(callee_func, "not in caller line",caller_line, caller_srccode)
+        return False
+    return True
 def get_callee_afterline_fromcoverline(PATH, caller_line):
     callee_funcs = []
     with open(PATH+"/coverlineinfo", "r") as f:

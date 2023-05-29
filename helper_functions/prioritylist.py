@@ -1667,9 +1667,11 @@ def copyfiles(srcpath, dstpath, filelist):
         shutil.copy(srcpath+"/"+filename , dstpath+"/"+filename)
 
 def read_calltracefunclist(PATH):
-    with open(PATH+"/calltracefunclist", "r") as f:
+    with open(PATH+"/cleancallstack_format", "r") as f:
         s_buf = f.readlines()
-    return [line[:-1] for line in s_buf]
+    calltracefunclist = [line.split(" ")[0] for line in s_buf]
+    calltracefunclist.reverse()
+    return calltracefunclist
 
 # PATH: path to the directory of case.
 # kernel: path to the kernel to be compiled into bc 
@@ -1717,9 +1719,6 @@ def get_BBlist(PATH):
 
 def get_BBlinelist_doms(PATH):
     print("\nget_BBlinelist_doms\n")
-    if not os.path.exists(PATH+"/calltracefunclist"):
-        print(PATH+"/calltracefunclist not exists")
-        exit()
     calltracefunclist = read_calltracefunclist(PATH)
     print("calltracefunclist:", calltracefunclist)
     #get doms/postdoms dot file from built-in_tag.bc
