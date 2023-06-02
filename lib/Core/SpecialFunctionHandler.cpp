@@ -1236,11 +1236,11 @@ void SpecialFunctionHandler::handleStrcmp(ExecutionState &state,
                                           std::vector<ref<Expr> > &arguments) {
   klee_message("\nfunction Model handleStrcmp");
   ObjectPair op, op2;
-  bool success1, success2;
+  bool success2;
 
   ref<Expr> srcaddr = arguments[0];
   if (ConstantExpr* CE1 = dyn_cast<ConstantExpr>(srcaddr)) {
-    success1 = state.addressSpace.resolveOne(CE1, op);
+    bool success1 = state.addressSpace.resolveOne(CE1, op);
   }  else {
     return;
   }
@@ -1369,8 +1369,13 @@ void SpecialFunctionHandler::handleStrchr(ExecutionState &state,
     ref<Expr> returnaddr = ConstantExpr::create((dyn_cast<ConstantExpr>(srcaddr)->getZExtValue() + i), Context::get().getPointerWidth());
     constraint = NeExpr::create(svalue, strc);
     if (i%10 != 0){
-      executor.addConstraint(state, constraint);
-      continue;
+      bool mayBeTrue;
+      if (executor.solver->mayBeTrue(state.constraints, constraint, mayBeTrue, state.queryMetaData)){
+        if (mayBeTrue){
+          executor.addConstraint(state, constraint);
+          continue;
+        }
+      }
     }
     Executor::StatePair branches = executor.fork(state, constraint, false);
     // this byte must equal the given char. should stop the iteration since the latter addresses cannot be returned;
@@ -1515,10 +1520,9 @@ void SpecialFunctionHandler::handleMemset(ExecutionState &state,
       }
       //return;
     }
-
+    klee_message("write targetaddr %s length:%lu", targetaddr.get_ptr()->dump2().c_str(), length);
     for(uint64_t i =0; i<length; i++){
       ref<Expr> base = AddExpr::create(targetaddr, ConstantExpr::create(i, Context::get().getPointerWidth()));
-      klee_message("write address %s", base.get_ptr()->dump2().c_str());
       executor.executeMemoryOperation(state, true, base, value, 0);
     }
     executor.bindLocal(target, state, targetaddr);

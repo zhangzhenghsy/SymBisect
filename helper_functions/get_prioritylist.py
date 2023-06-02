@@ -209,7 +209,11 @@ if __name__ == "__main__":
         #helper.check_cleancallstack_format(PATH)
         #prioritylist.get_BB_lineinfo(PATH)
         #helper.get_indirectcalls(PATH)
-        generate_kleeconfig(PATH)
+        #generate_kleeconfig(PATH)
+        with open(PATH+"/mustBBs", "r") as f:
+            s_buf = f.readlines()
+        MustBBs = [line[:-1] for line in s_buf]
+        low_priority_bb_list = prioritylist.get_low_priority_bb_list(PATH, MustBBs)
     # Manual work1: config; report.txt;
     #1) Compile the refkernel with given config, note that we need to format the kernel first to keep consistent with later BC files
     if option == "compile_refkernel":

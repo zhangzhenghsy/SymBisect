@@ -670,7 +670,7 @@ bool kuc::UCListener::CallInstruction(klee::ExecutionState &state, klee::KInstru
     std::string simplifyname = simplifyfuncname(name);
     std::string local_skipfunctions[] = {"llvm.read_register.i64", "llvm.write_register.i64", "nla_data", "console_lock", "console_unlock", "klee_div_zero_check", "klee_overshift_check", "kmem_cache_alloc", "kmem_cache_alloc_node",
     "syscall_enter_from_user_mode ", "_raw_spin_lock_irqsave", "irqentry_enter", "__schedule", "preempt_schedule_irq", "bad_range", "update_curr", "_raw_spin_lock_irq", "finish_task_switch", "call_rcu",
-    "__free_object", "free_unref_page", "rcu_read_unlock", "rcu_lock_release", "ERR_PTR"};
+    "__free_object", "free_unref_page", "rcu_read_unlock", "rcu_lock_release", "ERR_PTR", "crypto_alloc_shash"};
     for (std::string local_skipfunction:local_skipfunctions)
     {
         skip_functions.insert(local_skipfunction);
@@ -762,7 +762,7 @@ bool kuc::UCListener::skip_calltrace_distance(klee::ExecutionState &state, klee:
                     currentdistance += 1;
                     diverge_calltrace += 1;
                 }
-                if (diverge_calltrace > 3)
+                if (diverge_calltrace >= 3)
                 {
                     klee::klee_message("diverge_calltrace distance:%d  skip the function due diverge_calltrace", diverge_calltrace);
                     return true;
@@ -806,6 +806,7 @@ std::string kuc::UCListener::create_global_var_name(klee::KInstruction *ki, int6
 }
 
 klee::ref<klee::Expr> kuc::UCListener::create_symaddr_object(klee::ExecutionState &state, klee::KInstruction *ki, klee::ref<klee::Expr> base, llvm::Type *ty, unsigned size = 0) {
+    klee::klee_message("create_symaddr_object()");
     auto *real_address = llvm::dyn_cast<klee::ConstantExpr>(base);
     if (real_address) {
         klee::klee_message("real_address");
@@ -826,19 +827,19 @@ klee::ref<klee::Expr> kuc::UCListener::create_symaddr_object(klee::ExecutionStat
         }        
     }
     
-    for (auto& pair:state.map_symbolic_address){
-        klee::ref<klee::Expr> symbolic_address = pair.first;
-        ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
-        //klee_message("equal_expr:%s", equal_expr.get_ptr()->dump2().c_str());
-        bool equal_result;
-        bool success = executor->solver->mustBeTrue(state.constraints, equal_expr, equal_result,
-                                                state.queryMetaData);
-        if(equal_result){
-            klee_message("base equals to previous sym_addr:%s", symbolic_address.get_ptr()->dump2().c_str());
-            base = symbolic_address;
-            return base;
-        }
-    }
+    //for (auto& pair:state.map_symbolic_address){
+    //    klee::ref<klee::Expr> symbolic_address = pair.first;
+    //    ref<Expr> equal_expr = EqExpr::create(symbolic_address, base);
+    //    //klee_message("equal_expr:%s", equal_expr.get_ptr()->dump2().c_str());
+    //    bool equal_result;
+    //    bool success = executor->solver->mustBeTrue(state.constraints, equal_expr, equal_result,
+    //                                            state.queryMetaData);
+    //    if(equal_result){
+    //        klee_message("base equals to previous sym_addr:%s", symbolic_address.get_ptr()->dump2().c_str());
+    //        base = symbolic_address;
+    //        return base;
+    //    }
+    //}
     if (state.map_symbolic_address.find(base) != state.map_symbolic_address.end()) {
         // question: is it possible that the previous allocated object size is too limited for the new use?
         klee::klee_message("find corresponding real_address of load symbolic address %s", state.map_symbolic_address[base].get_ptr()->dump2().c_str());
@@ -860,12 +861,12 @@ klee::ref<klee::Expr> kuc::UCListener::create_symaddr_object(klee::ExecutionStat
         klee::klee_message("Symaddr:%s Concreteaddr: %s mo->size:%u", base.get_ptr()->dump2().c_str(), concrete_addr.get_ptr()->dump2().c_str(), mo->size);
 
         klee::ref<klee::Expr> one = klee::ConstantExpr::create(1, klee::Context::get().getPointerWidth());
+        klee::klee_message("Symaddr base:%s Concreteaddr base: %s size:%u", base.get_ptr()->dump2().c_str(), concrete_addr.get_ptr()->dump2().c_str(), size);
         for(unsigned i=1; i< size; i++){
             base = AddExpr::create(base, one);
             concrete_addr =  AddExpr::create(concrete_addr, one);
             state.map_symbolic_address[base] = concrete_addr;
             state.map_address_symbolic[concrete_addr] = base;
-            klee::klee_message("Symaddr:%s Concreteaddr: %s", base.get_ptr()->dump2().c_str(), concrete_addr.get_ptr()->dump2().c_str());
         }
         return mo->getBaseExpr();
     }
@@ -1081,7 +1082,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
     line_info = line_info.substr(pos+1);
     
     //ref<Expr> prevvalue = executor->getDestCell(state, ki).value;
-    klee_message("previous target ptr: %p", executor->getDestCell(state, ki).value.ptr);
+    //klee_message("previous target ptr: %p", executor->getDestCell(state, ki).value.ptr);
 
     if (llvm::isa<llvm::InlineAsm>(fp)) {
         goto create_return;
