@@ -1371,8 +1371,10 @@ ref<Expr> Executor::toUnique(const ExecutionState &state,
       cond = optimizer.optimizeExpr(cond, false);
       if (solver->mustBeTrue(state.constraints, cond, isTrue,
                              state.queryMetaData) &&
-          isTrue)
+          isTrue){
         result = value;
+        klee_message("toUnique() must be a unique constant:%s", value.get_ptr()->dump2().c_str());
+        }
     }
     solver->setTimeout(time::Span());
   }
@@ -2140,11 +2142,11 @@ std::string getCalltrace(ExecutionState &state) {
   calltrace.pop_back();
   return calltrace;
 }
-void Executor::checkLoopLimit(ExecutionState &state, KInstruction *ki, unsigned int looplimit, bool terminate = false) {
+bool Executor::checkLoopLimit(ExecutionState &state, KInstruction *ki, unsigned int looplimit, bool terminate = false) {
   std::string BBname = ki->inst->getParent()->getName().str();
   // for Intrinsic function no need to set the limit
   if (BBname.find("bc-") == std::string::npos){
-      return;
+      return false;
   }
   BBname = BBname.substr(BBname.find("bc-")+3);
   BBname = BBname.substr(BBname.find("-")+1);
@@ -2158,12 +2160,16 @@ void Executor::checkLoopLimit(ExecutionState &state, KInstruction *ki, unsigned 
   klee::klee_message("checkLoopLimit() for state : %p BBkey: %s  count: %u", &state, BBkey.c_str(), state.BBcount[BBkey]);
   // question: what if there is an constant time loop which requires loop for more than the limit
   // answer:  just call this function when both branches are possible
-  if (terminate){
-    if (state.BBcount[BBkey] > looplimit) {
-      klee::klee_message("reach loop limit, terminate the state: %p", &state);
+  if (state.BBcount[BBkey] > looplimit) {
+    klee::klee_message("reach loop limit %p", &state);
+    if (terminate)
+    {
+      klee::klee_message("terminate the state %p", &state);
       terminateState(state);
     }
+    return true;
   }
+  return false;
 }
 
 void Executor::logNewConstraint(ExecutionState &state, KInstruction *ki) {
@@ -2450,10 +2456,20 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         checkLoopLimit(newstate, ki, looplimit, true);
         klee_message("this->listener_service->afterExecuteInstruction(newstate, ki) newstate: %p", &newstate);
         this->listener_service->afterExecuteInstruction(newstate, ki);
-      } else if (branches.first) {
-        checkLoopLimit(*branches.first, ki, 128, true);
-      } else {
-        checkLoopLimit(*branches.second, ki, 128, true);
+      } 
+      //else if (branches.first) {
+      //  bool reachlooplimit = checkLoopLimit(*branches.first, ki, 1025);
+      //  if (reachlooplimit){ 
+      //    klee_message("Forcely break the loop");
+      //    transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), state);}
+      //} 
+      else {
+        bool reachlooplimit = checkLoopLimit(state, ki, 129);
+        if (reachlooplimit){
+          klee_message("Forcely break the loop");
+          // we should jump out of the loop, but currently not sure which BB is out of the loop, just randomly pick one(if fail, just another loop)
+          randvalue = std::rand()%2;
+          transferToBasicBlock(bi->getSuccessor(unsigned(randvalue)), bi->getParent(), state);}
       }
 
       if (TargetBB != "") {
@@ -4387,7 +4403,7 @@ void Executor::executeAlloc(ExecutionState &state,
   //std::cout <<"\nFunction Executor::executeAlloc\n";
   //std::cout << "&State: " << &state << "\n";
   klee_message("size before toUnique(state, size):\n %s", size.get_ptr()->dump2().c_str());
-  size = toUnique(state, size);
+  size = toUnique(state, size); 
   klee_message("size after toUnique(state, size):\n %s", size.get_ptr()->dump2().c_str());
   if (ConstantExpr *CE = dyn_cast<ConstantExpr>(size)) {
     const llvm::Value *allocSite = state.prevPC->inst;
