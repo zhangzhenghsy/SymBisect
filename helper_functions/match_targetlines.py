@@ -53,6 +53,7 @@ def get_filename_diff(p_buf,st,ed):
         return (fn,fp)
 
 def get_files(p_buf):
+    print("get_files()")
     filenames=set()
     trim_lines(p_buf)
     diff_index = [i for i in range(len(p_buf)) if p_buf[i].startswith('diff')] + [len(p_buf)]
@@ -90,12 +91,12 @@ def writelist(List, path):
             f.write(str(ele)+"\n")
 
 def get_matchfiles(refkernel, targetkernel, PATH1, PATH2):
-    print("get_matchfiles() \n PATH1:",PATH1,"\nPATH2:",PATH2)
-    print("get_matchfiles() \n refkernel:",refkernel," targetkernel:",targetkernel)
+    print("get_matchfiles() \nPATH1:",PATH1,"\nPATH2:",PATH2)
+    print("refkernel:",refkernel,"\ntargetkernel:",targetkernel)
     #if not os.path.exists(PATH2+"/diffbuf"):
     get_diff_buf(refkernel, targetkernel, PATH2)
 
-    with open(PATH2+"/diffbuf", "r") as f:
+    with open(PATH2+"/diffbuf", "r", errors='replace') as f:
         s_buf = f.readlines()
     matchfiles = get_files(s_buf)
     writelist(matchfiles, PATH2+"/matchfiles")
@@ -109,6 +110,9 @@ def get_matchfiles(refkernel, targetkernel, PATH1, PATH2):
             continue
         if ".h" not in fn and ".c" not in fn:
             continue
+        fn = fn.replace(refkernel+"/" , "")
+        if fp:
+            fp = fp.replace(targetkernel+"/" , "")
         filter_matchedfiles += [(fn,fp)]
         filter_matchedfiles_dic[fn] = fp
     print("no duplicate matching in filter_matchedfiles:",len(filter_matchedfiles) == len(filter_matchedfiles_dic))
@@ -236,13 +240,11 @@ def get_ref_files(PATH):
 
 def store_matchedlines(matchedfile):
     fn,fp,refkernel,targetkernel = matchedfile
-    matchedlines = get_matchedlines_git(fn, fp)
-    fnpath = fn.split(refkernel)[1]
-    fppath = fp.split(targetkernel)[1]
+    matchedlines = get_matchedlines_git(refkernel + "/" +fn, targetkernel+"/"+fp)
     filematchedlines = {}
     for i in matchedlines:
-        filematchedlines[fnpath+":"+str(i)] = fppath+":"+str(matchedlines[i])
-    output = fp.replace(".c", "_c_matchedlines.json")
+        filematchedlines[fn+":"+str(i)] = fp+":"+str(matchedlines[i])
+    output = targetkernel+"/"+fp.replace(".c", "_c_matchedlines.json")
     output = output.replace(".h", "_h_matchedlines.json")
     print("store_matchedlines in", output)
     with open(output, 'w') as f:
@@ -259,23 +261,26 @@ def format_targetkernel(targetkernel):
 #targetkernel
 def get_all_matchedlines_git(refkernel, targetkernel, PATH1, PATH2):
     print("\nget_all_matchedlines_git()\n")
-    refkernel = refkernel + "/" if refkernel[-1] != "/" else refkernel
-    targetkernel = targetkernel + "/" if targetkernel[-1] != "/" else targetkernel
+    #refkernel = refkernel + "/" if refkernel[-1] != "/" else refkernel
+    #targetkernel = targetkernel + "/" if targetkernel[-1] != "/" else targetkernel
     t0 = time.time()
     all_matchedlines = {}
     matchedfiles = get_matchfiles(refkernel, targetkernel, PATH1, PATH2)
     ref_files = get_ref_files(PATH1)
     ref_files = [helper.simplify_path(line) for line in ref_files]
+    print("ref_files:", ref_files)
     filter_matchedfiles = []
     for (fn, fp) in matchedfiles:
         #fnpath: relative path
-        fnpath = fn.split(refkernel)[1]
+        #fnpath = fn.split(refkernel)[1]
+        #fnpath = fn
         #fp = fp.split(targetkernel)[1]
         #fp = fp[:-1] if fp[-1] == "/" else fp
-        if fnpath in ref_files:
-            #if fp == None:
-            #    print(fnpath,"is deleted")
-            #    continue
+        print("fn:", fn)
+        if fn in ref_files:
+            if fp == None:
+                print(fn,"is deleted")
+                continue
             filter_matchedfiles += [(fn, fp, refkernel, targetkernel)]
     print("size of matchedfiles:", len(matchedfiles), "size of filter_matchedfiles:", len(filter_matchedfiles))
     #for ele in matchedfiles:
@@ -286,7 +291,7 @@ def get_all_matchedlines_git(refkernel, targetkernel, PATH1, PATH2):
     #print("cost time2:", time.time()-t0)
 
     for (fn, fp, refkernel, targetkernel) in filter_matchedfiles:
-        inputfile = fp
+        inputfile = targetkernel + "/" +fp
         dstfile = inputfile.replace(targetkernel, PATH2+"/source/")
         dstfolder = os.path.dirname(dstfile)
         if not os.path.exists(dstfolder):
@@ -295,6 +300,7 @@ def get_all_matchedlines_git(refkernel, targetkernel, PATH1, PATH2):
 
         inputfile = fp.replace(".c", "_c_matchedlines.json")
         inputfile = inputfile.replace(".h", "_h_matchedlines.json")
+        inputfile = targetkernel + "/" + inputfile
         with open(inputfile, 'r') as f:
             matchedlines = json.load(f)
             all_matchedlines.update(matchedlines)
@@ -327,7 +333,7 @@ def generate_linelist_targetkernel(refkernel, targetkernel, PATH1, PATH2, func_l
             line = helper.simplify_path(line)
             filename = line.split(":")[0]
             # The file is not changed, thus keep the original line
-            if refkernel+filename not in filter_matchedfiles:
+            if filename not in filter_matchedfiles:
                 if filename not in notchangedfiles:
                     notchangedfiles += [filename]
                     print(filename, "is not changed in target kernel")
@@ -418,24 +424,32 @@ def get_callstack_targetkernel(refkernel, targetkernel, PATH1, PATH2):
 
     cleancallstack_format = []
     calltracefunclist = []
+    require_manualcheck = False
     with open(PATH1+"/cleancallstack_format", "r") as f:
         s_buf = f.readlines()
     for line in s_buf:
         funcname, refline = line[:-1].split(" ")
         filename = refline.split(":")[0]
         # The file is not changed, thus keep the original line
-        if refkernel+filename not in filter_matchedfiles:
+        if filename not in filter_matchedfiles:
+            print(line[:-1], "is not changed")
             cleancallstack_format += [line[:-1]]
             calltracefunclist += [line.split(" ")[0]]
             continue
         if refline not in all_matchedlines:
             print("\nNo corresponding line in target kernel for", line)
-            if not os.path.exists(PATH2+"/cleancallstack_format"):
+            if not os.path.exists(PATH2+"/cleancallstack_format_correct"):
                 print("\nRequire manual get cleancallstack_format and calltracefunclist for target kernel\n")
+                require_manualcheck = True
+                cleancallstack_format += [funcname+" manualget"]
+                calltracefunclist += [funcname]
+                continue
             else:
+                shutil.copy(PATH2+"/cleancallstack_format_correct", PATH2+"/cleancallstack_format")
                 print("Use the manual get cleancallstack_format and calltracefunclist")
-            return
+                return
         targetline = all_matchedlines[refline]
+        print(line[:-1], "is changed to", funcname+" "+targetline)
         cleancallstack_format += [funcname+" "+targetline]
         calltracefunclist += [funcname]
     with open(PATH2+"/cleancallstack_format", "w") as f:
@@ -445,6 +459,9 @@ def get_callstack_targetkernel(refkernel, targetkernel, PATH1, PATH2):
         for line in calltracefunclist:
             f.write(line+"\n")
     helper.get_targetline_format(PATH2)
+    if require_manualcheck:
+        print("exit in advance")
+        exit()
 
 def get_targetline_format_targetkernel(PATH2):
     print("\nget_targetline_format_targetkernel()\n")

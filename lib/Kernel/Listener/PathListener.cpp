@@ -125,6 +125,35 @@ bool kuc::PathListener::Isaloop(BasicBlock * A, BasicBlock * B, BasicBlock * C){
   return BB1_reach_BB2(B, A) || BB1_reach_BB2(C, A);
 }
 
+std::string simplifylineinfo(string lineinfo) {
+    stringstream test(lineinfo);
+    string segment;
+    vector<std::string> seglist;
+
+    while(std::getline(test, segment, '/'))
+    {
+        seglist.push_back(segment);
+    }
+
+    vector<string> vector1, vector2;
+    vector<string>::iterator pos;
+    while (find(seglist.begin(), seglist.end(), "..") != seglist.end()) {
+        pos  = std::find(seglist.begin(), seglist.end(), "..");
+        vector1 = std::vector<string>(seglist.begin(), pos-1);
+        vector2 = std::vector<string>(pos+1, seglist.end());
+        vector1.insert(vector1.end(), vector2.begin(), vector2.end());
+        seglist = vector1;
+    }
+
+    string simplifylineinfo ;
+    for (pos = seglist.begin(); pos < seglist.end(); pos++) {
+        if(*pos == ".") continue;
+        simplifylineinfo += *pos;
+        simplifylineinfo += "/";
+    }
+    simplifylineinfo = simplifylineinfo.substr(0, simplifylineinfo.length()-1);
+    return simplifylineinfo;
+}
 
 void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
 
@@ -196,6 +225,7 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
 
 
             // pick function form function_map(json)
+            line_info = simplifylineinfo(line_info);
             if (this->indirectcall_map.find(line_info) != this->indirectcall_map.end())
             {
                 std::string callee_func = this->indirectcall_map[line_info];
@@ -297,35 +327,6 @@ bool kuc::PathListener::OOBWcheck(klee::ExecutionState &state, klee::KInstructio
     return OOBW;
 }
 
-std::string simplifylineinfo(string lineinfo) {
-    stringstream test(lineinfo);
-    string segment;
-    vector<std::string> seglist;
-
-    while(std::getline(test, segment, '/'))
-    {
-        seglist.push_back(segment);
-    }
-
-    vector<string> vector1, vector2;
-    vector<string>::iterator pos;
-    while (find(seglist.begin(), seglist.end(), "..") != seglist.end()) {
-        pos  = std::find(seglist.begin(), seglist.end(), "..");
-        vector1 = std::vector<string>(seglist.begin(), pos-1);
-        vector2 = std::vector<string>(pos+1, seglist.end());
-        vector1.insert(vector1.end(), vector2.begin(), vector2.end());
-        seglist = vector1;
-    }
-
-    string simplifylineinfo ;
-    for (pos = seglist.begin(); pos < seglist.end(); pos++) {
-        if(*pos == ".") continue;
-        simplifylineinfo += *pos;
-        simplifylineinfo += "/";
-    }
-    simplifylineinfo = simplifylineinfo.substr(0, simplifylineinfo.length()-1);
-    return simplifylineinfo;
-}
 void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, klee::KInstruction *ki) {
     klee::klee_message("PathListener::afterExecuteInstruction()");
 
@@ -356,8 +357,9 @@ void kuc::PathListener::afterExecuteInstruction(klee::ExecutionState &state, kle
         } else {
             low_priority_lines_counter[simple_name_l] = 1;
         }
-        if (low_priority_lines_counter[simple_name_l] > 4) {
+        if (low_priority_lines_counter[simple_name_l] > 10) {
             klee::klee_message("Ignore low priority line list %s, count: %d", simple_name_l.c_str(), low_priority_lines_counter[simple_name_l]);
+            //low_priority_lines_counter[simple_name_l] = 0;
         } else{
             klee::klee_message("reach low priority line list terminate the state %s, count: %d", simple_name_l.c_str(), low_priority_lines_counter[simple_name_l]);
             this->executor->terminateState(state);

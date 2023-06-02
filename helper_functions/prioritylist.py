@@ -993,10 +993,12 @@ def get_line_blacklist(PATH):
 def get_low_priority_bb_list(PATH, MustBBs):
     low_priority_bb_list = []
     for MustBB in MustBBs:
+        #print("\n\nMustBB:", MustBB)
         func = MustBB.split("built-in.bc-")[1].split("-")[0]
         BB_reachBBs = cfg_analysis.get_BB_reachBBs(PATH, func)
         #print("BB_reachBBs\n",json.dumps(BB_reachBBs, sort_keys=True, indent=4))
         blackBBs = [BB for BB in BB_reachBBs if MustBB not in BB_reachBBs[BB]]
+        #print("blackBBs:", blackBBs)
         blackBBs.remove(MustBB)
         low_priority_bb_list += blackBBs
     low_priority_bb_list = list(set(low_priority_bb_list))
@@ -1015,8 +1017,9 @@ def generate_kleeconfig(PATH, parameterlist = []):
         s_buf = f.readlines()
     for line in s_buf:
         line,callee = line[:-1].split(" ")
+        line = helper.simplify_path(line)
         indirectcall[line] = callee
-        indirectcall["./"+line] = callee
+        #indirectcall["./"+line] = callee
     
     config = {}
 
@@ -1041,6 +1044,7 @@ def generate_kleeconfig(PATH, parameterlist = []):
             s_buf = f.readlines()
     for line in s_buf:
         target_line_list += [line[:-1]]
+    target_line_list = [helper.simplify_path(line) for line in target_line_list]
     config["4_target_line_list"] = target_line_list
     
     target_bb_list = []
@@ -1082,6 +1086,7 @@ def generate_kleeconfig(PATH, parameterlist = []):
     #    output = PATH+"/config_cover.json"
     with open(PATH + "/lineguidance/line_blacklist_doms.json", "r") as f:
         low_priority_line_list_doms = json.load(f)
+    low_priority_line_list_doms = [helper.simplify_path(line) for line in low_priority_line_list_doms]
     config["90_low_priority_line_list"] = low_priority_line_list_doms
     output = PATH+"/config_cover_doms.json"
 
@@ -1670,7 +1675,7 @@ def read_calltracefunclist(PATH):
     with open(PATH+"/cleancallstack_format", "r") as f:
         s_buf = f.readlines()
     calltracefunclist = [line.split(" ")[0] for line in s_buf]
-    calltracefunclist.reverse()
+    #calltracefunclist.reverse()
     return calltracefunclist
 
 # PATH: path to the directory of case.
