@@ -29,9 +29,9 @@ def cut_cover_line(PATH, targetline):
         prevaddr = addr
     
     # sometimes cover file will miss some lines in target function, resulting in FP of blacklist. Make our algorithm more robust
-    with open(PATH+"/calltracefunclist", "r") as f:
+    with open(PATH+"/cleancallstack_format", "r") as f:
         call_buf = f.readlines()
-        targetfunc = call_buf[0][:-1]
+        targetfunc = call_buf[0].split(" ")[0]
     print("targetfunc:", targetfunc)
     for line in s_buf[lastindex+1:]:
         if not line.startswith("0x"):
