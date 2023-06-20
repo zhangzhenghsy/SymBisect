@@ -49,9 +49,9 @@ def prepare_inputs(Type, hashvalue, targetkernel):
     if os.path.exists("/data3/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel):
         shutil.rmtree("/data3/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel)
 
-    if os.path.exists(PATH2+"/configs/config_cover_doms.json"):
-        print("already generate", PATH2+"/configs/config_cover_doms.json  continue")
-        return
+    #if os.path.exists(PATH2+"/configs/config_cover_doms.json"):
+    #    print("already generate", PATH2+"/configs/config_cover_doms.json  continue")
+    #    return
     print("prepare_inputs:", Type, hashvalue, "targetkernel:",targetkernel)
     if not os.path.exists(PATH2):
         os.makedirs(PATH2)
@@ -71,6 +71,8 @@ if __name__ == "__main__":
     with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/OOBR_targetkernels.json", "r") as f:
         OOBR_targetkernels = json.load(f)
     for hashvalue in OOBR_targetkernels:
+        #if hashvalue != "02617ac69815ae324053c954118c2dc7ba0e59b2":
+        #    continue
         for targetkernel in OOBR_targetkernels[hashvalue]:
             inputpaths = prepare_inputs("OOBR", hashvalue, targetkernel)
             if not inputpaths:

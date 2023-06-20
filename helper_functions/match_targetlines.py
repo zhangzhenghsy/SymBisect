@@ -276,7 +276,7 @@ def get_all_matchedlines_git(refkernel, targetkernel, PATH1, PATH2):
         #fnpath = fn
         #fp = fp.split(targetkernel)[1]
         #fp = fp[:-1] if fp[-1] == "/" else fp
-        print("fn:", fn)
+        #print("fn:", fn)
         if fn in ref_files:
             if fp == None:
                 print(fn,"is deleted")
@@ -459,9 +459,9 @@ def get_callstack_targetkernel(refkernel, targetkernel, PATH1, PATH2):
         for line in calltracefunclist:
             f.write(line+"\n")
     helper.get_targetline_format(PATH2)
-    if require_manualcheck:
-        print("exit in advance")
-        exit()
+    #if require_manualcheck:
+    #    print("exit in advance")
+    #    exit()
 
 def get_targetline_format_targetkernel(PATH2):
     print("\nget_targetline_format_targetkernel()\n")
@@ -488,3 +488,7 @@ def generate_kleeconfig_targetkernel(PATH2):
     if not os.path.exists(PATH2+"/configs"):
         os.mkdir(PATH2+"/configs")
     shutil.copy(PATH2+"/config_cover_doms.json", PATH2+"/configs/config_cover_doms.json")
+
+if __name__ == "__main__":
+    PATH2 = sys.argv[1]
+    helper.get_mustBBs(PATH2)
