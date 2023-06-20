@@ -186,9 +186,9 @@ def get_func_BB_targetBBs(PATH):
 
     with open(PATH+"/lineguidance/BB_lineinfo.json", "r") as f:
         BB_lineinfo = json.load(f)
-    for BB in BB_targetBB:
+    for BB in total_BB_targetBB:
         print("\n"+BB, BB_lineinfo[BB])
-        print(BB_targetBB[BB], BB_lineinfo[BB_targetBB[BB]])
+        print(total_BB_targetBB[BB], BB_lineinfo[total_BB_targetBB[BB]])
 
 # I'm trying to summarize some patterns where there is a guidance that BB1 -> BB2.
 # In symbolic execution if it doesn't happen, I will try to under-constraint the condition
