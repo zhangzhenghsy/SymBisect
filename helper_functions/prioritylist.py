@@ -586,7 +586,7 @@ def get_complete_coverage(PATH):
         addr = line[:-1]
         #print(addr)
         bbaddrs = get_bb_addrs(dumpresult, addr)
-        func_no_covinst(dumpresult, addr);
+        func_no_covinst(dumpresult, addr)
         #print(bbaddrs)
         completeaddrs += bbaddrs
 
@@ -1759,17 +1759,34 @@ def get_all(PATH):
 
 def get_cover_from_vmlog(PATH):
     print("\nget_cover_from_vmlog()\n")
+    if os.path.exists(PATH+"/vm.log_correct"):
+        print("Use manual get vm.log_correct")
+        shutil.copy(PATH+"/vm.log_correct", PATH+"/vm.log")
     with open(PATH+"/vm.log") as f:
         s_buf = f.readlines()
     
     addrlist = []
+    prev_addrlist = []
+    total_addrlist = []
     completed = False
     for line in s_buf:
         if "KCOV:" in line:
+            if len(line[:-1].split("KCOV: ")) < 2:
+                print(line)
+                continue
             addr = line[:-1].split("KCOV: ")[1]
+            if "[" in addr:
+                print(addr)
+                continue
             addrlist += [addr]
         if "Done!" in line:
             completed = True
+            if addrlist != prev_addrlist:
+                total_addrlist += addrlist
+            else:
+                print("duplicate coverage trace")
+            prev_addrlist = addrlist
+            addrlist = []
 
     if completed:
         print("Complete coverage from KCOV output")
@@ -1777,7 +1794,7 @@ def get_cover_from_vmlog(PATH):
         print("Not Complete coverage from KCOV output?")
         exit()
     with open(PATH+"/cover", "w") as f:
-        for addr in addrlist:
+        for addr in total_addrlist:
             f.write(str(addr)+"\n")
 
 # Since we now use the linux_ref downloaded. Before compilation restore the kernel to avoid bugs
@@ -1941,4 +1958,5 @@ if __name__ == "__main__":
         cover = "/completecover_filter_func_no_covinst"
         output = "/completecoverlineinfo_filter"
         get_cover_lineinfo(PATH, cover, output)
-
+    elif option == "get_complete_coverage_coverline":
+        get_complete_coverage_coverline(PATH)
