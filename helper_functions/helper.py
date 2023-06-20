@@ -221,7 +221,7 @@ def get_cleancallstack_format(PATH):
 
     if os.path.exists(PATH+"/cleancallstack_format_correct"):
         print("Use cleancallstack_format_correct(manual get) as cleancallstack_format_correct")
-        shutil.copy(PATH+"/cleancallstack_format_correct", PATH+"/cleancallstack_correct")
+        shutil.copy(PATH+"/cleancallstack_format_correct", PATH+"/cleancallstack_format")
         #check_cleancallstack_format(PATH)
         return
 
@@ -237,6 +237,7 @@ def get_cleancallstack_format(PATH):
 
     with open(PATH+"/cleancallstack_format", "w") as f:
         for line in cleancallstack_format:
+            line = simplify_path(line)
             f.write(line+"\n")
     check_result = check_cleancallstack_format(PATH)
     if not check_result:
@@ -348,6 +349,7 @@ def get_callee_afterline_fromcompletecoverline(PATH, caller_line):
 # generate the BB where caller calls callee in callstack. 
 # Requirement: cleancallstack_format (the call stack after code format), line_BBinfo.json which includes matching between line and BB
 def get_mustBBs(PATH):
+    print("get_mustBBs()", PATH)
     mustBBs = []
     with open(PATH+"/lineguidance/line_BBinfo.json") as f:
         line_BBinfo = json.load(f)
@@ -356,8 +358,10 @@ def get_mustBBs(PATH):
 
     for line in s_buf:
         line_ref = line[:-1].split(" ")[1]
+        print(line_ref)
         if line_ref in line_BBinfo and len(line_BBinfo[line_ref]) == 1:
             mustBBs += [line_BBinfo[line_ref][0]]
+            print(line_BBinfo[line_ref][0])
 
     with open(PATH+"/mustBBs", "w") as f:
         for BB in mustBBs:
