@@ -1305,6 +1305,13 @@ void kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction 
                 ref<Expr> targetaddr = executor->eval(ki, 1, state).value;
                 ref<Expr> len = executor->eval(ki, 3, state).value;
                 targetaddr = AddExpr::create(targetaddr, len);
+                if(klee::ConstantExpr* CE = dyn_cast<klee::ConstantExpr>(len)){
+                    uint64_t length = CE->getZExtValue();
+                    if (length==0){
+                        klee_message("memcpy copy length is 0, no need to check");
+                        break;
+                    }
+                }
                 targetaddr = SubExpr::create(targetaddr, klee::ConstantExpr::create(1, Context::get().getPointerWidth()));
                 OOB_check(state, targetaddr, 1);
             }
