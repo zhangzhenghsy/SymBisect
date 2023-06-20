@@ -8,38 +8,6 @@ import cfg_analysis
 import shutil
 import json
 
-def download_linux_ref(PATH, syzbothash):
-    print("download_linux_ref")
-    # put the linux kernel file in the parent directory
-    PATH = "/".join(PATH.split("/")[:-1])
-    with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/syzbothash_linux_ref_link.json", "r") as f:
-        syzbothash_linux_ref_link = json.load(f)
-    link = syzbothash_linux_ref_link[syzbothash]
-    if link == "manualget":
-        print("we need to manually get the linux_ref for", PATH)
-        return
-    filename = link.split("/")[-1]
-    if os.path.exists(PATH+"/"+filename):
-        os.remove(PATH+"/"+filename)
-    string1 = "cd "+PATH+"; wget "+ link
-    print(string1)
-    command(string1)
-
-    if not os.path.exists(PATH+"/"+filename):
-        print("Download fail")
-        return
-    else:
-        print("Download Done")
-    string1 = "cd " + PATH + ";tar -xf " + filename
-    print(string1)
-    command(string1)
-
-    dirname = filename.split(".")[0]
-    if os.path.exists(PATH+"/linux_ref"):
-        shutil.rmtree(PATH+"/linux_ref")
-    string1 = "cd " + PATH + ";mv "+dirname + " linux_ref"
-    command(string1)
-
 def copy_vmlog(PATH, syzbothash):
     syzbothash = syzbothash[:7]
     print("copy_vmlog()")
@@ -85,26 +53,6 @@ def run_SyzMorph_add(syzbothash):
     return_code = process.returncode
     print("Return code: ", return_code)
 
-def get_config_report_reflink(PATH, syzbothash):
-    print("\nget_config_report_reflink()\n")
-    case_infos_path = SyzMorph_PATH +"/projects/test/cases.json"
-    with open(case_infos_path, "r") as f:
-        case_infos = json.load(f)
-    case_info = case_infos[syzbothash]
-    syz_repro_url = case_info["syz_repro"]
-    helper.get_file_url(syz_repro_url, PATH+"/repro.syz")
-    report_url = case_info["report"]
-    helper.get_file_url(report_url, PATH+"/report.txt")
-    config_url = case_info["config"]
-    helper.get_file_url(config_url, PATH+"/config")
-
-    #get the refkernel link when pattern matching and update the cases/syzbothash_linux_ref_link.json
-    #refkernel = case_info["kernel"]
-    #commit = case_info["commit"]
-    #if refkernel == "upstream":
-    #    refkernel_link = "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/snapshot/linux-"+commit+".tar.gz"
-    #elif refkernel == "linux-next":
-    #    refkernel_link = "https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/snapshot/linux-next-"+commit+".tar.gz"
 
 def run_SyzMorph_ucklee(syzbothash):
     print("run_SyzMorph_ucklee()\n")
@@ -128,7 +76,7 @@ def run_SyzMorph_ucklee(syzbothash):
 
 def compile_refkernel(PATH, syzbothash):
     print("\ncompile_refkernel()\n")
-    download_linux_ref(PATH, syzbothash)
+    #download_linux_ref(PATH, syzbothash)
     prioritylist.copy_refkernel(PATH)
     # Add -fno-inline-small-functions in Makefile
     # Format the code to avoid 2 BBs in a line
@@ -148,13 +96,20 @@ def compile_refkernel(PATH, syzbothash):
 
 def get_cover_from_vmlog(PATH, syzbothash):
     print("\nget_cover_from_vmlog()\n")
-    run_SyzMorph_ucklee(syzbothash)
-    copy_vmlog(PATH, syzbothash)
+    if not os.path.exists(PATH+"/vm.log_correct"):
+        run_SyzMorph_ucklee(syzbothash)
+        copy_vmlog(PATH, syzbothash)
+    else:
+        print("skip run_SyzMorph_ucklee since vm.log_correct exists")
+    prioritylist.get_cover_from_vmlog(PATH)
+
+def get_cover_from_vmlog2(PATH):
     prioritylist.get_cover_from_vmlog(PATH)
 
 def get_cover_lineinfo(PATH):
     print("\nget_cover_lineinfo()\n")
     prioritylist.get_cover_lineinfo(PATH)
+    prioritylist.get_complete_coverage_coverline(PATH)
     #if not os.path.exists(PATH + "/targetline"):
     if not os.path.exists(PATH+"/lineguidance/"):
         os.mkdir(PATH+"/lineguidance/")
@@ -177,7 +132,7 @@ def get_cover_lineinfo(PATH):
 
 def get_lineguidance(PATH):
     print("\nget_lineguidance()\n")
-    prioritylist.get_complete_coverage_coverline(PATH)
+    #prioritylist.get_complete_coverage_coverline(PATH)
     prioritylist.get_linelist(PATH)
     prioritylist.get_BBlist(PATH)
     prioritylist.get_BBlinelist_doms(PATH)
@@ -221,7 +176,7 @@ if __name__ == "__main__":
     #2) Manual work2: get KCOV output vm.0 from syzkaller reproducer (already automated)
     # requirement repro.syz, compiled kernel from 0), compiled corresponding syzkaller tool
     if option == "get_cover_from_vmlog":
-        get_cover_from_vmlog(PATH)
+        get_cover_from_vmlog2(PATH)
     if option == "get_cover_lineinfo":
         get_cover_lineinfo(PATH)
     #1.2) compile kernels to bcfiles in repos/linux
@@ -234,9 +189,11 @@ if __name__ == "__main__":
     if option == "generate_kleeconfig":
         generate_kleeconfig(PATH)
     if option == "all":
-        run_SyzMorph_add(syzbothash)
-        get_config_report_reflink(PATH, syzbothash)
-        compile_refkernel(PATH, syzbothash)
+        if not os.path.exists(PATH+"/vm.log_correct"):
+            run_SyzMorph_add(syzbothash)
+            compile_refkernel(PATH, syzbothash)
+        else:
+            print("skip run_SyzMorph_add/compile_refkernel since vm.log_correct exists")
         get_cover_from_vmlog(PATH, syzbothash)
         get_cover_lineinfo(PATH)
         compile_bcfiles(PATH)
