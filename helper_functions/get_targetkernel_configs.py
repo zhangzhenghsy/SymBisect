@@ -20,7 +20,7 @@ def get_targetkernel_config(PATH1, PATH2, refkernel, targetkernel):
     match_targetlines.generate_kleeconfig_targetkernel(PATH2)
 
 repo_PATH = {
-  "linux":"/data/zzhan173/repos/linux/"        
+  "linux":"/home/zzhan173/repos/linux/"
 }
 def get_targetkernel(PATH, repo, commit):
     string1 = "cd "+ repo + ";git archive -o " + PATH+"/"+commit+".tar " + commit
@@ -34,7 +34,8 @@ def get_targetkernel(PATH, repo, commit):
     helper.command(string1)
     if not os.path.exists(PATH+"/kernel/Makefile"):
         print("generate target kernel fail")
-        exit()
+        return False
+        #exit()
 
 def clean_refkernel(refkernel):
     string1 = "cd "+refkernel+";make mrproper"
@@ -57,24 +58,45 @@ def prepare_inputs(Type, hashvalue, targetkernel):
         os.makedirs(PATH2)
     repo,commit = targetkernel.split("-")
     repopath = repo_PATH[repo]
-    get_targetkernel(PATH2, repopath, commit)
+    result = get_targetkernel(PATH2, repopath, commit)
+    if result == False:
+        return False
     targetkernel = PATH2+"/kernel"
 
     clean_refkernel(refkernel)
     return PATH1,PATH2,refkernel,targetkernel
+def clean_files(PATH):
+    if os.path.exists(PATH+"/kernel"):
+        string1 = "cd "+PATH+"/kernel;make mrproper"
+        print(string1)
+        helper.command(string1)
+    string1 = "cd "+PATH+"/kernel;rm -r source"
+    print(string1)
+    helper.command(string1)
+
+    string1 = "cd "+PATH+"/kernel;rm -r *.tar"
+    print(string1)
+    helper.command(string1)
+
 
 if __name__ == "__main__":
     #PATH = "/data/zzhan173/test"
     #repo = "/home/zzhan173/repos/linux"
     #tag = "v5.4"
     #get_targetkernel(PATH, repo, tag)
-    with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/OOBR_targetkernels.json", "r") as f:
+    Type = "OOBR"
+    casePATH = "/home/zzhan173/Linux_kernel_UC_KLEE/cases/"+Type+"cases_complete"
+    with open(casePATH, "r") as f:
+        s_buf = f.readlines()
+        hashlist = [line[:-1] for line in s_buf]
+    with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/"+Type+"_targetkernels.json", "r") as f:
         OOBR_targetkernels = json.load(f)
-    for hashvalue in OOBR_targetkernels:
+    #for hashvalue in OOBR_targetkernels:
+    for hashvalue in hashlist:
         #if hashvalue != "02617ac69815ae324053c954118c2dc7ba0e59b2":
         #    continue
         for targetkernel in OOBR_targetkernels[hashvalue]:
-            inputpaths = prepare_inputs("OOBR", hashvalue, targetkernel)
+            inputpaths = prepare_inputs(Type, hashvalue, targetkernel)
             if not inputpaths:
                 continue
             PATH1,PATH2,refkernel,targetkernel = inputpaths
@@ -82,8 +104,9 @@ if __name__ == "__main__":
             string1 = "cd /home/zzhan173/Linux_kernel_UC_KLEE/; python3 helper_functions/get_targetkernel_config.py "+PATH1+" "+PATH2+" "+refkernel+" "+targetkernel+" > "+PATH2+"/get_targetkernel_config_log"
             print(string1)
             helper.command(string1)
+            # clean not useful file to save the storage
+            clean_files(PATH2)
     klee_inputs = [] 
-    Type = "OOBR"
     for hashvalue in OOBR_targetkernels:
         for targetkernel in OOBR_targetkernels[hashvalue]:
             PATH2 = "/data/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel
