@@ -233,11 +233,11 @@ def get_cleancallstack_format(PATH):
     for line in s_buf:
         funcname, line_ref = line[:-1].split(" ")
         line_format = format_line_targetline[line_ref]
+        line_format = simplify_path(line_format)
         cleancallstack_format += [funcname+" "+line_format]
 
     with open(PATH+"/cleancallstack_format", "w") as f:
         for line in cleancallstack_format:
-            line = simplify_path(line)
             f.write(line+"\n")
     check_result = check_cleancallstack_format(PATH)
     if not check_result:
