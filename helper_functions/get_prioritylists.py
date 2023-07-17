@@ -16,6 +16,11 @@ def get_prioritylist(PATH):
         print("generate config_cover_doms.json fail")
     return
 
+def clean_files(PATH):
+    string1 = "cd "+PATH+"; rm -rf klee-*"
+    print(string1)
+    helper.command(string1)
+
 OOBW_skipcases = ["6087eafb76a94c4ac9eb", "b055b1a6b2b958707a21", "a42d84593d6a89a76f26", "838eb0878ffd51f27c41", "cfc0247ac173f597aaaa"]
 OOBR_skipcases = ["35101610ff3e83119b1b", "37ba33391ad5f3935bbd","983cb8fb2d17a7af549d","a22c6092d003d6fe1122", "d29e9263e13ce0b9f4fd", "7d027845265d531ba506", "f68108fed972453a0ad4"]
 UAFR_skipcases = ["6720d64f31c081c2f708","cbb289816e728f56a4e2c1b854a3163402fe2f88", "9f43bb6a66ff96a21931", "5be8aebb1b7dfa90ef31"]
@@ -25,7 +30,7 @@ if __name__ == "__main__":
     #    s_buf = f.readlines()
     #Type = "UAFR"
     Type = "OOBR"
-    PATH = "/home/zzhan173/Fixtag_locator/"+Type+"_cases_filter.json"
+    PATH = "/data4/zzhan173/Fixtag_locator/"+Type+"_cases_filter.json"
     with open(PATH, "r") as f:
         syzbothash_info = json.load(f)
     for syzbothash in syzbothash_info:

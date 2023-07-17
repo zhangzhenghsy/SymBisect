@@ -16,6 +16,11 @@ def run_klee(arguments):
     print(string1)
     helper.command(string1)
 
+    dirpath = os.path.dirname(config)
+    string1 = "cd "+ dirpath +";cd ..; rm -rf klee-*"
+    print(string1)
+    helper.command(string1)
+
 def generate_configlist(PATH):
     configs_dir = PATH + "/configs"
 

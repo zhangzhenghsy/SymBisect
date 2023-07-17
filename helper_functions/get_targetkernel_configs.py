@@ -6,19 +6,6 @@ import shutil
 import get_refkernel_results
 from multiprocessing import Pool
 
-def get_targetkernel_config(PATH1, PATH2, refkernel, targetkernel):
-    print("\nget_targetkernel_config()")
-    print("PATH1:",PATH1, "PATH2:",PATH2,"refkernel:",refkernel,"targetkernel:",targetkernel)
-    match_targetlines.format_targetkernel(targetkernel)
-    match_targetlines.get_all_matchedlines_git(refkernel, targetkernel, PATH1, PATH2)
-    match_targetlines.generate_linelists_targetkernel(refkernel, targetkernel, PATH1, PATH2)
-    match_targetlines.compile_bcfiles_targetkernel(targetkernel, PATH1, PATH2)
-    #match_targetlines.link_bclist_fromcover__targetkernel("/home/zzhan173/OOBW2022/c993ee0f9f81/91265a6da44d/linux_ref/", targetkernel, PATH1, PATH2)
-    match_targetlines.link_bclist_fromcover__targetkernel(refkernel, targetkernel, PATH1, PATH2)
-    match_targetlines.get_callstack_targetkernel(refkernel, targetkernel, PATH1, PATH2)
-    match_targetlines.get_BBguidance_targetkernel(PATH2)
-    match_targetlines.generate_kleeconfig_targetkernel(PATH2)
-
 repo_PATH = {
   "linux":"/home/zzhan173/repos/linux/"
 }
@@ -43,12 +30,14 @@ def clean_refkernel(refkernel):
     helper.command(string1)
 #Type: OOBR. We store different types in different directories
 def prepare_inputs(Type, hashvalue, targetkernel):
-    if Type == "OOBR":
-        PATH1 = "/data3/zzhan173/OOBR/"+hashvalue+"/refkernel"
-        refkernel = PATH1+ "/linux_ref"
-    PATH2 = "/data/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel
-    if os.path.exists("/data3/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel):
-        shutil.rmtree("/data3/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel)
+    #if Type == "OOBR":
+    PATH1 = "/data3/zzhan173/"+Type+"/"+hashvalue+"/refkernel"
+    refkernel = PATH1+ "/linux_ref"
+    PATH2 = "/data4/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel
+    if os.path.exists(PATH2+"/configs/config_cover_doms.json"):
+        return PATH1,PATH2,refkernel,PATH2+"/kernel"
+    #if os.path.exists("/data3/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel):
+    #    shutil.rmtree("/data3/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel)
 
     #if os.path.exists(PATH2+"/configs/config_cover_doms.json"):
     #    print("already generate", PATH2+"/configs/config_cover_doms.json  continue")
@@ -78,41 +67,77 @@ def clean_files(PATH):
     print(string1)
     helper.command(string1)
 
+def get_targetkernel_config(arguments):
+    Type, hashvalue, targetkernel = arguments
+    PATH2 = "/data4/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel
+    #if os.path.exists(PATH2+"/configs/config_cover_doms.json"):
+    #    print("already generated config_cover_doms.json, skip")
+    #    return
+    inputpaths = prepare_inputs(Type, hashvalue, targetkernel)
+    if not inputpaths:
+        print("inputpaths generated fail for", Type, hashvalue, targetkernel)
+        return
+    PATH1,PATH2,refkernel,targetkernel = inputpaths
+    if not os.path.exists(PATH1):
+        print(PATH1, "not exists")
+        return
+    string1 = "cd /home/zzhan173/Linux_kernel_UC_KLEE/; python3 helper_functions/get_targetkernel_config.py "+PATH1+" "+PATH2+" "+refkernel+" "+targetkernel+" > "+PATH2+"/get_targetkernel_config_log"
+    print(string1)
+    helper.command(string1)
+    # clean not useful file to save the storage
+    clean_files(PATH2)
 
+def get_targetkernel_configs(Type, specific_hashvalue = None):
+    #casePATH = "/home/zzhan173/Linux_kernel_UC_KLEE/cases/"+Type+"cases_complete"
+    #with open(casePATH, "r") as f:
+    #    s_buf = f.readlines()
+    #    hashlist = [line[:-1] for line in s_buf]
+    with open("/data4/zzhan173/"+Type+"_targetkernels.json", "r") as f:
+        hash_targetkernels = json.load(f)
+    #for hashvalue in OOBR_targetkernels:
+    intputlist = []
+    #for hashvalue in hashlist:
+    for hashvalue in hash_targetkernels:
+        if specific_hashvalue:
+            if hashvalue != specific_hashvalue:
+                continue
+        for targetkernel in hash_targetkernels[hashvalue]:
+            intputlist += [(Type, hashvalue, targetkernel)]
+    print("length of inputlist:", len(intputlist))
+    with Pool(25) as p:
+        p.map(get_targetkernel_config, intputlist)
+
+def run_klees(Type, specific_hashvalue = None):
+    with open("/data4/zzhan173/"+Type+"_targetkernels.json", "r") as f:
+        hash_targetkernels = json.load(f)
+    klee_inputs = [] 
+    for hashvalue in hash_targetkernels:
+        if specific_hashvalue:
+            if hashvalue != specific_hashvalue:
+                continue
+        for targetkernel in hash_targetkernels[hashvalue]:
+            PATH2 = "/data4/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel
+            config = PATH2+"/configs/config_cover_doms.json"
+            output = PATH2+"/configs/output"
+
+            PATH1 = "/data3/zzhan173/"+Type+"/"+hashvalue+"/refkernel"
+            helper.generate_kleeconfig_newentry(PATH1, PATH2)
+            if os.path.exists(config):
+                klee_inputs += [(config, output)]
+            else:
+                print(config, "not exist")
+    print("size of klee_inputs:", len(klee_inputs))
+    with Pool(50) as p:
+        p.map(get_refkernel_results.run_klee, klee_inputs)
 if __name__ == "__main__":
     #PATH = "/data/zzhan173/test"
     #repo = "/home/zzhan173/repos/linux"
     #tag = "v5.4"
     #get_targetkernel(PATH, repo, tag)
     Type = "OOBR"
-    casePATH = "/home/zzhan173/Linux_kernel_UC_KLEE/cases/"+Type+"cases_complete"
-    with open(casePATH, "r") as f:
-        s_buf = f.readlines()
-        hashlist = [line[:-1] for line in s_buf]
-    with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/"+Type+"_targetkernels.json", "r") as f:
-        OOBR_targetkernels = json.load(f)
-    #for hashvalue in OOBR_targetkernels:
-    for hashvalue in hashlist:
-        #if hashvalue != "02617ac69815ae324053c954118c2dc7ba0e59b2":
-        #    continue
-        for targetkernel in OOBR_targetkernels[hashvalue]:
-            inputpaths = prepare_inputs(Type, hashvalue, targetkernel)
-            if not inputpaths:
-                continue
-            PATH1,PATH2,refkernel,targetkernel = inputpaths
-            #get_targetkernel_config(PATH1,PATH2,refkernel,targetkernel)
-            string1 = "cd /home/zzhan173/Linux_kernel_UC_KLEE/; python3 helper_functions/get_targetkernel_config.py "+PATH1+" "+PATH2+" "+refkernel+" "+targetkernel+" > "+PATH2+"/get_targetkernel_config_log"
-            print(string1)
-            helper.command(string1)
-            # clean not useful file to save the storage
-            clean_files(PATH2)
-    klee_inputs = [] 
-    for hashvalue in OOBR_targetkernels:
-        for targetkernel in OOBR_targetkernels[hashvalue]:
-            PATH2 = "/data/zzhan173/"+Type+"/"+hashvalue+"/"+targetkernel
-            config = PATH2+"/configs/config_cover_doms.json"
-            output = PATH2+"/configs/output"
-            if os.path.exists(config):
-                klee_inputs += [(config, output)]
-    with Pool(20) as p:
-        p.map(get_refkernel_results.run_klee, klee_inputs)
+    
+    get_targetkernel_configs(Type, sys.argv[1])
+    #run_klees(Type)
+    run_klees(Type, sys.argv[1])
+
+    
