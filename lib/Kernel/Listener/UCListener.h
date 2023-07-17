@@ -31,6 +31,7 @@ namespace kuc {
 
         void OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki);
         void OOB_check(klee::ExecutionState &state, klee::ref<klee::Expr> targetaddr, unsigned bytes);
+        void OOB_check2(klee::ExecutionState &state, klee::ref<klee::Expr> targetaddr, klee::ref<klee::Expr> len);
         void separateConstantAndSymbolic(const klee::ref<klee::Expr> &expr, std::set<klee::ref<klee::Expr>> &constants, std::set<klee::ref<klee::Expr>> &symbolics);
         void extract_baseaddr(klee::ref<klee::Expr> &symaddr, klee::ref<klee::Expr> &baseaddr);
         klee::ref<klee::Expr> create_symaddr_object(klee::ExecutionState &state, klee::KInstruction *ki, klee::ref<klee::Expr> base, llvm::Type *ty, unsigned size);

@@ -1303,8 +1303,9 @@ void kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction 
 
             if (name == "memcpy"){
                 ref<Expr> targetaddr = executor->eval(ki, 1, state).value;
+                ref<Expr> srcaddr = executor->eval(ki, 2, state).value;
                 ref<Expr> len = executor->eval(ki, 3, state).value;
-                targetaddr = AddExpr::create(targetaddr, len);
+
                 if(klee::ConstantExpr* CE = dyn_cast<klee::ConstantExpr>(len)){
                     uint64_t length = CE->getZExtValue();
                     if (length==0){
@@ -1312,8 +1313,16 @@ void kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction 
                         break;
                     }
                 }
+                // If the object is allocated outside SE scope, (pointed by a symbolic pointer).
+                // We simply check if the len is symbolic and can be larger than a large constant
+                OOB_check2(state, srcaddr, len);
+                OOB_check2(state, targetaddr, len);
+                targetaddr = AddExpr::create(targetaddr, len);
+                srcaddr = AddExpr::create(srcaddr, len);
                 targetaddr = SubExpr::create(targetaddr, klee::ConstantExpr::create(1, Context::get().getPointerWidth()));
+                srcaddr = SubExpr::create(srcaddr, klee::ConstantExpr::create(1, Context::get().getPointerWidth()));
                 OOB_check(state, targetaddr, 1);
+                OOB_check(state, srcaddr, 1);
             }
         }
     }
@@ -1355,20 +1364,46 @@ void kuc::UCListener::extract_baseaddr(ref<Expr> &symaddr, ref<Expr> &baseaddr) 
     }
 }
 
+void kuc::UCListener::OOB_check2(klee::ExecutionState &state, ref<Expr> targetaddr, ref<Expr> len) {
+    ref<Expr> baseaddress = klee::ConstantExpr::create(0, klee::Context::get().getPointerWidth());;
+    extract_baseaddr(targetaddr, baseaddress);
+    klee::ConstantExpr *CE = dyn_cast<klee::ConstantExpr>(baseaddress);
+    if(CE->getZExtValue() == 0){
+        klee_message("OOB_check2() object allocated outside the SE scope");
+        ref<Expr> threshold_size = klee::ConstantExpr::create(512, klee::Context::get().getPointerWidth());
+        ref<Expr> check = UleExpr::create(len, threshold_size);
+        klee::klee_message("check: %s", check.get_ptr()->dump2().c_str());
+        bool inBounds;
+        bool success =  executor->solver->mustBeTrue(state.constraints, check, inBounds,
+                                  state.queryMetaData);
+        if (!success) {
+            klee::klee_message("timeout in OOB_check");
+            return;
+        }
+        if (!inBounds) {
+            klee_message("Not find corresponding object OOB may happen state.OOBW = true");
+            state.OOBW = true;
+        } else {
+            klee_message("Not find corresponding object OOB should not happen");
+        }
+    }
+}
 void kuc::UCListener::OOB_check(klee::ExecutionState &state, ref<Expr> targetaddr, unsigned bytes) {
 
     //Expr::Width type = (isWrite ? value->getWidth() :
     //                 getWidthForLLVMType(target->inst->getType()));
     //unsigned bytes = Expr::getMinBytesForWidth(type);
-    klee_message("OOB_check() for targetaddr %s  bytes:%u", targetaddr.get_ptr()->dump2().c_str(), bytes);
+    klee_message("\nOOB_check() for targetaddr %s  bytes:%u", targetaddr.get_ptr()->dump2().c_str(), bytes);
     ref<Expr> baseaddress = klee::ConstantExpr::create(0, klee::Context::get().getPointerWidth());;
     extract_baseaddr(targetaddr, baseaddress);
+    klee_message("baseaddress %s", baseaddress.get_ptr()->dump2().c_str());
     // Do we need a check whether targetbaseaddr is initialized?
 
     // Some objects are allocated outside the symbolic execution scope. 
     // For example, (Add w64 2 (ReadLSB w64 0 input_0)) (pointed by argument)
     klee::ConstantExpr *CE = dyn_cast<klee::ConstantExpr>(baseaddress);
     if(CE->getZExtValue() == 0){
+        klee_message("baseaddress is 0. Return directly");
         return;
     }
 
@@ -1377,7 +1412,7 @@ void kuc::UCListener::OOB_check(klee::ExecutionState &state, ref<Expr> targetadd
     success = state.addressSpace.resolveOne(cast<klee::ConstantExpr>(baseaddress), op);
 
     if (!success){
-        klee_message("L1116 OOB may happen state.OOBW = true");
+        klee_message("not find corresponding object OOB may happen state.OOBW = true");
         state.OOBW = true;
         return;
     }
@@ -1407,9 +1442,9 @@ void kuc::UCListener::OOB_check(klee::ExecutionState &state, ref<Expr> targetadd
     }
 
     if (!inBounds) {
-        klee_message("L1123 OOB may happen state.OOBW = true");
+        klee_message("find corresponding object OOB may happen state.OOBW = true");
         state.OOBW = true;
     } else {
-        klee_message("L1123 OOB should not happen");
+        klee_message("find corresponding object OOB should not happen");
     }
 }
