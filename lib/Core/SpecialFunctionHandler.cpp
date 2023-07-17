@@ -982,21 +982,21 @@ void SpecialFunctionHandler::handleDivRemOverflow(ExecutionState &state,
 }
 
 // yu hao: handle kernel function
-// set the memory to zero
+// Not set the memory to zero (under-constraint feature)
 void SpecialFunctionHandler::handleKmalloc(ExecutionState &state,
                                            KInstruction *target,
                                            std::vector<ref<Expr> > &arguments) {
     // XXX should type check args
     //assert(arguments.size()==2 && "invalid number of arguments to kmalloc");
-    executor.executeAlloc(state, arguments[0], false, target, true);
+    executor.executeAlloc(state, arguments[0], false, target, false);
 }
-
+// Not set the memory to zero (under-constraint feature)
 void SpecialFunctionHandler::handlekmem_cache_alloc_trace(ExecutionState &state,
                                            KInstruction *target,
                                            std::vector<ref<Expr> > &arguments) {
     // XXX should type check args
     //assert(arguments.size()==2 && "invalid number of arguments to kmalloc");
-    executor.executeAlloc(state, arguments[2], false, target, true);
+    executor.executeAlloc(state, arguments[2], false, target, false);
 }
 
 void SpecialFunctionHandler::handleIminor(ExecutionState &state,
