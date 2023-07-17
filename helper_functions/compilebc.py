@@ -211,12 +211,26 @@ def format_dir_commands(PATH):
     return commandlist
 
 def format_linux(kernel = "/home/zzhan173/repos/linux"):
+    format_linux_b8fe393f999a291a9ea6(kernel)
     commands = format_dir_commands(kernel)
     print("size of files to be formatted:", len(commands))
     with Pool(32) as p:
         #p.map(command, commands)
         p.map(format_file_command, commands)
 
+def format_linux_b8fe393f999a291a9ea6(kernel):
+    filepath = kernel + "/net/qrtr/Kconfig"
+    if os.path.exists(filepath):
+        s_buf2 = []
+        with open(filepath, "r") as f:
+            s_buf = f.readlines()
+        for line in s_buf:
+            if "depends on ARCH_QCOM || COMPILE_TEST" in line:
+                continue
+            s_buf2 += [line]
+        with open(filepath, "w") as f:
+            for line in s_buf2:
+                f.write(line)
 # currently it can insert some lines according to codeadaptation json file
 # note: it should not be done when compile bc
 # todo: then there is a line matching issue, unless the added lines are added only before the crash line
