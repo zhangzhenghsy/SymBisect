@@ -142,11 +142,61 @@ def get_callstack(PATH):
         if any(func in s_buf[i] for func in Ignore_funcs):
             startline = i
     s_buf = s_buf[startline+1:]
-    print(s_buf)
+    #print(s_buf)
     with open(PATH+"/callstack", "w") as f:
         for line in s_buf:
             f.write(line)
+    return s_buf
 
+def get_allocate_callstack(PATH):
+    print("get_allocate_callstack() from report.txt")
+    with open(PATH+"/report.txt", "r") as f:
+        s_buf = f.readlines()
+
+    refkernels = ["syzkaller/managers/upstream-linux-next-kasan-gce-root/kernel/"]
+    for refkernel in refkernels:
+        for i in range(len(s_buf)):
+            s_buf[i] = s_buf[i].replace(refkernel, "")
+
+    for i in range(len(s_buf)):
+        line = s_buf[i]
+        if "Allocated by" in line:
+            break
+    else:
+        print("Allocated Trace not detected")
+        return False
+    s_buf = s_buf[i+1:]
+
+    entry_funcs = ["do_sys", "_sys_", "syscall", "start_kernel"]
+    for i in range(len(s_buf)):
+        if any(func in s_buf[i] for func in entry_funcs):
+            break
+    else:
+        print("Entry Function not detected")
+        return False
+    s_buf = s_buf[:i]
+
+    Ignore_funcs = ["kasan", "memcpy"]
+    startline = 0
+    for i in range(len(s_buf)):
+        if any(func in s_buf[i] for func in Ignore_funcs):
+            startline = i
+    s_buf = s_buf[startline+1:]
+    return s_buf
+
+def get_callfunctions(s_buf):
+    callfunctions = []
+    prevfuncname = ""
+    for line in s_buf:
+        line = line[:-1].strip()
+        funcname = line.split(" ")[0]
+        if "+" in funcname:
+            funcname = funcname.split("+")[0]
+        if funcname == prevfuncname:
+            continue
+        callfunctions += [funcname]
+    return callfunctions
+        
 def get_cleancallstack(PATH):
     cleancallstack = []
     with open(PATH+"/callstack", "r") as f:
@@ -387,13 +437,25 @@ def get_indirectcalls(PATH):
         caller = caller.split(" ")[0]
         #print("callerline:", callerline)
         # only when the calller line corresponds unique BB, we generate the indirect call mapping. Thus there may be FNs which requires adding manually
-        if callerline in line_BBinfo and len(line_BBinfo[callerline]) == 1:
-            BB = line_BBinfo[callerline][0]
-            #print("BB:", BB)
-            indirectcall = Check_indirectcall(bcfile, BB, callee)
-            if indirectcall:
+        #if callerline in line_BBinfo and len(line_BBinfo[callerline]) == 1:
+        #    BB = line_BBinfo[callerline][0]
+        #    #print("BB:", BB)
+        #    indirectcall = Check_indirectcall(bcfile, BB, callee)
+        #    if indirectcall:
+        #        indirectcalls[callerline] = callee
+        #        print("found indirect call", caller, callee, callerline, BB)
+        
+        if callerline in line_BBinfo:
+            directcall = False
+            for BB in line_BBinfo[callerline]:
+                directcall = Check_directcall(bcfile, BB, callee)
+                if directcall:
+                    break
+            if not directcall:
                 indirectcalls[callerline] = callee
                 print("found indirect call", caller, callee, callerline, BB)
+        else:
+            print("callerline", callerline, "not in line_BBinfo")
 
     with open(PATH+"/indirectcalls", "w") as f:
         for callerline in indirectcalls:
@@ -415,12 +477,36 @@ def Check_indirectcall(bcfile, BB, callee):
         line = bcfile[index]
         if "@"+callee in line and "call" in line:
             directcall = True
-            break;
+            break
         elif "call" in line and "@" not in line.split("call")[1].split("(")[0]:
             indirectcall = True
         index += 1
 
     if not directcall and indirectcall:
+        return True
+    return False
+
+# Check if there is an direct call to callee in the BB
+# bcfile is the buffer of LLVM bc file.
+def Check_directcall(bcfile, BB, callee):
+    BBline = [line for line in bcfile if line.startswith(BB)]
+
+    if len(BBline) > 1:
+        print("there are multiple definitions for", BB)
+    index = bcfile.index(BBline[0])
+
+    #indirectcall = False
+    directcall = False
+    while not bcfile[index+1].startswith("built-in.bc-"):
+        line = bcfile[index]
+        if "@"+callee in line and "call" in line:
+            directcall = True
+            break
+        #elif "call" in line and "@" not in line.split("call")[1].split("(")[0]:
+        #    indirectcall = True
+        index += 1
+
+    if directcall:
         return True
     return False
 
@@ -452,6 +538,68 @@ def automate_addskipfunction(configfile):
         skipfuncname = get_stuckfunction.get_func_percent(casepath, callstack_functions)
         add_skipfunction(configfile, skipfuncname)
 
+# Get the common caller of allocation trace/crash trace. It can be used as entry function point
+# PATH example: /data3/zzhan173/OOBR/b8fe393f999a291a9ea6/refkernel
+def get_common_caller(PATH):
+    reportpath = PATH + "/report.txt"
+    if not os.path.exists(reportpath):
+        print(reportpath, "not exist")
+        return None
+    with open(reportpath, "r") as f:
+        s_buf = f.readlines()
+    if not any("Call Trace:" in line for line in s_buf):
+        return None
+    if not any("Allocated by" in line for line in s_buf):
+        return None
+    allocate_callstack = get_allocate_callstack(PATH)
+    if not allocate_callstack:
+        return None
+    allocate_functions = get_callfunctions(allocate_callstack)
+    callstack =  get_callstack(PATH)
+    if not callstack:
+        return None
+    crash_functions = get_callfunctions(callstack)
+    print("crash_functions:", crash_functions)
+    print("allocate_functions:", allocate_functions)
+    for function in allocate_functions:
+        if function in crash_functions:
+            return function
+    return None
+
+# PATH1 example: /data3/zzhan173/OOBR/b8fe393f999a291a9ea6/refkernel
+# PATH2 example: /data4/zzhan173/OOBR/b8fe393f999a291a9ea6/linux-v5.6
+def generate_kleeconfig_newentry(PATH1, PATH2):
+    print("generate_kleeconfig_newentry()", PATH2)
+    new_entryfunc = get_common_caller(PATH1)
+    print("new_entryfunc:", new_entryfunc)
+
+    configpath = PATH2 + "/configs/config_cover_doms.json"
+    if not os.path.exists(configpath):
+        return
+    backup = PATH2 + "/configs/config_cover_doms_old.json"
+    if not os.path.exists(backup):
+        string1 = "cd "+ PATH2 + "/configs; cp config_cover_doms.json config_cover_doms_old.json"
+        command(string1)
+    
+    with open(configpath, "r") as f:
+        config = json.load(f)
+    oldcalltrace = config['97_calltrace']
+    if not new_entryfunc:
+        print("no common entry", PATH2)
+        if len(oldcalltrace) > 5:
+            config['97_calltrace'] = oldcalltrace[-5:]
+            config['3_entry_function'] = oldcalltrace[-5]
+    elif new_entryfunc not in oldcalltrace:
+        print("new_entryfunc not in oldcalltrace", new_entryfunc, PATH2)
+        if len(oldcalltrace) > 5:
+            config['97_calltrace'] = oldcalltrace[-5:]
+            config['3_entry_function'] = oldcalltrace[-5]
+    else:
+        print("new_entryfunc in oldcalltrace", PATH2)
+        config['97_calltrace'] = oldcalltrace[oldcalltrace.index(new_entryfunc):]
+        config['3_entry_function'] = new_entryfunc
+    with open(configpath, "w") as f:
+        json.dump(config, f, indent=4)
 
 if __name__ == "__main__":
     #caller = "netlink_sendmsg"
@@ -473,5 +621,14 @@ if __name__ == "__main__":
     #result = command(string1, 60)
     #print(result)
 
-    configfile = "/home/zzhan173/OOBW2020-2021/3b0c40612471/f40ddce88593/configs/fbcon_modechanged.json"
-    automate_addskipfunction(configfile)
+    #configfile = "/home/zzhan173/OOBW2020-2021/3b0c40612471/f40ddce88593/configs/fbcon_modechanged.json"
+    #automate_addskipfunction(configfile)
+
+    #PATH = "/data3/zzhan173/OOBR/b8fe393f999a291a9ea6/refkernel"
+    PATH = sys.argv[1]
+    result = get_common_caller(PATH)
+    print(result)
+
+    #PATH1 = sys.argv[1]
+    #PATH2 = sys.argv[2]
+    #generate_kleeconfig_newentry(PATH1, PATH2)
