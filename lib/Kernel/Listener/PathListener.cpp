@@ -231,6 +231,11 @@ void kuc::PathListener::beforeExecuteInstruction(klee::ExecutionState &state, kl
                 std::string callee_func = this->indirectcall_map[line_info];
                 auto m = this->executor->get_module();
                 llvm::Function *f = m->getFunction(callee_func);
+                if (!f) {
+                    klee::klee_message("callee_func found: %s not in bc file", callee_func.c_str());
+                    this->executor->haltExecution = true;
+                    break;
+                }
                 auto f_address = klee::Expr::createPointer(reinterpret_cast<std::uint64_t>(f));
                 klee::klee_message("callee_func found: %s f(p): %p f(s): %s", f->getName().str().c_str(), f, f_address.ptr->dump2().c_str());
                 executor->un_eval(ki, 0, state).value = f_address;
