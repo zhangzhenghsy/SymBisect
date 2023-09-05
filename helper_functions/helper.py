@@ -117,6 +117,12 @@ def get_callstack(PATH):
     for refkernel in refkernels:
         for i in range(len(s_buf)):
             s_buf[i] = s_buf[i].replace(refkernel, "")
+    
+    for i in range(len(s_buf)):
+        line = s_buf[i]
+        if "Allocated by" in line:
+            s_buf = s_buf[:i]
+            break
 
     for i in range(len(s_buf)):
         line = s_buf[i]
@@ -127,7 +133,7 @@ def get_callstack(PATH):
         return False
     s_buf = s_buf[i+1:]
 
-    entry_funcs = ["do_sys", "_sys_", "syscall"]
+    entry_funcs = ["do_sys", "_sys_", "syscall", "asm_exc_page_fault"]
     for i in range(len(s_buf)):
         if any(func in s_buf[i] for func in entry_funcs):
             break
@@ -136,7 +142,7 @@ def get_callstack(PATH):
         return False
     s_buf = s_buf[:i]
 
-    Ignore_funcs = ["kasan", "memcpy"]
+    Ignore_funcs = ["kasan", "memcpy", "memset"]
     startline = 0
     for i in range(len(s_buf)):
         if any(func in s_buf[i] for func in Ignore_funcs):
@@ -176,7 +182,7 @@ def get_allocate_callstack(PATH):
         return False
     s_buf = s_buf[:i]
 
-    Ignore_funcs = ["kasan", "memcpy"]
+    Ignore_funcs = ["kasan", "memcpy", "memset"]
     startline = 0
     for i in range(len(s_buf)):
         if any(func in s_buf[i] for func in Ignore_funcs):
@@ -581,6 +587,9 @@ def generate_kleeconfig_newentry(PATH1, PATH2):
         string1 = "cd "+ PATH2 + "/configs; cp config_cover_doms.json config_cover_doms_old.json"
         command(string1)
     
+    OOBdetected_entry = generate_OOBdetected_entry(PATH1)
+    print("OOBdetected_entry:", OOBdetected_entry)
+
     with open(configpath, "r") as f:
         config = json.load(f)
     oldcalltrace = config['97_calltrace']
@@ -589,17 +598,53 @@ def generate_kleeconfig_newentry(PATH1, PATH2):
         if len(oldcalltrace) > 5:
             config['97_calltrace'] = oldcalltrace[-5:]
             config['3_entry_function'] = oldcalltrace[-5]
+        if OOBdetected_entry and OOBdetected_entry in config['97_calltrace']:
+            config['97_calltrace'] = oldcalltrace[oldcalltrace.index(OOBdetected_entry):]
+            config['3_entry_function'] = OOBdetected_entry
     elif new_entryfunc not in oldcalltrace:
         print("new_entryfunc not in oldcalltrace", new_entryfunc, PATH2)
         if len(oldcalltrace) > 5:
             config['97_calltrace'] = oldcalltrace[-5:]
             config['3_entry_function'] = oldcalltrace[-5]
+        if OOBdetected_entry and OOBdetected_entry in config['97_calltrace']:
+            config['97_calltrace'] = oldcalltrace[oldcalltrace.index(OOBdetected_entry):]
+            config['3_entry_function'] = OOBdetected_entry
     else:
         print("new_entryfunc in oldcalltrace", PATH2)
         config['97_calltrace'] = oldcalltrace[oldcalltrace.index(new_entryfunc):]
         config['3_entry_function'] = new_entryfunc
     with open(configpath, "w") as f:
         json.dump(config, f, indent=4)
+
+def generate_OOBdetected_entry(PATH):
+    configs_dir = PATH + "/configs"
+    files = os.listdir(configs_dir)
+
+    config_files = [configs_dir + "/" + filename for filename in files if filename.endswith('.json')]
+
+    calltrace_len = 0
+    entry = None
+    for config in config_files:
+        calltrace = get_config_calltrace(config)
+        output = config.replace(".json", "_output")
+        if not os.path.exists(output):
+            continue
+        OOBdetected = check_output_OOBdetected(output)
+        if OOBdetected:
+            if len(calltrace) > calltrace_len:
+                entry = calltrace[0]
+                calltrace_len = len(calltrace)
+    return entry
+
+def get_config_calltrace(config):
+    with open(config, "r") as f:
+        config = json.load(f)
+    return config["97_calltrace"]
+def check_output_OOBdetected(output):
+    with open(output, "r") as f:
+        s_buf = f.readlines()
+    s_buf = s_buf[-1000:]
+    return any("OOB detected in target line" in line for line in s_buf)
 
 if __name__ == "__main__":
     #caller = "netlink_sendmsg"

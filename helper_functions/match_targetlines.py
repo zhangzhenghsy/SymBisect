@@ -81,7 +81,7 @@ def get_diff_buf(refkernel, targetkernel, PATH2):
     #compilebc.format_linux(target_kernel)
     if os.path.exists(PATH2 +"/diffbuf"):
         os.remove(PATH2 +"/diffbuf")
-    string1 = "git diff --no-index "+refkernel+" "+targetkernel+" >" + PATH2 +"/diffbuf"
+    string1 = "git diff --no-index --patience "+refkernel+" "+targetkernel+" >" + PATH2 +"/diffbuf"
     print(string1)
     result = command(string1)
 
@@ -159,7 +159,7 @@ def get_matchedlines(PATH1, PATH2):
     return filter_line_targetline
 
 def get_matchedlines_git(PATH1, PATH2):
-    string1 = "git diff --no-index "+PATH1+" "+PATH2
+    string1 = "git diff --no-index --patience "+PATH1+" "+PATH2
     print(string1)
     p_buf = command(string1)
     p_buf = [line.decode("utf-8") for line in p_buf]
@@ -492,3 +492,4 @@ def generate_kleeconfig_targetkernel(PATH2):
 if __name__ == "__main__":
     PATH2 = sys.argv[1]
     helper.get_mustBBs(PATH2)
+    generate_kleeconfig_targetkernel(PATH2)

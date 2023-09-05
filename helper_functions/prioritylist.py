@@ -1040,8 +1040,9 @@ def generate_kleeconfig(PATH, parameterlist = []):
         with open(PATH+"/4_target_line_list", "r") as f:
             s_buf = f.readlines()
     else:
-        with open(PATH+"/targetline", "r") as f:
+        with open(PATH+"/cleancallstack_format", "r") as f:
             s_buf = f.readlines()
+            s_buf = [s_buf[0].split(" ")[1]]
     for line in s_buf:
         target_line_list += [line[:-1]]
     target_line_list = [helper.simplify_path(line) for line in target_line_list]
@@ -1736,8 +1737,6 @@ def get_BBlinelist_doms(PATH):
 
 #requirement: vm.log, config_withoutkasan, calltracefunclist
 def get_all(PATH):
-    if not os.path.exists(PATH + "/targetline"):
-        helper.get_targetline_format(PATH)
     with open(PATH+"/targetline", "r") as f:
         targetline = f.readlines()[0][:-1]
         print("targetline:", targetline)
@@ -1755,6 +1754,7 @@ def get_all(PATH):
     get_BBlist(PATH)
     get_BBlinelist_doms(PATH)
     cfg_analysis.get_cfg_files(PATH)
+    helper.get_targetline_format(PATH)
     generate_kleeconfig(PATH, [])
 
 def get_cover_from_vmlog(PATH):

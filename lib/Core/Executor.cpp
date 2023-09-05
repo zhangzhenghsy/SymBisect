@@ -3991,7 +3991,7 @@ void Executor::run(ExecutionState &initialState) {
 
     //auto execute_time = std::time(NULL)-start_time;
     auto execute_time = ((double)(clock() - start_time))/CLOCKS_PER_SEC;
-    if (execute_time > 12000) {
+    if (execute_time > 7200) {
       // todo: check if target line has been reached?
       klee::klee_message("execution time out (12000) we think there is no OOB triggerred");
       haltExecution = true;
@@ -4665,18 +4665,6 @@ void Executor::executeMemoryOperation(ExecutionState &state,
     ref<Expr> check = mo->getBoundsCheckOffset(offset, bytes);
     check = optimizer.optimizeExpr(check, true);
     //std::cout << "check:"  << (check.ptr)->dump2() <<"\n";
-
-    /// zheng: check whether it's symbolic size
-    //std::cout << "mo->issymsize: " << mo->issymsize << "\n";
-    /*if (!mo->issymsize.compare("True")){
-      ref<Expr> symsize = mo->symsize;
-      //klee::klee_message("mo->issymsize True    symsize: %s", symsize.get_ptr()->dump2().c_str());
-      //std::cout << "mo->issymsize True    symsize of object:\n";
-      //std::cout << (symsize.ptr)->dump2() << "\n";
-	    check = UltExpr::create(offset, symsize);
-      klee::klee_message("mo->issymsize True new check: %s", check.get_ptr()->dump2().c_str());
-	    //std::cout << "new check:\n"  << (check.ptr)->dump2() <<"\n";
-    }*/
 
     bool inBounds;
     solver->setTimeout(coreSolverTimeout);

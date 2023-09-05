@@ -1248,6 +1248,8 @@ void SpecialFunctionHandler::handleStrcmp(ExecutionState &state,
   if (ConstantExpr* CE2 = dyn_cast<ConstantExpr>(targetaddr)) {
     success2 = state.addressSpace.resolveOne(CE2, op2);
   }  else {
+    ref<Expr> ret = ConstantExpr::alloc(0, target->inst->getType()->getIntegerBitWidth());
+    executor.bindLocal(target, state, ret);
     return;
   }
   

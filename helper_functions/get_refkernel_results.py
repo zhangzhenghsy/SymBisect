@@ -2,6 +2,7 @@ import sys, os
 import helper
 from multiprocessing import Pool
 import json
+import get_prioritylists
 
 def run_klee(arguments):
     config, output = arguments
@@ -30,7 +31,7 @@ def generate_configlist(PATH):
     calltrace = config_cover_doms["97_calltrace"]
 
     new_config_cover_doms = config_cover_doms
-    length = 3
+    length = 1
     while length < len(calltrace):
         new_calltrace = calltrace[-1*length:]
         new_config_cover_doms["97_calltrace"] = new_calltrace
@@ -50,11 +51,24 @@ def get_configlist(PATH):
 
 if __name__ == "__main__":
     config_output = []
-    with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/OOBRcases", "r") as f:
-        s_buf = f.readlines()
-    for syzbothash in s_buf:
-        syzbothash = syzbothash[:-1]
-        PATH = "/data3/zzhan173/OOBR/"+syzbothash+"/refkernel"
+    #with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/OOBRcases", "r") as f:
+    #    s_buf = f.readlines()
+    #for syzbothash in s_buf:
+    Type = "UAF"
+    PATH = "/data4/zzhan173/Fixtag_locator/"+Type+"_cases_filter.json"
+    
+    specific_hash = None
+    if len(sys.argv) > 1:
+        specific_hash = sys.argv[1]
+    total_skipcases = get_prioritylists.total_skipcases
+    with open(PATH, "r") as f:
+        syzbothash_info = json.load(f)
+    for syzbothash in syzbothash_info:
+        if syzbothash in total_skipcases:
+            continue
+        if specific_hash and syzbothash != specific_hash:
+            continue
+        PATH = "/data3/zzhan173/" + Type + "/"+syzbothash+"/refkernel"
         generate_configlist(PATH)
         configlist = get_configlist(PATH)
         for config in configlist:

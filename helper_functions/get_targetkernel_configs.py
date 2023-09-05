@@ -5,6 +5,7 @@ import match_targetlines
 import shutil
 import get_refkernel_results
 from multiprocessing import Pool
+import get_prioritylists
 
 repo_PATH = {
   "linux":"/home/zzhan173/repos/linux/"
@@ -101,6 +102,8 @@ def get_targetkernel_configs(Type, specific_hashvalue = None):
         if specific_hashvalue:
             if hashvalue != specific_hashvalue:
                 continue
+        if hashvalue in get_prioritylists.total_skipcases:
+            print("skip", hashvalue)
         for targetkernel in hash_targetkernels[hashvalue]:
             intputlist += [(Type, hashvalue, targetkernel)]
     print("length of inputlist:", len(intputlist))
@@ -120,6 +123,21 @@ def run_klees(Type, specific_hashvalue = None):
             config = PATH2+"/configs/config_cover_doms.json"
             output = PATH2+"/configs/output"
 
+            with open(config, "r") as f:
+                klee_config = json.load(f)
+            target_line_list = klee_config["4_target_line_list"]
+            target_line_list = [line for line in target_line_list if line != "manualget"]
+            if len(target_line_list) == 0:
+                with open(output, "w") as f:
+                    f.write("target line not exist")
+                print(hashvalue, targetkernel, "target line not exist")
+                continue
+
+
+            #if os.path.exists(output):
+            #    print("already generate the output, continue")
+            #    continue
+
             PATH1 = "/data3/zzhan173/"+Type+"/"+hashvalue+"/refkernel"
             helper.generate_kleeconfig_newentry(PATH1, PATH2)
             if os.path.exists(config):
@@ -134,10 +152,14 @@ if __name__ == "__main__":
     #repo = "/home/zzhan173/repos/linux"
     #tag = "v5.4"
     #get_targetkernel(PATH, repo, tag)
-    Type = "OOBR"
+    specifichash = None
+    if len(sys.argv) > 1:
+        specifichash = sys.argv[1]
+    #Type = "OOBR"
+    #Type = "OOBW"
+    Type = "UAF"
     
-    get_targetkernel_configs(Type, sys.argv[1])
-    #run_klees(Type)
-    run_klees(Type, sys.argv[1])
+    get_targetkernel_configs(Type, specifichash)
+    run_klees(Type, specifichash)
 
     

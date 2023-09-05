@@ -392,6 +392,11 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
                 //Note that we will match all the corresponding symaddrs (within the size) to the object
                 klee::ref<klee::Expr> concrete_addr = create_symaddr_object(state, ki, base, ty, 64);
                 executor->un_eval(ki, 1, state).value = concrete_addr;
+
+                //base = executor->eval(ki, 2, state).value;
+                //ty = ki->inst->getOperand(2)->getType();
+                //concrete_addr = create_symaddr_object(state, ki, base, ty, 64);
+                //executor->un_eval(ki, 2, state).value = concrete_addr;
             }
             if (name == "memcpy" || name == "_copy_from_user" || name == "_copy_to_user" || name == "strncpy_from_user") {
                 klee::ref<klee::Expr> base = executor->eval(ki, 1, state).value;
@@ -1238,6 +1243,11 @@ void kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction 
             break;
         }
         case llvm::Instruction::GetElementPtr: {
+            // If the object is allocated outside SE scope, (pointed by a symbolic pointer).
+            // We simply check if the len(index) is symbolic and can be larger than a large constant
+            ref<Expr> baseaddr = executor->eval(ki, 0, state).value;
+            ref<Expr> index = executor->eval(ki, 1, state).value;
+            OOB_check2(state, baseaddr, index, 16);
             break;
             /*
             klee::ObjectPair op;
@@ -1315,14 +1325,23 @@ void kuc::UCListener::OOBWcheck(klee::ExecutionState &state, klee::KInstruction 
                 }
                 // If the object is allocated outside SE scope, (pointed by a symbolic pointer).
                 // We simply check if the len is symbolic and can be larger than a large constant
-                OOB_check2(state, srcaddr, len);
-                OOB_check2(state, targetaddr, len);
+                OOB_check2(state, srcaddr, len, 512);
+                OOB_check2(state, targetaddr, len, 512);
                 targetaddr = AddExpr::create(targetaddr, len);
                 srcaddr = AddExpr::create(srcaddr, len);
                 targetaddr = SubExpr::create(targetaddr, klee::ConstantExpr::create(1, Context::get().getPointerWidth()));
                 srcaddr = SubExpr::create(srcaddr, klee::ConstantExpr::create(1, Context::get().getPointerWidth()));
                 OOB_check(state, targetaddr, 1);
                 OOB_check(state, srcaddr, 1);
+            }
+            if (name == "memset"){
+                ref<Expr> targetaddr = executor->eval(ki, 1, state).value;
+                ref<Expr> len = executor->eval(ki, 3, state).value;
+                OOB_check2(state, targetaddr, len, 512);
+                targetaddr = AddExpr::create(targetaddr, len);
+                targetaddr = SubExpr::create(targetaddr, klee::ConstantExpr::create(1, Context::get().getPointerWidth()));
+                OOB_check(state, targetaddr, 1);
+
             }
         }
     }
@@ -1364,13 +1383,17 @@ void kuc::UCListener::extract_baseaddr(ref<Expr> &symaddr, ref<Expr> &baseaddr) 
     }
 }
 
-void kuc::UCListener::OOB_check2(klee::ExecutionState &state, ref<Expr> targetaddr, ref<Expr> len) {
+void kuc::UCListener::OOB_check2(klee::ExecutionState &state, ref<Expr> targetaddr, ref<Expr> len, uint64_t thresholdlen) {
+    if (klee::ConstantExpr* CE1 = dyn_cast<klee::ConstantExpr>(len)) {
+        klee_message("OOB_check2() len is concrete");
+        return;
+    }
     ref<Expr> baseaddress = klee::ConstantExpr::create(0, klee::Context::get().getPointerWidth());;
     extract_baseaddr(targetaddr, baseaddress);
     klee::ConstantExpr *CE = dyn_cast<klee::ConstantExpr>(baseaddress);
     if(CE->getZExtValue() == 0){
         klee_message("OOB_check2() object allocated outside the SE scope");
-        ref<Expr> threshold_size = klee::ConstantExpr::create(512, klee::Context::get().getPointerWidth());
+        ref<Expr> threshold_size = klee::ConstantExpr::create(thresholdlen, len->getWidth());
         ref<Expr> check = UleExpr::create(len, threshold_size);
         klee::klee_message("check: %s", check.get_ptr()->dump2().c_str());
         bool inBounds;

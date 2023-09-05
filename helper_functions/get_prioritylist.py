@@ -110,7 +110,6 @@ def get_cover_lineinfo(PATH):
     print("\nget_cover_lineinfo()\n")
     prioritylist.get_cover_lineinfo(PATH)
     prioritylist.get_complete_coverage_coverline(PATH)
-    #if not os.path.exists(PATH + "/targetline"):
     if not os.path.exists(PATH+"/lineguidance/"):
         os.mkdir(PATH+"/lineguidance/")
     helper.get_callstack(PATH)
@@ -190,10 +189,13 @@ if __name__ == "__main__":
         generate_kleeconfig(PATH)
     if option == "all":
         if not os.path.exists(PATH+"/vm.log_correct"):
-            run_SyzMorph_add(syzbothash)
+            #run_SyzMorph_add(syzbothash)
             compile_refkernel(PATH, syzbothash)
         else:
             print("skip run_SyzMorph_add/compile_refkernel since vm.log_correct exists")
+        if not os.path.exists(PATH+"/vm.log_correct"):
+            print("Please generate the vm.log_correct manually")
+            exit()
         get_cover_from_vmlog(PATH, syzbothash)
         get_cover_lineinfo(PATH)
         compile_bcfiles(PATH)
