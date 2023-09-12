@@ -32,6 +32,7 @@ namespace kuc {
         void OOBWcheck(klee::ExecutionState &state, klee::KInstruction *ki);
         void OOB_check(klee::ExecutionState &state, klee::ref<klee::Expr> targetaddr, unsigned bytes);
         void OOB_check2(klee::ExecutionState &state, klee::ref<klee::Expr> targetaddr, klee::ref<klee::Expr> len, u_int64_t thresholdlen);
+        void assign_symsize(klee::ExecutionState &state, klee::MemoryObject *mo);
         void separateConstantAndSymbolic(const klee::ref<klee::Expr> &expr, std::set<klee::ref<klee::Expr>> &constants, std::set<klee::ref<klee::Expr>> &symbolics);
         void extract_baseaddr(klee::ref<klee::Expr> &symaddr, klee::ref<klee::Expr> &baseaddr);
         klee::ref<klee::Expr> create_symaddr_object(klee::ExecutionState &state, klee::KInstruction *ki, klee::ref<klee::Expr> base, llvm::Type *ty, unsigned size);
@@ -49,6 +50,7 @@ namespace kuc {
         nlohmann::json config;
         std::set<std::string> skip_functions;
         bool print_inst;
+        bool sym_size;
         bool print_log;
         std::map<std::string, std::string> indirectcall_map;
         std::string kernelversion;
@@ -57,7 +59,7 @@ namespace kuc {
         bool skip_calltrace;
 
     private:
-        std::string create_global_var_name(klee::KInstruction *ki, int64_t index, std::string kind);
+        std::string create_global_var_name(klee::KInstruction *ki, std::string kind);
 
         void symbolic_before_load(klee::ExecutionState &state, klee::KInstruction *ki);
 

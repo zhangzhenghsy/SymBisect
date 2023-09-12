@@ -26,6 +26,12 @@ kuc::UCListener::UCListener(klee::Executor *executor) : Listener(executor) {
     else {
         print_inst = false;
     }
+    if (config.contains("99_symsize")) {
+        sym_size = config["99_symsize"];
+    }
+    else {
+        sym_size = false;
+    }
 
     if (config.contains("92_indirectcall")){
         indirectcall_map = config["92_indirectcall"];
@@ -98,6 +104,8 @@ void kuc::UCListener::beforeRun(klee::ExecutionState &state) {
             klee::klee_message("pointer element type: %s", str.c_str());
             // create an object corresponding to the pointer
             klee::MemoryObject *mo = executor->create_mo(state, ty->getPointerElementType(), ki->inst, name, 0);
+            if (sym_size)
+                assign_symsize(state, mo);
             state.map_symbolic_address[argument] = mo->getBaseExpr();
             state.map_address_symbolic[mo->getBaseExpr()] = argument;
             klee_message("mo base: %lu mo size: %u", mo->address, mo->size);
@@ -441,7 +449,7 @@ void kuc::UCListener::beforeExecuteInstruction(klee::ExecutionState &state, klee
 // if skip OOB error, we need to symbolize the dest value
 void kuc::UCListener::symbolize_Inst_return(klee::ExecutionState &state, klee::KInstruction *ki){
     llvm::Type *ty = ki->inst->getType();
-    auto sym_name = this->create_global_var_name(ki, 0, "symbolic_Inst_return");
+    auto sym_name = this->create_global_var_name(ki, "symbolic_Inst_return");
     if (print_log){klee_message("create symbolic return for Load Inst: %s", sym_name.c_str());}
     unsigned int size =  executor->kmodule->targetData->getTypeStoreSize(ty);
     Expr::Width width = executor->getWidthForLLVMType(ty);
@@ -633,7 +641,7 @@ void kuc::UCListener::afterExecuteInstruction(klee::ExecutionState &state, klee:
             if (ty->getTypeID() == Type::VoidTyID){
                 break;
             }
-            auto sym_name = this->create_global_var_name(ki, 0, "symbolic_call_return_unreachinst");
+            auto sym_name = this->create_global_var_name(ki, "symbolic_call_return_unreachinst");
             unsigned int size =  executor->kmodule->targetData->getTypeStoreSize(ty);
             Expr::Width width = executor->getWidthForLLVMType(ty);
             ref<Expr> symbolic = executor->manual_make_symbolic(sym_name, size, width);
@@ -788,7 +796,7 @@ void kuc::UCListener::executionFailed(klee::ExecutionState &state, klee::KInstru
 
 }
 
-std::string kuc::UCListener::create_global_var_name(klee::KInstruction *ki, int64_t index, std::string kind) {
+std::string kuc::UCListener::create_global_var_name(klee::KInstruction *ki, std::string kind) {
     std::string name;
     //klee_message("inst_to_strID(ki->inst): %s", inst_to_strID(ki->inst).c_str());
     //name += inst_to_strID(ki->inst);
@@ -859,6 +867,8 @@ klee::ref<klee::Expr> kuc::UCListener::create_symaddr_object(klee::ExecutionStat
         //auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
         auto name = "obj("+base.get_ptr()->dump2()+")";
         klee::MemoryObject *mo = executor->create_mo(state, ty, ki->inst, name, size);
+        if (sym_size)
+            assign_symsize(state, mo);
         //executor->un_eval(ki, 0, state).value = mo->getBaseExpr();
         klee::ref<klee::Expr> concrete_addr = mo->getBaseExpr();
         state.map_symbolic_address[base] = concrete_addr;
@@ -907,6 +917,8 @@ void kuc::UCListener::symbolic_before_load(klee::ExecutionState &state, klee::KI
             //auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
             auto name = "obj("+base.get_ptr()->dump2()+")";
             klee::MemoryObject *mo = executor->create_mo(state, ty, ki->inst, name, 0);
+            if (sym_size)
+                assign_symsize(state, mo);
             executor->un_eval(ki, 0, state).value = mo->getBaseExpr();
             state.map_symbolic_address[base] = mo->getBaseExpr();
             state.map_address_symbolic[mo->getBaseExpr()] = base;
@@ -960,6 +972,8 @@ void kuc::UCListener::symbolic_before_store(klee::ExecutionState &state, klee::K
             //auto name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
             std::string name = base.get_ptr()->dump2();
             klee::MemoryObject *mo = executor->create_mo(state, ty, ki->inst, name, 0);
+            if (sym_size)
+                assign_symsize(state, mo);
             executor->un_eval(ki, 1, state).value = mo->getBaseExpr();
             state.map_symbolic_address[base] = mo->getBaseExpr();
             state.map_address_symbolic[mo->getBaseExpr()] = base;
@@ -1016,65 +1030,6 @@ void kuc::UCListener::find_equalsymaddr(klee::ExecutionState &state, klee::ref<k
     }
     klee_message("find_equalsymaddr() state.map_symbolic_address.size():%lu find_equalsymaddr_result:%d", state.map_symbolic_address.size(), find_equalsymaddr_result);
 }
-
-/*
-void kuc::UCListener::symbolic_after_load(klee::ExecutionState &state, klee::KInstruction *ki) {
-    std::string str;
-    // check value of load, if it is pointer, create mo and symbolic os
-    auto ty = ki->inst->getType();
-    if (ty->isPointerTy() && ty->getPointerElementType()->isSized()) {
-        // ignore the 0-sized type
-        auto size = executor->kmodule->targetData->getTypeStoreSize(ty->getPointerElementType());
-        klee_message("size : %lu", size.getKnownMinSize());
-        if (size == 0) {
-            klee_message("struct size is 0. don't create object for it");
-            return;
-        }
-        // the return value (a pointer) of load instruction
-        auto ret = executor->getDestCell(state, ki).value;
-        if (ret->getKind() == klee::Expr::Constant) {
-            return;
-        }
-        // type of base is pointer of pointer (char ** for example)
-        klee::ref<klee::Expr> base = executor->eval(ki, 0, state).value;
-
-        //klee_message("load ret symbolic: %s", ret.get_ptr()->dump2().c_str());
-        if (state.map_symbolic_address.find(ret) != state.map_symbolic_address.end()) {
-            klee::klee_message("find load ret symbolic in state.map_symbolic_address");
-            auto value = state.map_symbolic_address[ret];
-            klee::klee_message("corresponding concrete address: %s:", value.get_ptr()->dump2().c_str());
-            executor->bindLocal(ki, state, value);
-            executor->executeMemoryOperation(state, true, base, value, nullptr);
-        } else {
-            /// yu hao: create mo for non-constant pointer
-            // e.g. symbolic pointer load address
-            // create new mo and symbolic pointer = mo->getBaseExpr();
-            klee::klee_message("make symbolic load ret concolic with creating a concolic object");
-            std::string name;
-            //std::string retstr = ret.get_ptr()->dump2();
-            //klee::klee_message("retstr: %s  retstr.length():%u", retstr.c_str(), retstr.length());
-            //if(retstr.substr(0,21) == "(ReadLSB w64 0 input_" && (retstr.length() == 23)) {
-            //    name = "input_"+retstr.substr(21,1)+"(pointer)";
-            //} else {
-            //    name = this->create_global_var_name(ki->inst, 0, "symbolic_address");
-            //}
-            name = ret.get_ptr()->dump2();
-            //std::string name = retstr;
-            klee::klee_message("name: %s", name.c_str());
-            yhao_print(ty->getPointerElementType()->print, str);
-            klee::klee_message("pointer element type: %s", str.c_str());
-            klee::MemoryObject *mo = executor->create_mo(state, ty->getPointerElementType(), ki->inst, name);
-            executor->bindLocal(ki, state, mo->getBaseExpr());
-            executor->executeMemoryOperation(state, true, base, mo->getBaseExpr(), nullptr);
-            state.map_symbolic_address[ret] = mo->getBaseExpr();
-            state.map_address_symbolic[mo->getBaseExpr()] = ret;
-            yhao_print(mo->getBaseExpr()->print, str);
-            klee::klee_message("mo base: %s", str.c_str());
-        }
-
-    }
-}
-*/
 
 void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KInstruction *ki) {
     klee::klee_message("symbolic_after_call");
@@ -1168,7 +1123,7 @@ void kuc::UCListener::symbolic_after_call(klee::ExecutionState &state, klee::KIn
                 funcname = "indirectcall";
             }
         }
-        auto name = create_global_var_name(ki, -1, funcname+"-call_return");
+        auto name = create_global_var_name(ki, funcname+"-call_return");
         auto ty = ki->inst->getType();
         unsigned int size = executor->kmodule->targetData->getTypeStoreSize(ty);
         klee::Expr::Width width = executor->getWidthForLLVMType(ty);
@@ -1425,10 +1380,10 @@ void kuc::UCListener::OOB_check(klee::ExecutionState &state, ref<Expr> targetadd
     // Some objects are allocated outside the symbolic execution scope. 
     // For example, (Add w64 2 (ReadLSB w64 0 input_0)) (pointed by argument)
     klee::ConstantExpr *CE = dyn_cast<klee::ConstantExpr>(baseaddress);
-    if(CE->getZExtValue() == 0){
-        klee_message("baseaddress is 0. Return directly");
-        return;
-    }
+    //if(CE->getZExtValue() == 0){
+    //    klee_message("baseaddress is 0. Return directly");
+    //    return;
+    //}
 
     ObjectPair op;
     bool success;
@@ -1470,4 +1425,18 @@ void kuc::UCListener::OOB_check(klee::ExecutionState &state, ref<Expr> targetadd
     } else {
         klee_message("find corresponding object OOB should not happen");
     }
+}
+
+
+void kuc::UCListener::assign_symsize(klee::ExecutionState &state, klee::MemoryObject *mo) {
+    std::string name = "symsize";
+    if (this->count.find(name) == this->count.end()) {
+        this->count[name] = 0;
+    } else {
+        this->count[name] = this->count[name] + 1;
+    }
+    name += "-" + std::to_string(this->count[name]);
+    klee::ref<klee::Expr> symbolic = klee::Executor::manual_make_symbolic(name, 8, 64);
+    mo->issymsize = "True";
+    mo->symsize = symbolic ;
 }

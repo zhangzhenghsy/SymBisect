@@ -1097,6 +1097,7 @@ def generate_kleeconfig(PATH, parameterlist = []):
         config["96_concolic_map"] = all_index_value
         
     config["91_print_inst"] = False
+    config["99_symsize"] = False
     #if not os.path.exists(PATH + "/92_indirectcall.json"):
     #    with open(PATH + "/92_indirectcall.json", 'w') as f:
     #        json.dump({}, f, indent=4)
