@@ -355,7 +355,7 @@ def generate_linelists_targetkernel(refkernel, targetkernel, PATH1, PATH2):
     print("\ngenerate_linelist_targetkernel()\n")
     
     # question: should we use the original blacklist or blacklist filter with refkernel bc dom tree?
-    # question： should we check if the function is renamed?
+    # question: should we check if the function is renamed?
     generate_linelist_targetkernel(refkernel, targetkernel,PATH1, PATH2, "func_line_blacklist.json")
     generate_linelist_targetkernel(refkernel, targetkernel,PATH1, PATH2, "func_line_blacklist_doms.json")
     generate_linelist_targetkernel(refkernel, targetkernel,PATH1, PATH2, "func_line_whitelist_doms.json")
