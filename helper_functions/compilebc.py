@@ -27,9 +27,9 @@ def compile_bc_extra(option, PATH, kernel, filename = None):
     #path = os.path.join(base, 'llvmclang_log')
     #path = os.path.join(base, 'clang_log')
     path = kernel+'/clang_log'
-    #clang_path = '/data2/zheng/clangs/clang11/clang11.0.1/bin/clang'
+    #clang_path = '/data3/zheng/clangs/clang11/clang11.0.1/bin/clang'
     #clang_path = "/home/zzhan173/repos/Linux_kernel_UC_KLEE/build/llvm-project/build/bin/clang"
-    #clang_path = "/data2/zheng/clangs/clang10/clang10/bin/clang"
+    #clang_path = "/data3/zheng/clangs/clang10/clang10/bin/clang"
     #newclang_path = "/home/zzhan173/repos/Linux_kernel_UC_KLEE/build/llvm-project/build/bin/clang"
 
     newcmds = []
@@ -111,7 +111,7 @@ def compile_bc_extra(option, PATH, kernel, filename = None):
         #    if any(bcfile in cmd for bcfile in notcompiledbc):
         #        print(cmd)
     if option == "compile":
-        with open("compile_bc_commands", "w") as f:
+        with open(kernel+"/compile_bc_commands", "w") as f:
             for newcmd in newcmds:
                 f.write(newcmd+"\n")
             #print(newcmd)
@@ -305,6 +305,7 @@ def adapt_CONFIG_LOG_BUF_SHIFT(PATH):
             f.write(line)
 
 def get_config_withoutkasan(PATH):
+    print("get_config_withoutkasan()")
     with open(PATH+"/config", "r") as f:
         s_buf = f.readlines()
     for i in range(len(s_buf)):
@@ -348,7 +349,7 @@ def compile_gcc(PATH, kernel, clang=None):
     result = command(string1)
 
 def get_dryruncommands(kernel):
-    #clang_path = "/data2/zheng/clangs/clang11/clang11.0.1/bin/clang"
+    #clang_path = "/data3/zheng/clangs/clang11/clang11.0.1/bin/clang"
     #string1 = "cd /home/zzhan173/repos/linux;make olddefconfig CC="+clang_path
     string1 = "cd " + kernel +";make olddefconfig CC="+clang_path
     print(string1)
@@ -377,6 +378,6 @@ if __name__ == "__main__":
     elif option == "copy":
         compile_bc_extra("copy", targetdir)
     elif option == "check":
-        compile_bc_extra("check", targetdir)
+        compile_bc_extra("check", None, targetdir)
     elif option == "compilefile":
         compile_bc_extra("compile", None, sys.argv[2])

@@ -23,8 +23,6 @@ def run_klee(arguments):
     helper.command(string1)
 
 def generate_configlist(PATH):
-    configs_dir = PATH + "/configs"
-
     config_file = PATH+"/configs/config_cover_doms.json"
     with open(config_file, "r") as f:
         config_cover_doms = json.load(f)
@@ -49,17 +47,8 @@ def get_configlist(PATH):
     json_files = [configs_dir + "/" + filename for filename in files if filename.endswith('.json')]
     return json_files
 
-if __name__ == "__main__":
+def get_refkernel_results(Type, PATH, specific_hash, symsize=False):
     config_output = []
-    #with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/OOBRcases", "r") as f:
-    #    s_buf = f.readlines()
-    #for syzbothash in s_buf:
-    Type = "UAF"
-    PATH = "/data4/zzhan173/Fixtag_locator/"+Type+"_cases_filter.json"
-    
-    specific_hash = None
-    if len(sys.argv) > 1:
-        specific_hash = sys.argv[1]
     total_skipcases = get_prioritylists.total_skipcases
     with open(PATH, "r") as f:
         syzbothash_info = json.load(f)
@@ -69,6 +58,12 @@ if __name__ == "__main__":
         if specific_hash and syzbothash != specific_hash:
             continue
         PATH = "/data3/zzhan173/" + Type + "/"+syzbothash+"/refkernel"
+        if symsize:
+            result = any_OOBdetected(PATH)
+            if not result:
+                set_99_symsize(PATH)
+            else:
+                continue
         generate_configlist(PATH)
         configlist = get_configlist(PATH)
         for config in configlist:
@@ -81,3 +76,28 @@ if __name__ == "__main__":
 
     with Pool(20) as p:
         p.map(run_klee, config_output)
+
+def any_OOBdetected(PATH):
+    string = "OOB detected"
+    output_path = PATH + "/configs"
+    result = helper.search_string_in_directory(output_path, string)
+    return result
+
+def set_99_symsize(PATH):
+    config_file = PATH+"/configs/config_cover_doms.json"
+    helper.set_config_option(config_file, "99_symsize", True)
+
+if __name__ == "__main__":
+    #with open("/home/zzhan173/Linux_kernel_UC_KLEE/cases/OOBRcases", "r") as f:
+    #    s_buf = f.readlines()
+    #for syzbothash in s_buf:
+    Type = "UAF"
+    PATH = "/data4/zzhan173/Fixtag_locator/"+Type+"_cases_filter.json"
+    specific_hash = None
+    if len(sys.argv) > 1:
+        specific_hash = sys.argv[1]
+    get_refkernel_results(Type, PATH, specific_hash)
+    print("\n\n\n Run with 99_symsize again")
+    get_refkernel_results(Type, PATH, specific_hash, True)
+    
+    

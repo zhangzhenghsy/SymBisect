@@ -99,7 +99,7 @@ def extract_sourceinfo_fromoutput(filepath):
     return filelist,sourceinfolist
 
 home_path = "/home/zzhan173/repos/Linux_kernel_UC_KLEE/build"
-kernel= "/data2/zheng/Linux_bc/4_14_clang11_defconfig/"
+kernel= "/data3/zheng/Linux_bc/4_14_clang11_defconfig/"
 outputfile = "./OOBW/c7a91bc7/built-in2.bc"
 def link_bclist(filelist):
     link_cmd = home_path+"/llvm-project/build/bin/llvm-link -o " + outputfile

@@ -636,8 +636,8 @@ def generate_OOBdetected_entry(PATH):
                 calltrace_len = len(calltrace)
     return entry
 
-def get_config_calltrace(config):
-    with open(config, "r") as f:
+def get_config_calltrace(configpath):
+    with open(configpath, "r") as f:
         config = json.load(f)
     return config["97_calltrace"]
 def check_output_OOBdetected(output):
@@ -645,6 +645,37 @@ def check_output_OOBdetected(output):
         s_buf = f.readlines()
     s_buf = s_buf[-1000:]
     return any("OOB detected in target line" in line for line in s_buf)
+
+def get_config_option(configpath, option):
+    with open(configpath, "r") as f:
+        config = json.load(f)
+    if option not in config:
+        return False
+    return config[option]
+
+def set_config_option(configpath, option, value):
+    with open(configpath, "r") as f:
+        config = json.load(f)
+    config[option] = value
+    with open(configpath, "w") as f:
+        json.dump(config, f, indent=4)
+
+def search_string_in_directory(search_directory, target_string):
+    """
+    Search for the target_string in all files of the specified directory.
+    :param search_directory: The directory to search.
+    :param target_string: The string to search for.
+    :return: True if the string exsits
+    """
+    # Walk through the directory
+    for dirpath, dirnames, filenames in os.walk(search_directory):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            with open(filepath, 'r', encoding='utf-8', errors='ignore') as file:
+                if target_string in file.read():
+                    return True
+
+    return False
 
 if __name__ == "__main__":
     #caller = "netlink_sendmsg"
