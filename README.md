@@ -1,11 +1,6 @@
-# Linux_kernel_UC_KLEE
+# SymBisect
 
-Linux_kernel_UC_KLEE is an under constraint symbolic execution engine for the Linux kernel based on [KLEE](https://github.com/klee/klee).
-
-- KLEE: v2.2
-- LLVM/Clang: 11
-- OS: Ubuntu 20.04
-
+To do
 ## Feature
 
 - handle some the Linux kernel functions, e.g., kmalloc()
